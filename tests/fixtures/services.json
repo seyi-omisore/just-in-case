@@ -1,0 +1,103 @@
+{
+  "_readme": "SAMPLE DATA for building and testing. Every entry with sample=true is a placeholder, not a real program. Leya replaces these with 10 to 12 verified Boston-area services. Keep the same fields. last_verified must be the date someone actually confirmed the entry by phone or official website.",
+  "services": [
+    {
+      "id": "svc_escort_volunteer",
+      "name": "SAMPLE Volunteer Medical Escort Program",
+      "needs": ["ride_home_after_procedure", "check_in_after_procedure"],
+      "areas": ["Boston"],
+      "cost": "free",
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2026-10-01",
+      "phone": "TO BE VERIFIED",
+      "url": "",
+      "how_to_use": "Book at least 2 weeks before the procedure. A trained volunteer rides with you and stays until you are settled at home.",
+      "sample": true
+    },
+    {
+      "id": "svc_coa_rides",
+      "name": "SAMPLE Council on Aging Medical Rides",
+      "needs": ["ride_home_after_procedure", "transportation"],
+      "areas": ["Boston"],
+      "cost": "free",
+      "waitlist": true,
+      "waitlist_note": "Rides fill up. Call as soon as you have a date.",
+      "last_verified": "2026-09-15",
+      "phone": "TO BE VERIFIED",
+      "url": "",
+      "how_to_use": "Call to register, then book each ride ahead of time.",
+      "sample": true
+    },
+    {
+      "id": "svc_paid_companion",
+      "name": "SAMPLE Paid Companion Escort Service",
+      "needs": ["ride_home_after_procedure", "check_in_after_procedure"],
+      "areas": ["Boston", "Cambridge"],
+      "cost": "paid",
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2026-08-20",
+      "phone": "TO BE VERIFIED",
+      "url": "",
+      "how_to_use": "Hourly fee. A trained companion picks you up and stays with you.",
+      "sample": true
+    },
+    {
+      "id": "svc_old_volunteer_drivers",
+      "name": "SAMPLE Neighborhood Volunteer Drivers",
+      "needs": ["transportation", "ride_home_after_procedure"],
+      "areas": ["Boston"],
+      "cost": "free",
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2024-11-02",
+      "phone": "TO BE VERIFIED",
+      "url": "",
+      "how_to_use": "Drivers take you to appointments within the city.",
+      "sample": true
+    },
+    {
+      "id": "svc_utility_medical",
+      "name": "SAMPLE Utility Medical Needs Registration",
+      "needs": ["power_outage"],
+      "areas": ["*"],
+      "cost": "free",
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2026-07-30",
+      "phone": "TO BE VERIFIED",
+      "url": "",
+      "how_to_use": "Ask your electric company about registering a medical need. It can mean protection from shutoff and priority contact during outages.",
+      "sample": true
+    },
+    {
+      "id": "svc_pet_boarding",
+      "name": "SAMPLE Low-Cost Pet Boarding",
+      "needs": ["pet_care_during_stay"],
+      "areas": ["Boston"],
+      "cost": "low",
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2026-09-01",
+      "phone": "TO BE VERIFIED",
+      "url": "",
+      "how_to_use": "Short stays for healthy cats and dogs. Book ahead. Cannot take pets that need medication or special care.",
+      "sample": true
+    },
+    {
+      "id": "svc_home_repair",
+      "name": "SAMPLE Senior Home Repair Program",
+      "needs": ["home_repair"],
+      "areas": ["Boston"],
+      "cost": "free",
+      "waitlist": true,
+      "waitlist_note": "Non-emergency repairs can take several weeks.",
+      "last_verified": "2026-06-10",
+      "phone": "TO BE VERIFIED",
+      "url": "",
+      "how_to_use": "Call to ask if you qualify. Emergency heating repairs may be faster.",
+      "sample": true
+    }
+  ]
+}

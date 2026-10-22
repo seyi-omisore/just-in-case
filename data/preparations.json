@@ -1,0 +1,47 @@
+{
+  "_readme": "Simple preparations that reduce a need without asking anyone for a favor. No medical advice belongs here. The exercise and health sciences teammate can expand fall_at_home using the CDC STEADI 'Check for Safety' home checklist (cite it).",
+  "preparations": [
+    {
+      "id": "prep_key_lockbox",
+      "name": "Key lockbox",
+      "needs": ["spare_key_access", "fall_at_home", "check_in_after_procedure"],
+      "what": "A small lockbox with a code, holding a spare key, near the door. Share the code only with people or services you choose.",
+      "rough_cost": "about $20 to $40"
+    },
+    {
+      "id": "prep_emergency_kit",
+      "name": "Stocked emergency kit",
+      "needs": ["power_outage"],
+      "what": "Flashlight, spare batteries, blanket, water, shelf-stable food for 3 days, a phone power bank, and a printed copy of your card.",
+      "rough_cost": "varies"
+    },
+    {
+      "id": "prep_home_safety_check",
+      "name": "Home fall-safety check",
+      "needs": ["fall_at_home"],
+      "what": "Walk through your home with a simple checklist: clear paths, secure rugs, night lights, and grab bars where you need them.",
+      "rough_cost": "free to check"
+    },
+    {
+      "id": "prep_phone_reachable",
+      "name": "Phone within reach",
+      "needs": ["fall_at_home"],
+      "what": "Keep a charged phone where you can reach it from the floor, such as in a pocket or a low table.",
+      "rough_cost": "free"
+    },
+    {
+      "id": "prep_pet_sheet",
+      "name": "Pet care sheet",
+      "needs": ["pet_care_during_stay"],
+      "what": "One page on the fridge with your pet's food, routine, vet, and where supplies are kept.",
+      "rough_cost": "free"
+    },
+    {
+      "id": "prep_recovery_setup",
+      "name": "Recovery-day setup",
+      "needs": ["check_in_after_procedure"],
+      "what": "Before the procedure, set out easy meals, water, and your card, so the first evening home is simple.",
+      "rough_cost": "free"
+    }
+  ]
+}

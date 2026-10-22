@@ -1,0 +1,22 @@
+{
+  "_readme": "Fictional demo persona. All names and numbers are made up (555-01xx numbers are reserved for fiction). Used for the demo and the evaluation answer key.",
+  "name": "Ruth",
+  "age": 74,
+  "town": "Boston",
+  "story": "Ruth was widowed two years ago and lives alone with her cat, Pepper. She has an outpatient procedure with sedation next month. The clinic told her she needs someone to take her home.",
+  "comfortable_asking_people": true,
+  "friends_she_chooses": ["Marion", "Doris"],
+  "card": {
+    "contacts": [
+      {"name": "Marion Kelly", "relationship": "friend", "phone": "617-555-0142"},
+      {"name": "Doris Chen", "relationship": "neighbor", "phone": "617-555-0177"}
+    ],
+    "medications": ["Blood pressure pill, mornings", "Eye drops, at night"],
+    "pet": {"name": "Pepper (cat)", "caregiver": "Doris Chen"}
+  },
+  "answer_key": {
+    "ride_home_after_procedure": ["svc_escort_volunteer", "svc_coa_rides"],
+    "spare_key_access": ["prep_key_lockbox"],
+    "pet_care_during_stay": ["svc_pet_boarding", "prep_pet_sheet"]
+  }
+}

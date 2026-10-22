@@ -1,0 +1,19 @@
+# Secrets
+.env
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Generated plans and cards (may contain personal info)
+output/*
+!output/.gitkeep
+
+# Editors / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
