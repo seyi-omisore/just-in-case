@@ -123,13 +123,25 @@ a[href^="tel:"] { white-space: nowrap; }
 }
 
 /* ---- Chat ---------------------------------------------------------------- */
+/* The chat stays a fixed size; the conversation scrolls inside it. */
 .chat {
   display: flex; flex-direction: column; gap: 1rem;
   background: var(--paper); border-radius: 22px; padding: 1.25rem;
   border: 2px solid var(--line);
-  min-height: 70vh;
+  height: min(80vh, 820px); min-height: 28rem;
+  position: sticky; top: 1rem;
 }
-.messages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1rem; flex: 1; }
+.messages {
+  list-style: none; margin: 0; padding: 0 .4rem .25rem 0;
+  display: flex; flex-direction: column; gap: 1rem;
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: auto; scrollbar-color: var(--sky) transparent;
+}
+.messages > * { flex-shrink: 0; }  /* never squeeze a message; scroll instead */
+.messages::-webkit-scrollbar { width: 12px; }
+.messages::-webkit-scrollbar-thumb { background: var(--sky); border-radius: 999px; border: 3px solid var(--paper); }
+.chat .starters, .chat .composer, .chat .typing { flex: none; }
+@media (max-width: 900px) { .chat { position: static; height: 75vh; } }
 .msg { display: flex; gap: .7rem; align-items: flex-start; max-width: 46rem; }
 .msg-avatar { width: 2.4rem; height: 2.4rem; flex: none; margin-top: .15rem; }
 .msg-body { padding: .8rem 1.05rem; border-radius: 18px; }
@@ -401,6 +413,18 @@ a[href^="tel:"] { white-space: nowrap; }
   background: var(--paper); font-weight: 400; width: 100%; min-width: 0;
 }
 .task-form input::placeholder { color: var(--ink-soft); opacity: .8; }
+.optional { font-weight: 400; color: var(--ink-soft); }
+.open-chip {
+  display: inline-flex; gap: .25rem; align-items: center; padding: .05rem .55rem; border-radius: 999px;
+  border: 2px dashed var(--route-prep); color: var(--route-prep); font-weight: 700; font-size: .8rem;
+}
+.slip-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.slip-checks label {
+  display: flex; gap: .65rem; align-items: center; min-height: 3rem; padding: .4rem .8rem;
+  border: 2px solid var(--line); border-radius: 12px; cursor: pointer; font-weight: 700;
+}
+.slip-checks label:has(input:checked) { border-color: var(--blue); background: var(--sky-tint); }
+.slip-checks input { width: 1.5rem; height: 1.5rem; accent-color: var(--blue); flex: none; }
 .task-form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
 .task-form-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
 .task-error { color: var(--route-person); font-weight: 700; font-size: .9rem; }

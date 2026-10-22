@@ -46,17 +46,20 @@ def build_card_lines(card: dict, state: PlanState, directory: Directory, today: 
         who = f", looked after by {pet['caregiver']}" if pet.get("caregiver") else ""
         lines += ["MY PET", f"  {pet['name']}{who}", ""]
 
+    sections = card.get("sections", ["helpers", "plan"])
     tasks = getattr(state, "helper_tasks", [])
-    if tasks:
+    if tasks and "helpers" in sections:
         lines += ["WHO IS HELPING"]
         for t in tasks:
             when = ", ".join(x for x in (t.get("date", ""), t.get("time", "")) if x)
-            lines.append(f"  {t['person']}: {t['task']}" + (f" ({when})" if when else ""))
+            task = t["task"] + (f" ({when})" if when else "")
+            lines.append(f"  {task}: {t['person'] or 'open, anyone can sign up'}")
         lines.append("")
 
-    if state.items:
+    items = state.items if "plan" in sections else []
+    if items:
         lines += ["MY PLAN"]
-    for item in state.items:
+    for item in items:
         need = NEEDS[item.need]
         if item.route == "blank":
             lines.append(f"  {need}: not covered yet")

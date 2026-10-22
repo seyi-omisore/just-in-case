@@ -32,7 +32,7 @@ def approve(ws):
     return a
 
 
-def ruth_flow(ws, pet=True):
+def ruth_flow(ws, pet=True, sections=("contacts",)):
     until(ws, "hello")
     first = "I'm Ruth. I have a procedure next month and may stay two nights in the hospital."
     ws.send_json({"type": "say", "text": first + (" My cat needs feeding." if pet else "")})
@@ -41,16 +41,18 @@ def ruth_flow(ws, pet=True):
     ws.send_json({"type": "say", "text": "Yes, I could ask Samantha."})
     note = approve(ws)
     row = approve(ws)
-    until(ws, "agent")
-    ws.send_json({"type": "say", "text": "Samantha Lee 617-555-0142"})
-    until(ws, "agent")
-    ws.send_json({"type": "say", "text": "No medications, thanks."})
+    choose = until(ws, "approval")
+    assert choose["kind"] == "choose_card_sections"
+    ws.send_json({"type": "answer", "id": choose["id"], "ok": True, "choice": list(sections)})
+    if "contacts" in sections:
+        until(ws, "agent")
+        ws.send_json({"type": "say", "text": "Samantha Lee 617-555-0142"})
     card = approve(ws)
     until(ws, "agent")
     return needs, note, row, card, until(ws, "plan")["plan"]
 
 
-def test_full_flow_with_four_checkpoints():
+def test_full_flow_with_all_checkpoints():
     with client.websocket_connect("/ws") as ws:
         needs, note, row, card, plan = ruth_flow(ws)
         assert client.get(plan["card"]).status_code == 200
@@ -120,7 +122,7 @@ def test_user_edits_table_and_downloads_spreadsheet():
         plan = until(ws, "plan")["plan"]
         assert plan["tasks"][0]["task"] == "Drive me home"
         ws.send_json({"type": "table", "action": "add", "row": {"task": "", "person": ""}})
-        assert "needs a task" in until(ws, "table_error")["text"]
+        assert "needs a task" in until(ws, "table_error")["text"].lower()
         csv_text = client.get(f"/table/{sid}.csv").text
         assert "Drive me home,Nov 14,2 pm,Leo" in csv_text
         assert "Drive me home" in client.get(f"/table/{sid}").text
@@ -132,3 +134,19 @@ def test_card_files_are_deleted_when_the_visit_ends():
     with client.websocket_connect("/ws") as ws:
         sid = until(ws, "hello")["session"]
     assert not (OUTPUT_DIR / "sessions" / sid).exists()
+
+
+def test_card_checklist_starts_unticked_and_controls_questions():
+    with client.websocket_connect("/ws") as ws:
+        *_, plan = ruth_flow(ws, sections=())
+        page = client.get(plan["card"]).text
+    assert "IN AN EMERGENCY, CALL 911" in page
+    assert "People to contact" not in page and "My medications" not in page and "My plan" not in page
+
+
+def test_open_rows_from_the_page():
+    with client.websocket_connect("/ws") as ws:
+        sid = until(ws, "hello")["session"]
+        ws.send_json({"type": "table", "action": "add", "row": {"task": "Rides to PT", "person": ""}})
+        assert until(ws, "plan")["plan"]["tasks"][0]["person"] == ""
+        assert "Open: add your name" in client.get(f"/table/{sid}").text

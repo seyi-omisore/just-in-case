@@ -45,7 +45,16 @@ def describe(short: str, data: dict) -> str:
     return json.dumps(data, indent=2)
 
 
-async def terminal_approver(short: str, data: dict) -> bool:
+async def terminal_approver(short: str, data: dict):
+    if short == "choose_card_sections":
+        from .state import CARD_SECTIONS
+        print("\nWhat would you like on your fridge card? (911 and 988 are always on it.)")
+        picked = []
+        for key, label in CARD_SECTIONS.items():
+            ans = await asyncio.to_thread(input, f"  {label}? (y/n): ")
+            if ans.strip().lower().startswith("y"):
+                picked.append(key)
+        return picked
     print("\n" + "=" * 60 + "\nPLEASE REVIEW\n" + describe(short, data) + "\n" + "=" * 60)
     answer = await asyncio.to_thread(input, "Approve? (y/n): ")
     return answer.strip().lower().startswith("y")
@@ -67,7 +76,11 @@ def make_gate(approver: Approver, trace=print):
                 trace(f"  [rule]  note sent back for rewrite: {problem}")
                 return PermissionResultDeny(message=f"RULE: {problem}")
         # 3. Human checkpoint.
-        if await approver(short, input_data):
+        answer = await approver(short, input_data)
+        if short == "choose_card_sections" and isinstance(answer, list):
+            # The user's own ticks replace whatever the agent suggested.
+            return PermissionResultAllow(updated_input={"sections": answer})
+        if answer:
             return PermissionResultAllow(updated_input=input_data)
         trace(f"  [human] user declined {short}")
         return PermissionResultDeny(

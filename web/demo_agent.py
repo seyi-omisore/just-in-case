@@ -58,6 +58,9 @@ class DemoAgent:
         self.turn = 0
         self.task = ""
         self.contacts: list[dict] = []
+        self.meds: list[str] = []
+        self.pet = ""
+        self.queue: list[str] = []
         self.cost_usd = 0.0
         self.transcript: list[tuple[str, str]] = []
 
@@ -82,6 +85,8 @@ class DemoAgent:
             data = {"need": args[0]}
         elif short == "add_to_plan":
             data = {"need": args[0], "route": args[1]}
+        elif short == "choose_card_sections":
+            data = {"sections": []}
         elif short == "add_helper_task":
             data = {"task": args[0], "person": args[1], "date": args[2], "time": args[3]}
         self.on_tool(short, data)
@@ -89,6 +94,8 @@ class DemoAgent:
         decision = await self.gate(PREFIX + short, data, None)
         if decision.__class__.__name__ == "PermissionResultDeny":
             return None
+        if short == "choose_card_sections":  # use the user's own ticks
+            args = (decision.updated_input.get("sections", []),)
         try:
             result = fn(*args)
             if self.state.trace:
@@ -97,6 +104,23 @@ class DemoAgent:
         except ToolError as e:
             self.trace(f"  [rule]  blocked: {e}")
             return None
+
+    async def _next_card_step(self) -> str:
+        """Ask about the next section the user ticked, or make the card."""
+        questions = {"contacts": "Who would you like on your card, and what are their phone numbers?",
+                     "medications": "Which medications would you like listed? Please use your own words.",
+                     "pet": "Tell me about your pet: their name, and who looks after them."}
+        if self.queue:
+            return questions[self.queue[0]]
+        self.turn = 9
+        st = self.state
+        me = re.search(r"\b(?:I'm|I am|my name is)\s+([A-Z][a-z]+)", st.heard())
+        card = await self._call("make_fridge_card", self.box.make_fridge_card, me.group(1) if me else "",
+                                self.contacts, self.meds, self.pet, "")
+        if card is None:
+            return "Of course. What would you like to change on the card?"
+        return ("Your fridge card is ready. You can print it and put it on the fridge.\n\n"
+                "Let's look at this plan again in a few months.")
 
     async def send(self, user_text: str, on_text=print) -> str:
         self.transcript.append(("user", user_text))
@@ -178,27 +202,20 @@ class DemoAgent:
                     for n in names:
                         await self._call("add_helper_task", b.add_helper_task, self.task[0].upper() + self.task[1:], n, "", "")
                     lines.append(f"- **Note:** I wrote a short note to {who}. You can send it yourself.")
-            return ("Here's your plan so far.\n\n" + "\n".join(lines) +
-                    "\n\nNow your fridge card. Who would you like on it, and what are their phone numbers?")
+            await self._call("choose_card_sections", b.choose_card_sections, [])
+            self.queue = [k for k in ("contacts", "medications", "pet") if k in (st.card_sections or [])]
+            return "Here's your plan so far.\n\n" + "\n".join(lines) + "\n\n" + await self._next_card_step()
 
         if self.turn == 2:
-            self.turn = 3
-            self.contacts = [] if NO.search(text) else [
-                {"name": n, "relationship": "", "phone": ph}
-                for n, ph in re.findall(r"([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\D{0,20}?(" + PHONE + ")", text)]
-            return "Are there any medications you'd like listed on the card? You can say no."
-
-        if self.turn == 3:
-            self.turn = 4
-            meds = [] if NO.search(text) else [m.strip(" .") for m in re.split(r"[;,\n]|\band\b", text) if m.strip(" .")]
-            me = re.search(r"\b(?:I'm|I am|my name is)\s+([A-Z][a-z]+)", st.heard())
-            card = await self._call("make_fridge_card", b.make_fridge_card, me.group(1) if me else "",
-                                    self.contacts, meds, "", "")
-            if card is None:
-                self.turn = 3
-                return "Of course. What would you like to change on the card?"
-            return ("Your fridge card is ready. You can print it and put it on the fridge.\n\n"
-                    "Let's look at this plan again in a few months.")
+            current = self.queue.pop(0) if self.queue else None
+            if current == "contacts" and not NO.search(text):
+                self.contacts = [{"name": n, "relationship": "", "phone": ph}
+                                 for n, ph in re.findall(r"([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\D{0,20}?(" + PHONE + ")", text)]
+            elif current == "medications" and not NO.search(text):
+                self.meds = [m.strip(" .") for m in re.split(r"[;,\n]|\band\b", text) if m.strip(" .")]
+            elif current == "pet" and not NO.search(text):
+                self.pet = text.strip(" .")[:60]
+            return await self._next_card_step()
 
         return ("This is the demo version, so it follows a set path. Turn on the real agent "
                 "to keep talking.")

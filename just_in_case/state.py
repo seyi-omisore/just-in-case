@@ -24,6 +24,15 @@ NEEDS: dict[str, str] = {
 
 ROUTES = ("service", "preparation", "person", "blank")
 
+# What can go on the fridge card. The user ticks these; nothing is assumed.
+CARD_SECTIONS: dict[str, str] = {
+    "contacts": "People to contact",
+    "medications": "My medications",
+    "pet": "My pet and who looks after it",
+    "helpers": "Who's helping",
+    "plan": "My plan",
+}
+
 
 @dataclass
 class PlanItem:
@@ -48,6 +57,8 @@ class PlanState:
     user_said: list[str] = field(default_factory=list)
     # The helper table: [{"id", "task", "date", "time", "person"}]
     helper_tasks: list[dict] = field(default_factory=list)
+    # Card sections the user picked. None means we have not asked yet.
+    card_sections: list[str] | None = None
     next_task_id: int = 1
 
     def people_allowed(self) -> bool:

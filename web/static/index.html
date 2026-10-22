@@ -108,7 +108,7 @@
           <svg class="icon" aria-hidden="true"><use href="#i-person"/></svg>
           Who's helping
         </h2>
-        <p class="helper-intro">Each task and the person helping. Add or change any row.</p>
+        <p class="helper-intro">Things you'd like help with. Leave the name blank and family can sign up.</p>
         <p id="table-empty" class="table-empty">No one is in your table yet.</p>
         <table id="helper-table" class="helper-table" hidden>
           <thead><tr><th scope="col">Task</th><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Who</th><th scope="col"><span class="sr-only">Change</span></th></tr></thead>
@@ -117,8 +117,8 @@
 
         <form id="task-form" class="task-form">
           <p class="task-form-title" id="task-form-title">Add a row</p>
-          <label>Task <input name="task" required maxlength="120" placeholder="For example: pick up groceries"></label>
-          <label>Who is helping <input name="person" required maxlength="120" placeholder="Their name"></label>
+          <label>What do you need help with? <input name="task" required maxlength="120" placeholder="For example: pick up groceries"></label>
+          <label>Who is helping <span class="optional">(optional)</span> <input name="person" maxlength="120" placeholder="Leave blank so family can sign up"></label>
           <div class="task-form-pair">
             <label>Date <input name="date" maxlength="120" placeholder="Like Nov 14"></label>
             <label>Time <input name="time" maxlength="120" placeholder="Like morning"></label>
@@ -140,7 +140,7 @@
             <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg> Print table
           </button>
         </div>
-        <p class="helper-small">The spreadsheet opens in Excel, Numbers, or Google Sheets. You choose who to send it to.</p>
+        <p class="helper-small">The spreadsheet opens in Excel, Numbers, or Google Sheets. You choose who gets it.</p>
       </section>
 
       <details id="support" class="helper-box support-box">

@@ -21,13 +21,14 @@ from .card import write_card
 from .config import MAX_HELPERS, OUTPUT_DIR
 from .directory import Directory
 from .safeguards import ESCORT_RULE_LINE, FALLBACK_LINE, check_helper_note, safe_cell, said_by_user
-from .state import NEEDS, ROUTES, PlanItem, PlanState
+from .state import CARD_SECTIONS, NEEDS, ROUTES, PlanItem, PlanState
 
 SERVER_NAME = "jic"
 PREFIX = f"mcp__{SERVER_NAME}__"
 
 # Tools that pause for the user's approval (the three human checkpoints).
-GATED_TOOLS = {"confirm_needs", "draft_helper_note", "add_helper_task", "make_fridge_card"}
+GATED_TOOLS = {"confirm_needs", "draft_helper_note", "add_helper_task",
+               "choose_card_sections", "make_fridge_card"}
 TASK_FIELDS = ("task", "date", "time", "person")
 MAX_FIELD = 120
 
@@ -142,8 +143,30 @@ class Toolbox:
                 "note_text": note_text}
 
     # ---- checkpoint 3 -------------------------------------------------------
+    def choose_card_sections(self, sections: list[str]) -> dict:
+        """CHECKPOINT. The user ticks what goes on the card. The list that arrives
+        here is the user's own choice from the checklist, not the agent's guess."""
+        bad = [x for x in sections if x not in CARD_SECTIONS]
+        if bad:
+            raise ToolError(f"Unknown card sections {bad}. Use only: {list(CARD_SECTIONS)}")
+        self.state.card_sections = list(dict.fromkeys(sections))
+        self.state.log(f"checkpoint: card sections chosen {self.state.card_sections}")
+        picked = [CARD_SECTIONS[x] for x in self.state.card_sections]
+        return {"user_picked": self.state.card_sections,
+                "next": ("Ask only about these, one at a time: " + ", ".join(picked)) if picked
+                else "The user picked nothing extra. Make the card with just the emergency lines."}
+
     def make_fridge_card(self, name: str, contacts: list[dict], medications: list[str],
                          pet_name: str = "", pet_caregiver: str = "") -> dict:
+        chosen = self.state.card_sections
+        if chosen is None:
+            raise ToolError("First ask what the user wants on the card: call choose_card_sections.")
+        not_chosen = [label for key, given in (("contacts", contacts), ("medications", medications),
+                                                ("pet", pet_name))
+                      if given and key not in chosen for label in [CARD_SECTIONS[key]]]
+        if not_chosen:
+            raise ToolError("The user did not pick these for the card: " + ", ".join(not_chosen)
+                            + ". Leave them off.")
         # Every detail must come from what the user typed. Nothing assumed.
         heard = self.state.heard()
         missing = []
@@ -167,7 +190,8 @@ class Toolbox:
                 + "; ".join(missing) + ". Ask the user instead of filling it in, or leave it off."
             )
         card = {"name": name, "contacts": contacts, "medications": medications,
-                "pet": {"name": pet_name, "caregiver": pet_caregiver} if pet_name else None}
+                "pet": {"name": pet_name, "caregiver": pet_caregiver} if pet_name else None,
+                "sections": list(chosen)}
         self.card = card  # kept so the card can refresh when the plan or table changes
         path = write_card(card, self.state, self.dir, self.today, self.out_dir)
         self.state.card_path = str(path)
@@ -178,25 +202,26 @@ class Toolbox:
     # ---- helper table ---------------------------------------------------------
     def _clean_task(self, row: dict) -> dict:
         out = {k: str(row.get(k, "") or "").strip()[:MAX_FIELD] for k in TASK_FIELDS}
-        if not out["task"] or not out["person"]:
-            raise ToolError("Each row needs a task and a person.")
-        return out
+        if not out["task"]:
+            raise ToolError("Each row needs a task.")
+        return out  # person may be blank: an open task family can sign up for
 
-    def add_helper_task(self, task: str, person: str, date: str = "", time: str = "") -> dict:
-        """Agent adds a row (checkpoint). Only for people the user named and chose."""
+    def add_helper_task(self, task: str, person: str = "", date: str = "", time: str = "") -> dict:
+        """Agent adds a row (checkpoint). Leave person blank for an open task
+        family can sign up for. A named person must be someone the user named."""
         s = self.state
         if not s.people_allowed():
             raise ToolError("People are not part of this plan, so do not add helper rows.")
-        if not said_by_user(person, s.heard(), name=True):
-            raise ToolError(f"The user has not named {person}. Ask who they would like to ask.")
-        people = {t["person"].lower() for t in s.helper_tasks} | {person.lower()}
+        if person and not said_by_user(person, s.heard(), name=True):
+            raise ToolError(f"The user has not named {person}. Leave the person blank instead.")
+        people = {t["person"].lower() for t in s.helper_tasks if t["person"]} | ({person.lower()} if person else set())
         if len(people) > MAX_HELPERS:
             raise ToolError(f"Keep the plan small: at most {MAX_HELPERS} people in the table.")
         row = self._clean_task({"task": task, "person": person, "date": date, "time": time})
         row["id"] = s.next_task_id
         s.next_task_id += 1
         s.helper_tasks.append(row)
-        s.log(f"checkpoint: helper row added for {row['person']}")
+        s.log(f"checkpoint: helper row added for {row['person'] or 'anyone (open)'}")
         self.refresh_card()
         return {"added": row, "note": "The user can edit or remove this row any time."}
 
@@ -345,15 +370,25 @@ def build_server(box: Toolbox, trace=print):
         return await run(box.draft_helper_note, args["helper_names"], args["role"], args["note_text"])
 
     @tool("add_helper_task",
-          "CHECKPOINT. Add one row to the user's helper table: a task, the person the user chose, "
-          "and a date and time if the user gave them. Only for people the user named.",
+          "CHECKPOINT. Add one row to the user's helper table: something they would like help with, "
+          "plus a date and time if they gave them. Leave person blank so family can sign up, or use "
+          "a name only if the user named that person for this task.",
           {"type": "object", "properties": {
               "task": {"type": "string"}, "person": {"type": "string"},
               "date": {"type": "string"}, "time": {"type": "string"}},
-           "required": ["task", "person"]})
+           "required": ["task"]})
     async def add_helper_task(args):
-        return await run(box.add_helper_task, args["task"], args["person"],
+        return await run(box.add_helper_task, args["task"], args.get("person", ""),
                          args.get("date", ""), args.get("time", ""))
+
+    @tool("choose_card_sections",
+          "CHECKPOINT. Before asking anything about the fridge card, show the user a checklist of "
+          "what can go on it. The user ticks what they want. Then ask only about those.",
+          {"type": "object", "properties": {
+              "sections": {"type": "array", "items": {"type": "string", "enum": list(CARD_SECTIONS)}}},
+           "required": []})
+    async def choose_card_sections(args):
+        return await run(box.choose_card_sections, args.get("sections", []))
 
     @tool("make_fridge_card",
           "CHECKPOINT. Create the printable card. Use ONLY details the user typed. Never add medical content.",
@@ -383,7 +418,7 @@ def build_server(box: Toolbox, trace=print):
         return _ok(box.review_plan())
 
     tools = [confirm_needs, set_comfort, find_services, find_preparations,
-             add_to_plan, draft_helper_note, add_helper_task, make_fridge_card,
+             add_to_plan, draft_helper_note, add_helper_task, choose_card_sections, make_fridge_card,
              get_support_lines, review_plan]
     server = create_sdk_mcp_server(name=SERVER_NAME, version="0.1.0", tools=tools)
     names = [PREFIX + t.name for t in tools]

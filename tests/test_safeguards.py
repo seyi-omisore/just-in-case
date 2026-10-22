@@ -18,9 +18,20 @@ TODAY = date(2026, 10, 19)
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+ALL_SECTIONS = ["contacts", "medications", "pet", "helpers", "plan"]
+
+
 @pytest.fixture
-def box(tmp_path):
+def fresh(tmp_path):
+    """A brand-new visit: nothing chosen yet."""
     return Toolbox(PlanState(town="Boston"), Directory(FIXTURES, today=TODAY), out_dir=tmp_path, today=TODAY)
+
+
+@pytest.fixture
+def box(fresh):
+    """Most tests: the user already ticked every card section."""
+    fresh.choose_card_sections(ALL_SECTIONS)
+    return fresh
 
 
 def test_free_services_rank_first(box):
@@ -207,8 +218,10 @@ def test_agent_adds_helper_row_only_for_named_people(box):
     box.state.user_said.append("Samantha could feed the cat on the 14th.")
     with pytest.raises(ToolError, match="has not named"):
         box.add_helper_task("Feed the cat", "Marion")
+    open_row = box.add_helper_task("Pick up groceries")["added"]
+    assert open_row["person"] == ""
     row = box.add_helper_task("Feed the cat", "Samantha", "Nov 14", "Evening")["added"]
-    assert row["person"] == "Samantha" and row["id"] == 1
+    assert row["person"] == "Samantha" and row["id"] == 2
 
 
 def test_no_helper_rows_in_burden_mode(box):
@@ -239,14 +252,14 @@ def test_spreadsheet_download_cannot_run_formulas(box):
 def test_card_lists_who_is_helping(box):
     box.state.user_said.append("I'm Ruth.")
     box.user_edit_task("add", {"task": "Feed the cat", "person": "Samantha", "date": "Nov 14"})
-    assert "Samantha: Feed the cat (Nov 14)" in card_text(box.make_fridge_card("Ruth", [], []))
+    assert "Feed the cat (Nov 14): Samantha" in card_text(box.make_fridge_card("Ruth", [], []))
 
 
 def test_card_refreshes_when_table_changes(box):
     box.state.user_said.append("I'm Ruth.")
     out = box.make_fridge_card("Ruth", [], [])
     box.user_edit_task("add", {"task": "Drive me home", "person": "Leo"})
-    assert "Leo: Drive me home" in card_text(out)
+    assert "Drive me home: Leo" in card_text(out)
     box.user_edit_task("delete", {"id": box.state.helper_tasks[0]["id"]})
     assert "Leo" not in card_text(out)
 
@@ -258,3 +271,45 @@ def test_card_names_the_chosen_helper(box):
     box.add_to_plan("pet_care_during_stay", "person")
     box.draft_helper_note(["Tasha"], "feed my dog", "Hi Tasha. Could you feed my dog? No pressure at all.")
     assert "Care for a pet during a hospital stay: Tasha" in card_text(box.make_fridge_card("Ruth", [], []))
+
+
+def test_open_task_without_a_name(box):
+    box.state.user_said.append("I'm Ruth.")
+    box.user_edit_task("add", {"task": "Rides to physical therapy", "date": "Tuesdays"})
+    assert box.state.helper_tasks[0]["person"] == ""
+    assert "Rides to physical therapy (Tuesdays): open, anyone can sign up" in card_text(
+        box.make_fridge_card("Ruth", [], []))
+
+
+# ---- Card checklist -------------------------------------------------------------
+
+def test_card_needs_the_checklist_first(fresh):
+    fresh.state.user_said.append("I'm Ruth.")
+    with pytest.raises(ToolError, match="choose_card_sections"):
+        fresh.make_fridge_card("Ruth", [], [])
+
+
+def test_card_blocks_sections_the_user_did_not_tick(fresh):
+    fresh.state.user_said.append("I'm Ruth. Marion 617-555-0142. Eye drops at night.")
+    fresh.choose_card_sections(["contacts"])
+    with pytest.raises(ToolError, match="did not pick"):
+        fresh.make_fridge_card("Ruth", [], ["Eye drops at night"])
+    txt = card_text(fresh.make_fridge_card(
+        "Ruth", [{"name": "Marion", "relationship": "", "phone": "617-555-0142"}], []))
+    assert "Marion" in txt and "MEDICATIONS" not in txt
+
+
+def test_ticking_nothing_gives_just_the_emergency_lines(fresh):
+    fresh.state.user_said.append("I'm Ruth.")
+    fresh.confirm_needs(["spare_key_access"])
+    fresh.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    fresh.user_edit_task("add", {"task": "Rides"})
+    fresh.choose_card_sections([])
+    txt = card_text(fresh.make_fridge_card("Ruth", [], []))
+    assert "911" in txt and "988" in txt
+    assert "MY PLAN" not in txt and "WHO IS HELPING" not in txt
+
+
+def test_unknown_section_rejected(fresh):
+    with pytest.raises(ToolError):
+        fresh.choose_card_sections(["social_security_number"])

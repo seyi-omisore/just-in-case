@@ -22,6 +22,16 @@
       "last_verified": "2026-10-21"
     },
     {
+      "id": "line_age_strong",
+      "name": "Age Strong Commission (Boston's Council on Aging)",
+      "how_to_reach": "Call 617-635-4366",
+      "hours": "Call for hours",
+      "kind": "find_help",
+      "what": "The City of Boston's office for older adults. They can help with rides, meals, help at home, and staying connected.",
+      "url": "https://www.boston.gov/departments/age-strong-commission",
+      "last_verified": "2026-10-22"
+    },
+    {
       "id": "line_mass211",
       "name": "Mass 211",
       "how_to_reach": "Dial 2-1-1 or call 877-211-6277",

@@ -66,9 +66,9 @@
     return frag;
   }
 
+  // Scroll inside the chat box only, so the page itself does not grow or jump.
   function scrollChat() {
-    const last = messages.lastElementChild;
-    if (last) last.scrollIntoView({ block: "end", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    messages.scrollTop = messages.scrollHeight;
   }
 
   // ---- messages ----------------------------------------------------------
@@ -95,7 +95,9 @@
     draft_helper_note: "Here is a note you can send",
     make_fridge_card: "Here is what goes on your fridge card",
     add_helper_task: "Add this to your helper table?",
+    choose_card_sections: "What would you like on your fridge card?",
   };
+  const SECTION_ICON = { contacts: "phone", medications: "note", pet: "paw", helpers: "person", plan: "home" };
   function addApproval(msg) {
     const { id, kind, data } = msg;
     const li = el("li", "slip");
@@ -111,10 +113,21 @@
       body.appendChild(el("p", null, "For " + data.to.join(" and ") + ". We never send it. You send it yourself if you like."));
       const note = el("div", "sticky"); const nh = el("span", "sticky-head"); nh.append(icon("note"), document.createTextNode("Your note"));
       note.append(nh, el("p", null, data.text)); body.appendChild(note);
+    } else if (kind === "choose_card_sections") {
+      body.appendChild(el("p", null, "Tick anything you want. The 911 and 988 lines are always on it."));
+      const ul = el("ul", "slip-checks");
+      for (const o of data.options) {
+        const li2 = el("li"); const lab = el("label");
+        const cb = el("input"); cb.type = "checkbox"; cb.value = o.key;
+        lab.append(cb, icon(SECTION_ICON[o.key] || "check"), document.createTextNode(o.label));
+        li2.appendChild(lab); ul.appendChild(li2);
+      }
+      body.appendChild(ul);
     } else if (kind === "add_helper_task") {
       const dl = el("dl");
       const row = (t, d) => { if (d) dl.append(el("dt", null, t), el("dd", null, d)); };
-      row("Task", data.task); row("Who is helping", data.person); row("Date", data.date); row("Time", data.time);
+      row("Task", data.task); row("Who is helping", data.person || "Open: family can sign up");
+      row("Date", data.date); row("Time", data.time);
       body.appendChild(dl);
       body.appendChild(el("p", "helper-small", "You can change or remove it later."));
     } else if (kind === "make_fridge_card") {
@@ -132,21 +145,36 @@
     const actions = el("div", "slip-actions");
     const yes = el("button", "btn btn-primary"); yes.type = "button"; yes.append(icon("check"), document.createTextNode("Yes, looks good"));
     const no = el("button", "btn btn-quiet"); no.type = "button"; no.append(icon("pencil"), document.createTextNode("Change something"));
+    const isChoice = kind === "choose_card_sections";
     const answer = (ok) => {
-      ws.send(JSON.stringify({ type: "answer", id, ok }));
+      const msg = { type: "answer", id, ok };
+      let doneText = ok ? "You said yes" : "You asked for a change";
+      if (isChoice) {
+        const picked = [...body.querySelectorAll("input[type=checkbox]")];
+        msg.choice = picked.filter((c) => c.checked).map((c) => c.value);
+        picked.forEach((c) => (c.disabled = true));
+        const names = picked.filter((c) => c.checked).map((c) => c.parentElement.textContent.trim());
+        doneText = names.length ? "You picked: " + names.join(", ") : "You picked just the emergency lines";
+      }
+      ws.send(JSON.stringify(msg));
       actions.remove();
+      if (busy) typing.hidden = false;
       const done = el("p", "slip-done " + (ok ? "yes" : "no"));
-      done.append(icon(ok ? "check" : "pencil"), document.createTextNode(ok ? "You said yes" : "You asked for a change"));
+      done.append(icon(ok ? "check" : "pencil"), document.createTextNode(doneText));
       li.appendChild(done);
       if (!ok) input.focus();
     };
     yes.onclick = () => answer(true);
     no.onclick = () => answer(false);
-    actions.append(yes, no);
+    if (isChoice) {
+      yes.replaceChildren(icon("check"), document.createTextNode("Continue"));
+      actions.append(yes);
+    } else actions.append(yes, no);
     li.append(head, body, actions);
     messages.appendChild(li);
     scrollChat();
     yes.focus({ preventScroll: true });
+    typing.hidden = true;  // waiting for her answer, not thinking
   }
 
   // ---- activity feed -----------------------------------------------------
@@ -229,7 +257,7 @@
   // ---- connection --------------------------------------------------------
   function setBusy(on) {
     busy = on; typing.hidden = !on; sendBtn.disabled = on;
-    if (on) typing.scrollIntoView({ block: "end" });
+    if (on) scrollChat();
   }
 
   function connect() {
@@ -300,7 +328,9 @@
     for (const t of tasks) {
       const tr = el("tr", seenTasks.has(t.id) ? "" : "new-row"); seenTasks.add(t.id);
       const td = (v, label, cls) => { const c = el("td", cls || "", v || ""); if (label) c.dataset.label = label; return c; };
-      tr.append(td(t.task, "Task"), td(t.date, "Date"), td(t.time, "Time"), td(t.person, "Who", "who"));
+      const whoCell = td(t.person, "Who", "who");
+      if (!t.person) { whoCell.replaceChildren(); const chip = el("span", "open-chip"); chip.append(icon("plus"), document.createTextNode("Open")); whoCell.appendChild(chip); }
+      tr.append(td(t.task, "Task"), td(t.date, "Date"), td(t.time, "Time"), whoCell);
       const act = el("td"); const box = el("div", "row-actions");
       const edit = el("button"); edit.type = "button"; edit.setAttribute("aria-label", "Change " + t.task); edit.title = "Change";
       edit.append(icon("pencil"), document.createTextNode("Change"));
@@ -334,7 +364,7 @@
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const row = {}; for (const k of ["task", "person", "date", "time"]) row[k] = form.elements[k].value.trim();
-    if (!row.task || !row.person) { $("task-error").textContent = "Please add a task and who is helping."; return; }
+    if (!row.task) { $("task-error").textContent = "Please add a task."; return; }
     if (editingId != null) { row.id = editingId; sendTable("update", row); } else sendTable("add", row);
     resetForm();
   });

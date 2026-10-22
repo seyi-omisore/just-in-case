@@ -30,7 +30,7 @@ from fastapi.staticfiles import StaticFiles
 
 from just_in_case.config import DATA_DIR, OUTPUT_DIR
 from just_in_case.prompts import GREETING
-from just_in_case.state import NEEDS
+from just_in_case.state import CARD_SECTIONS, NEEDS
 
 STATIC = Path(__file__).parent / "static"
 DEMO = os.getenv("JIC_DEMO") == "1"
@@ -58,6 +58,7 @@ def describe_tool(short: str, data: dict) -> tuple[str, str] | None:
         "add_to_plan": ("add", f"Adding to your plan: {need.lower()}"),
         "draft_helper_note": ("write", "Writing a note for you to look over"),
         "add_helper_task": ("add", "Adding a row to your helper table"),
+        "choose_card_sections": ("ask", "Asking what you'd like on your fridge card"),
         "make_fridge_card": ("card", "Making your fridge card"),
         "get_support_lines": ("heart", "Finding people you can talk to"),
         "review_plan": ("search", "Checking your plan"),
@@ -106,7 +107,7 @@ class Session:
             self.emit({"type": "activity", "kind": d[0], "text": d[1]})
         self.emit({"type": "plan", "plan": self.plan()})
 
-    async def approver(self, short: str, data: dict) -> bool:
+    async def approver(self, short: str, data: dict):
         """Checkpoint: show Yes / Change buttons and wait for the user."""
         aid = uuid.uuid4().hex[:8]
         fut = asyncio.get_running_loop().create_future()
@@ -124,6 +125,9 @@ class Session:
         if short == "draft_helper_note":
             return {"to": data.get("helper_names", []), "role": data.get("role", ""),
                     "text": data.get("note_text", "")}
+        if short == "choose_card_sections":
+            # Every box starts unticked. The agent's suggestion is not shown.
+            return {"options": [{"key": k, "label": v} for k, v in CARD_SECTIONS.items()]}
         if short == "add_helper_task":
             return {k: data.get(k, "") for k in ("task", "person", "date", "time")}
         if short == "make_fridge_card":
@@ -132,10 +136,13 @@ class Session:
                     "pet": data.get("pet_name", ""), "pet_caregiver": data.get("pet_caregiver", "")}
         return data
 
-    def answer(self, aid: str, ok: bool) -> None:
+    def answer(self, aid: str, ok: bool, choice=None) -> None:
         fut = self.pending.get(aid)
         if fut and not fut.done():
-            fut.set_result(bool(ok))
+            if isinstance(choice, list):
+                fut.set_result([str(c) for c in choice if str(c) in CARD_SECTIONS])
+            else:
+                fut.set_result(bool(ok))
 
     # -- plan snapshot for the fridge panel ---------------------------------
     def plan(self) -> dict:
@@ -264,7 +271,7 @@ async def table_print(sid: str):
         return JSONResponse({"error": "Not found"}, status_code=404)
     e = htmlmod.escape
     rows = "".join(f"<tr><td>{e(t['task'])}</td><td>{e(t['date'])}</td><td>{e(t['time'])}</td>"
-                   f"<td>{e(t['person'])}</td></tr>" for t in s.agent.state.helper_tasks)
+                   f"<td>{e(t['person']) or '<em>Open: add your name</em>'}</td></tr>" for t in s.agent.state.helper_tasks)
     rows = rows or '<tr><td colspan="4">No rows yet.</td></tr>'
     return HTMLResponse(f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>Who is helping</title>
@@ -304,7 +311,7 @@ async def ws_endpoint(ws: WebSocket):
                 tasks.add(t)
                 t.add_done_callback(tasks.discard)
             elif msg.get("type") == "answer":
-                s.answer(str(msg.get("id")), bool(msg.get("ok")))
+                s.answer(str(msg.get("id")), bool(msg.get("ok")), msg.get("choice"))
             elif msg.get("type") == "table" and isinstance(msg.get("row"), dict):
                 s.edit_table(str(msg.get("action")), msg["row"])
     except WebSocketDisconnect:
