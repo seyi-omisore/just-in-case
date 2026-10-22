@@ -5,7 +5,8 @@
   const $ = (id) => document.getElementById(id);
   const messages = $("messages"), feed = $("feed"), planEl = $("plan");
   const input = $("message"), sendBtn = $("send"), typing = $("typing");
-  let ws, sessionId, busy = false, seenItems = new Set();
+  let ws, sessionId, busy = false, seenItems = new Set(), cardUrl = null;
+  const USPS_HOLD = "https://holdmail.usps.com/holdmail/";
 
   // ---- small helpers -----------------------------------------------------
   const el = (tag, cls, text) => {
@@ -39,11 +40,13 @@
   // Turn the agent's simple markdown into safe DOM: paragraphs, "- " lists,
   // **bold**, and tappable phone numbers.
   function inline(parent, text) {
-    const parts = text.split(/(\*\*[^*]+\*\*|\b\d{3}-\d{3}-\d{4}\b)/g);
+    // Phone numbers: 617-482-1510, 1-800-243-4636, 988, 2-1-1, 911.
+    const PHONE = /^(?:1-)?\d{3}-\d{3}-\d{4}$|^(?:988|911|2-1-1)$/;
+    const parts = text.split(/(\*\*[^*]+\*\*|\b(?:1-)?\d{3}-\d{3}-\d{4}\b|\b2-1-1\b|\b988\b|\b911\b)/g);
     for (const p of parts) {
       if (!p) continue;
-      if (p.startsWith("**") && p.endsWith("**")) parent.appendChild(el("strong", null, p.slice(2, -2)));
-      else if (/^\d{3}-\d{3}-\d{4}$/.test(p)) {
+      if (p.startsWith("**") && p.endsWith("**")) inline(parent.appendChild(el("strong")), p.slice(2, -2));
+      else if (PHONE.test(p)) {
         const a = el("a", null, p); a.href = "tel:" + p.replace(/-/g, ""); parent.appendChild(a);
       } else parent.appendChild(document.createTextNode(p));
     }
@@ -145,6 +148,9 @@
     li.append(dot, el("span", null, text));
     feed.appendChild(li);
     feed.scrollTop = feed.scrollHeight;
+    if (kind === "heart") {
+      const box = $("support"); box.open = true; box.classList.add("glow");
+    }
   }
 
   // ---- the fridge (plan) -------------------------------------------------
@@ -173,6 +179,11 @@
         a.append(icon("info"), document.createTextNode("Website")); links.appendChild(a);
       }
       if (links.childNodes.length) li.appendChild(links);
+      if (item.need === "mail_while_away") {
+        const a = el("a", "btn btn-primary tag-action"); a.href = USPS_HOLD; a.target = "_blank"; a.rel = "noopener";
+        a.append(icon("mail"), document.createTextNode("Hold my mail on USPS.com"));
+        li.appendChild(a);
+      }
 
       if (item.flags && item.flags.length) {
         const ul = el("ul", "tag-flags");
@@ -193,7 +204,8 @@
     }
 
     const card = $("card-link");
-    if (plan.card) { card.href = plan.card; card.hidden = false; } else card.hidden = true;
+    cardUrl = plan.card;
+    card.hidden = !plan.card;
   }
   // Flags come from the rules in code; show them in friendlier words.
   function plainFlag(f) {
@@ -263,6 +275,40 @@
   applySize();
   $("bigger").onclick = () => { sizeIdx = Math.min(SIZES.length - 1, sizeIdx + 1); applySize(); };
   $("smaller").onclick = () => { sizeIdx = Math.max(0, sizeIdx - 1); applySize(); };
+
+  // ---- fridge card viewer ------------------------------------------------
+  const dialog = $("card-dialog"), frame = $("card-frame");
+  $("card-link").addEventListener("click", () => {
+    if (!cardUrl) return;
+    frame.src = cardUrl + "?t=" + Date.now();
+    dialog.showModal();
+  });
+  $("card-print").addEventListener("click", () => { try { frame.contentWindow.print(); } catch (_) { window.open(cardUrl); } });
+  $("card-close").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
+
+  // ---- people you can talk to ---------------------------------------------
+  fetch("/api/support").then((r) => r.json()).then((lines) => {
+    const ul = $("support-lines");
+    for (const l of lines) {
+      const li = el("li");
+      li.appendChild(el("p", "s-name", l.name));
+      const how = el("p", "s-how"); inline(how, l.how_to_reach); li.appendChild(how);
+      li.appendChild(el("p", "s-what", l.what + (l.hours ? " " + l.hours + "." : "")));
+      ul.appendChild(li);
+    }
+  }).catch(() => {});
+
+  // ---- light / dark (remembered on this device only) ---------------------
+  const setTheme = (t, save = true) => {
+    document.documentElement.dataset.theme = t;
+    $("theme-light").setAttribute("aria-pressed", String(t === "light"));
+    $("theme-dark").setAttribute("aria-pressed", String(t === "dark"));
+    if (save) { try { localStorage.setItem("jic-theme", t); } catch (_) {} }
+  };
+  setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light", false);
+  $("theme-light").onclick = () => setTheme("light");
+  $("theme-dark").onclick = () => setTheme("dark");
 
   connect();
 })();

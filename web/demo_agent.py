@@ -24,9 +24,11 @@ BURDEN = re.compile(r"bother|impose|burden|rather not|don'?t want to ask", re.I)
 
 
 class DemoAgent:
-    def __init__(self, approver, trace=print, on_tool=None, directory: Directory | None = None):
+    def __init__(self, approver, trace=print, on_tool=None, directory: Directory | None = None,
+                 out_dir=None):
         self.state = PlanState(town="Boston")
-        self.box = Toolbox(self.state, directory or Directory())
+        self.box = Toolbox(self.state, directory or Directory(),
+                           **({"out_dir": out_dir} if out_dir else {}))
         self.trace = trace
         self.on_tool = on_tool or (lambda *_: None)
         self.gate = make_gate(approver, trace)

@@ -9,6 +9,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
+  <script>
+    // Pick light or dark before the page draws: saved choice first, then the device setting.
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("jic-theme"); } catch (e) {}
+      if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 15 16 4l12 11v13H4z' fill='%230072B2'/%3E%3Cpath d='M16 25s-6-3.6-6-7.6a3.3 3.3 0 0 1 6-1.9 3.3 3.3 0 0 1 6 1.9c0 4-6 7.6-6 7.6z' fill='%23E69F00'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -31,6 +40,14 @@
       <span class="brand-name">Just in Case</span>
     </a>
     <p class="tagline">A little planning now means less worry later.</p>
+    <div class="theme-switch" role="group" aria-label="Light or dark mode">
+      <button type="button" id="theme-light" aria-label="Light mode" title="Light mode">
+        <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg>
+      </button>
+      <button type="button" id="theme-dark" aria-label="Dark mode" title="Dark mode">
+        <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg>
+      </button>
+    </div>
     <div class="text-size" role="group" aria-label="Text size">
       <button type="button" id="smaller" aria-label="Make text smaller">A<span aria-hidden="true">−</span></button>
       <button type="button" id="bigger" aria-label="Make text bigger">A<span aria-hidden="true">+</span></button>
@@ -80,11 +97,38 @@
         <p id="fridge-empty" class="fridge-empty">Your plan will show up here as we talk.</p>
         <ul id="plan" class="plan"></ul>
         <div id="notes"></div>
-        <a id="card-link" class="btn btn-card" href="#" target="_blank" rel="noopener" hidden>
+        <button type="button" id="card-link" class="btn btn-card" hidden>
           <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg>
-          Open your fridge card
-        </a>
+          See your fridge card
+        </button>
       </section>
+
+      <details id="support" class="helper-box support-box">
+        <summary>
+          <svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg>
+          People you can talk to
+        </summary>
+        <p class="helper-intro">Free, private, and there any time. You decide if and when to call.</p>
+        <ul id="support-lines" class="support-lines"></ul>
+      </details>
+
+      <details id="usps" class="helper-box usps-box">
+        <summary>
+          <svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>
+          Going away? Hold your mail
+        </summary>
+        <p class="helper-intro">The Post Office keeps your mail safe for 3 to 30 days. It's free.</p>
+        <ol class="usps-steps">
+          <li>Sign in to USPS.com, or make a free account.</li>
+          <li>Confirm who you are. If USPS mails you a code, it takes 3 to 5 days, so start a week or more early.</li>
+          <li>Pick the days you'll be away.</li>
+        </ol>
+        <a class="btn btn-primary btn-block" href="https://holdmail.usps.com/holdmail/" target="_blank" rel="noopener">
+          <svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>
+          Go to USPS Hold Mail
+        </a>
+        <p class="helper-small">This opens the official USPS website in a new tab. You sign in there. Just in Case never sees your password.</p>
+      </details>
 
       <section class="activity" aria-labelledby="activity-title">
         <h2 id="activity-title">What Just in Case is doing</h2>
@@ -92,6 +136,19 @@
       </section>
     </aside>
   </main>
+
+  <dialog id="card-dialog" class="card-dialog" aria-labelledby="card-dialog-title">
+    <div class="card-dialog-bar">
+      <h2 id="card-dialog-title">Your fridge card</h2>
+      <div class="card-dialog-actions">
+        <button type="button" id="card-print" class="btn btn-primary">
+          <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> Print card
+        </button>
+        <button type="button" id="card-close" class="btn btn-quiet">Close</button>
+      </div>
+    </div>
+    <iframe id="card-frame" title="Your fridge card"></iframe>
+  </dialog>
 
   <!-- Icons. Every icon sits next to a word, so meaning never depends on color. -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -117,6 +174,8 @@
       <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z" fill="currentColor"/></symbol>
       <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1 8v7h2v-7zm0-4v2h2V6z" fill="currentColor"/></symbol>
       <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4" fill="currentColor"/><path d="M4 21a8 8 0 0 1 16 0z" fill="currentColor"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.8A8.5 8.5 0 0 1 9.2 3.5a8.5 8.5 0 1 0 11.3 11.3z" fill="currentColor"/></symbol>
       <symbol id="i-dash" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zM7 11v2h10v-2z" fill="currentColor"/></symbol>
     </defs>
   </svg>

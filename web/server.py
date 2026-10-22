@@ -16,7 +16,9 @@ Messages this server sends:
 """
 
 import asyncio
+import json
 import os
+import shutil
 import uuid
 from pathlib import Path
 
@@ -24,6 +26,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from just_in_case.config import DATA_DIR, OUTPUT_DIR
 from just_in_case.prompts import GREETING
 from just_in_case.state import NEEDS
 
@@ -80,6 +83,8 @@ class Session:
         self.pending: dict[str, asyncio.Future] = {}
         self.agent = None
         self.lock = asyncio.Lock()  # one user message at a time
+        # Each visit gets its own folder for the card, deleted when the visit ends.
+        self.out_dir = OUTPUT_DIR / "sessions" / self.id
 
     def emit(self, msg: dict) -> None:
         self.out.put_nowait(msg)
@@ -155,11 +160,12 @@ class Session:
     async def start(self):
         if DEMO:
             from web.demo_agent import DemoAgent
-            self.agent = DemoAgent(self.approver, trace=self.on_trace, on_tool=self.on_tool)
+            self.agent = DemoAgent(self.approver, trace=self.on_trace, on_tool=self.on_tool,
+                                   out_dir=self.out_dir)
         else:
             from just_in_case.agent import JustInCaseAgent
             self.agent = JustInCaseAgent(approver=self.approver, trace=self.on_trace,
-                                         on_tool=self.on_tool)
+                                         on_tool=self.on_tool, out_dir=self.out_dir)
         await self.agent.__aenter__()
 
     async def stop(self):
@@ -171,6 +177,7 @@ class Session:
                 await self.agent.__aexit__(None, None, None)
             except Exception:
                 pass
+        shutil.rmtree(self.out_dir, ignore_errors=True)
 
     async def handle_say(self, text: str):
         async with self.lock:
@@ -198,6 +205,14 @@ async def index():
 @app.get("/api/config")
 async def config():
     return JSONResponse({"demo": DEMO, "greeting": GREETING})
+
+
+@app.get("/api/support")
+async def support():
+    """Verified support lines for the "People you can talk to" box."""
+    lines = json.loads((DATA_DIR / "support_lines.json").read_text())["lines"]
+    keep = ("name", "how_to_reach", "hours", "what", "kind", "url")
+    return JSONResponse([{k: l.get(k, "") for k in keep} for l in lines])
 
 
 @app.get("/card/{sid}")

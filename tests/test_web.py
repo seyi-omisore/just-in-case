@@ -80,3 +80,31 @@ def test_crisis_message_shares_988_and_does_not_plan():
 
 def test_unknown_card_is_not_served():
     assert client.get("/card/not-a-session").status_code == 404
+
+
+def test_support_lines_endpoint_lists_988_and_boston_police():
+    lines = client.get("/api/support").json()
+    text = " ".join(l["how_to_reach"] for l in lines)
+    assert "988" in text and "617-343-4200" in text
+
+
+def test_card_page_has_911_banner_and_print_button():
+    with client.websocket_connect("/ws") as ws:
+        until(ws, "hello")
+        for say in ("I have a procedure.", "Yes, Marion and Doris.", "Marion 617-555-0142"):
+            ws.send_json({"type": "say", "text": say})
+            a = until(ws, "approval")
+            ws.send_json({"type": "answer", "id": a["id"], "ok": True})
+            until(ws, "agent")
+        plan = until(ws, "plan")["plan"]
+        page = client.get(plan["card"]).text
+        assert "IN AN EMERGENCY, CALL 911" in page
+        assert "Print this card" in page
+        assert "Fifi (cat)" in page
+
+
+def test_card_files_are_deleted_when_the_visit_ends():
+    from just_in_case.config import OUTPUT_DIR
+    with client.websocket_connect("/ws") as ws:
+        sid = until(ws, "hello")["session"]
+    assert not (OUTPUT_DIR / "sessions" / sid).exists()

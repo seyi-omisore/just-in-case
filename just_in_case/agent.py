@@ -80,9 +80,10 @@ def make_gate(approver: Approver, trace=print):
 class JustInCaseAgent:
     def __init__(self, approver: Approver = terminal_approver, town: str = "Boston",
                  directory: Directory | None = None, trace=print, model: str | None = None,
-                 on_tool=None):
+                 on_tool=None, out_dir=None):
         self.state = PlanState(town=town)
-        self.box = Toolbox(self.state, directory or Directory())
+        self.box = Toolbox(self.state, directory or Directory(),
+                           **({"out_dir": out_dir} if out_dir else {}))
         self.trace = trace
         # Optional hook: on_tool(short_name, input_dict). The website uses it for
         # the live "what Just in Case is doing" feed.
