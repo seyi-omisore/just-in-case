@@ -123,23 +123,38 @@ class Toolbox:
                 "tell_the_user": flags}
 
     # ---- checkpoint 2 -------------------------------------------------------
+    def _note_problem(self, helper_names: list[str], note_text: str) -> str | None:
+        """Why a note cannot be drafted, or None. Checked BEFORE the user is asked."""
+        s = self.state
+        if not helper_names:
+            return "Ask the user who they would like to write to."
+        heard = s.heard()
+        unheard = [n for n in helper_names if not said_by_user(n, heard, name=True)]
+        if unheard:
+            return f"The user has not named {', '.join(unheard)}. Ask who they would like to write to."
+        # Asking for a note to someone by name IS saying they are comfortable asking.
+        latest = s.user_said[-1] if s.user_said else ""
+        asked_now = all(said_by_user(n, latest, name=True) for n in helper_names)
+        if not (asked_now or s.people_allowed()):
+            return ("First ask whether the user would like to ask someone for help, and who. "
+                    "Do not tell the user you cannot write notes.")
+        if s.helper_count() + len(helper_names) > MAX_HELPERS:
+            return f"Keep the plan small: at most {MAX_HELPERS} people in total."
+        return check_helper_note(note_text)
+
     def draft_helper_note(self, helper_names: list[str], role: str, note_text: str) -> dict:
         s = self.state
-        if not s.people_allowed():
-            raise ToolError("Do not draft a note. People are not part of this plan.")
-        if not helper_names:
-            raise ToolError("Name at least one person the user chose.")
-        unheard = [n for n in helper_names if not said_by_user(n, s.heard(), name=True)]
-        if unheard:
-            raise ToolError(f"The user has not named {', '.join(unheard)}. Ask who they would like to ask.")
-        if s.helper_count() + len(helper_names) > MAX_HELPERS:
-            raise ToolError(f"Keep the plan small: at most {MAX_HELPERS} people in total.")
-        problem = check_helper_note(note_text)
+        problem = self._note_problem(helper_names, note_text)
         if problem:
             raise ToolError(problem)
+        latest = s.user_said[-1] if s.user_said else ""
+        if all(said_by_user(n, latest, name=True) for n in helper_names) and not s.people_allowed():
+            # She asked for this herself, so she has changed her mind about asking someone.
+            s.comfortable_asking_people, s.worried_about_burden = True, False
+            s.log("comfort: user asked for a note to someone by name")
         s.helper_notes.append({"helpers": helper_names, "role": role, "text": note_text})
         s.log(f"checkpoint 2: note approved for {helper_names}")
-        return {"status": "draft saved. NOT sent. The user sends it herself, if she wants to.",
+        return {"status": "Draft saved. NOT sent. The user sends it herself if she wants to.",
                 "note_text": note_text}
 
     # ---- checkpoint 3 -------------------------------------------------------
@@ -156,18 +171,18 @@ class Toolbox:
                 "next": ("Ask only about these, one at a time: " + ", ".join(picked)) if picked
                 else "The user picked nothing extra. Make the card with just the emergency lines."}
 
-    def make_fridge_card(self, name: str, contacts: list[dict], medications: list[str],
-                         pet_name: str = "", pet_caregiver: str = "") -> dict:
+    def _card_problem(self, name: str, contacts: list[dict], medications: list[str],
+                      pet_name: str = "", pet_caregiver: str = "") -> str | None:
+        """Why this card cannot be made, or None. Checked BEFORE the user is asked."""
         chosen = self.state.card_sections
         if chosen is None:
-            raise ToolError("First ask what the user wants on the card: call choose_card_sections.")
-        not_chosen = [label for key, given in (("contacts", contacts), ("medications", medications),
-                                                ("pet", pet_name))
-                      if given and key not in chosen for label in [CARD_SECTIONS[key]]]
+            return "First ask what the user wants on the card: call choose_card_sections."
+        not_chosen = [CARD_SECTIONS[key] for key, given in
+                      (("name", name), ("contacts", contacts), ("medications", medications), ("pet", pet_name))
+                      if given and key not in chosen]
         if not_chosen:
-            raise ToolError("The user did not pick these for the card: " + ", ".join(not_chosen)
-                            + ". Leave them off.")
-        # Every detail must come from what the user typed. Nothing assumed.
+            return ("The user did not pick these for the card: " + ", ".join(not_chosen)
+                    + ". Leave them off and do not mention them.")
         heard = self.state.heard()
         missing = []
         if name and not said_by_user(name, heard, name=True):
@@ -185,19 +200,27 @@ class Toolbox:
         if pet_caregiver and not said_by_user(pet_caregiver, heard, name=True):
             missing.append(f"pet caregiver '{pet_caregiver}'")
         if missing:
-            raise ToolError(
-                "The card can only use details the user typed. Not said by the user: "
-                + "; ".join(missing) + ". Ask the user instead of filling it in, or leave it off."
-            )
+            return ("The card can only use details the user typed. Not said by the user: "
+                    + "; ".join(missing) + ". Ask the user instead of filling it in, or leave it off.")
+        return None
+
+    def make_fridge_card(self, name: str, contacts: list[dict], medications: list[str],
+                         pet_name: str = "", pet_caregiver: str = "") -> dict:
+        problem = self._card_problem(name, contacts, medications, pet_name, pet_caregiver)
+        if problem:
+            raise ToolError(problem)
         card = {"name": name, "contacts": contacts, "medications": medications,
                 "pet": {"name": pet_name, "caregiver": pet_caregiver} if pet_name else None,
-                "sections": list(chosen)}
+                "sections": list(self.state.card_sections)}
         self.card = card  # kept so the card can refresh when the plan or table changes
         path = write_card(card, self.state, self.dir, self.today, self.out_dir)
         self.state.card_path = str(path)
         self.state.log(f"checkpoint 3: card approved -> {path.name}")
-        return {"status": "card created", "file": str(path),
-                "print_tip": "Open the file and print it. It works without Wi-Fi after printing."}
+        # No file paths for the user: the page has a button.
+        return {"status": "Card made.",
+                "tell_the_user": "Your card is ready. Press 'See your fridge card' on the page to look at it "
+                                 "and print it. Once printed, it works without Wi-Fi.",
+                "on_the_card": [CARD_SECTIONS[k] for k in self.state.card_sections]}
 
     # ---- helper table ---------------------------------------------------------
     def _clean_task(self, row: dict) -> dict:
@@ -206,17 +229,26 @@ class Toolbox:
             raise ToolError("Each row needs a task.")
         return out  # person may be blank: an open task family can sign up for
 
+    def _task_problem(self, task: str, person: str = "") -> str | None:
+        s = self.state
+        if not str(task or "").strip():
+            return "Each row needs a task."
+        if not s.people_allowed():
+            return "The user has not said they would like help from others, so do not add rows. Ask first."
+        if person and not said_by_user(person, s.heard(), name=True):
+            return f"The user has not named {person}. Leave the person blank instead."
+        people = {t["person"].lower() for t in s.helper_tasks if t["person"]} | ({person.lower()} if person else set())
+        if len(people) > MAX_HELPERS:
+            return f"Keep the plan small: at most {MAX_HELPERS} people in the table."
+        return None
+
     def add_helper_task(self, task: str, person: str = "", date: str = "", time: str = "") -> dict:
         """Agent adds a row (checkpoint). Leave person blank for an open task
         family can sign up for. A named person must be someone the user named."""
         s = self.state
-        if not s.people_allowed():
-            raise ToolError("People are not part of this plan, so do not add helper rows.")
-        if person and not said_by_user(person, s.heard(), name=True):
-            raise ToolError(f"The user has not named {person}. Leave the person blank instead.")
-        people = {t["person"].lower() for t in s.helper_tasks if t["person"]} | ({person.lower()} if person else set())
-        if len(people) > MAX_HELPERS:
-            raise ToolError(f"Keep the plan small: at most {MAX_HELPERS} people in the table.")
+        problem = self._task_problem(task, person)
+        if problem:
+            raise ToolError(problem)
         row = self._clean_task({"task": task, "person": person, "date": date, "time": time})
         row["id"] = s.next_task_id
         s.next_task_id += 1
@@ -224,6 +256,22 @@ class Toolbox:
         s.log(f"checkpoint: helper row added for {row['person'] or 'anyone (open)'}")
         self.refresh_card()
         return {"added": row, "note": "The user can edit or remove this row any time."}
+
+    def precheck(self, short: str, data: dict) -> str | None:
+        """Run the rules for a checkpoint before the user is asked to approve it,
+        so the user never approves something that is then refused."""
+        if short == "draft_helper_note":
+            return self._note_problem(data.get("helper_names", []), data.get("note_text", ""))
+        if short == "add_helper_task":
+            return self._task_problem(data.get("task", ""), data.get("person", ""))
+        if short == "make_fridge_card":
+            return self._card_problem(data.get("name", ""), data.get("contacts", []),
+                                      data.get("medications", []), data.get("pet_name", ""),
+                                      data.get("pet_caregiver", ""))
+        if short == "confirm_needs":
+            unknown = [n for n in data.get("needs", []) if n not in NEEDS]
+            return f"Unknown needs {unknown}. Use only: {list(NEEDS)}" if unknown else None
+        return None
 
     def user_edit_task(self, action: str, row: dict) -> list[dict]:
         """The user edits the table on the page. Their table, their choice."""

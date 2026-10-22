@@ -18,12 +18,16 @@ TODAY = date(2026, 10, 19)
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-ALL_SECTIONS = ["contacts", "medications", "pet", "helpers", "plan"]
+ALL_SECTIONS = ["name", "contacts", "medications", "pet", "helpers", "plan"]
+
+
+CARD_DIR = [None]
 
 
 @pytest.fixture
 def fresh(tmp_path):
     """A brand-new visit: nothing chosen yet."""
+    CARD_DIR[0] = tmp_path
     return Toolbox(PlanState(town="Boston"), Directory(FIXTURES, today=TODAY), out_dir=tmp_path, today=TODAY)
 
 
@@ -115,7 +119,7 @@ def test_card_has_911_and_only_typed_meds(box):
     box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
     out = box.make_fridge_card("Ruth", [{"name": "Marion", "relationship": "friend",
                                          "phone": "617-555-0142"}], ["Eye drops, at night"])
-    txt = open(out["file"].replace(".html", ".txt")).read()
+    txt = card_text()
     assert txt.count(EMERGENCY_LINE.upper()) + txt.count(EMERGENCY_LINE) >= 2
     assert "Eye drops, at night" in txt
     assert "Key lockbox" in txt
@@ -156,7 +160,7 @@ def test_card_has_988_line(box):
     from just_in_case.safeguards import CRISIS_LINE
     box.state.user_said.append("I'm Ruth.")
     out = box.make_fridge_card("Ruth", [], [])
-    txt = open(out["file"].replace(".html", ".txt")).read()
+    txt = card_text()
     assert CRISIS_LINE in txt
 
 
@@ -165,15 +169,16 @@ def test_card_shows_service_phone(box):
     box.add_to_plan("ride_home_after_procedure", "service", "svc_escort_volunteer")
     box.state.user_said.append("I'm Ruth.")
     out = box.make_fridge_card("Ruth", [], [])
-    txt = open(out["file"].replace(".html", ".txt")).read()
+    txt = card_text()
     assert "SAMPLE Volunteer Medical Escort Program, TO BE VERIFIED" in txt
 
 
 
 # ---- No assumptions on the card --------------------------------------------
 
-def card_text(out):
-    return open(out["file"].replace(".html", ".txt")).read()
+def card_text(out=None):
+    import glob
+    return open(sorted(glob.glob(str(CARD_DIR[0] / "*.txt")))[-1]).read()
 
 
 def test_card_blocks_details_the_user_never_said(box):
@@ -203,6 +208,36 @@ def test_card_accepts_the_users_own_words(box):
     assert "Blood pressure pill, mornings" in txt
 
 
+def test_asking_for_a_note_by_name_is_enough(fresh):
+    """Regression: 'draft a note to my friend Samantha' was wrongly refused."""
+    fresh.state.user_said.append("draft a note to my friend Samantha")
+    assert fresh.precheck("draft_helper_note", {"helper_names": ["Samantha"],
+                          "note_text": "Hi Samantha. Could you feed Fifi? No pressure at all."}) is None
+    fresh.draft_helper_note(["Samantha"], "feed Fifi", "Hi Samantha. Could you feed Fifi? No pressure at all.")
+    assert fresh.state.people_allowed()
+
+
+def test_agent_cannot_bring_up_people_on_its_own_in_burden_mode(fresh):
+    fresh.state.user_said += ["I could ask Samantha maybe.", "Actually I don't want to bother anyone."]
+    fresh.set_comfort(False, True)
+    assert fresh.precheck("draft_helper_note", {"helper_names": ["Samantha"],
+                          "note_text": "Hi Samantha. No pressure at all."})
+
+
+def test_rules_are_checked_before_the_user_is_asked(fresh):
+    fresh.state.user_said.append("I'm Ruth.")
+    assert "choose_card_sections" in fresh.precheck("make_fridge_card", {"name": "Ruth"})
+    fresh.choose_card_sections(["contacts"])
+    assert "did not pick" in fresh.precheck("make_fridge_card", {"name": "Ruth"})
+    assert fresh.precheck("make_fridge_card", {"name": ""}) is None
+
+
+def test_card_result_has_no_file_path(box):
+    box.state.user_said.append("I'm Ruth.")
+    out = box.make_fridge_card("Ruth", [], [])
+    assert "/" not in out["tell_the_user"] and "See your fridge card" in out["tell_the_user"]
+
+
 def test_note_only_to_people_the_user_named(box):
     box.set_comfort(True, False)
     box.state.user_said.append("I could ask Samantha.")
@@ -227,7 +262,7 @@ def test_agent_adds_helper_row_only_for_named_people(box):
 def test_no_helper_rows_in_burden_mode(box):
     box.set_comfort(True, True)
     box.state.user_said.append("Samantha")
-    with pytest.raises(ToolError, match="People are not part"):
+    with pytest.raises(ToolError, match="not said they would like help"):
         box.add_helper_task("Feed the cat", "Samantha")
 
 
@@ -294,8 +329,10 @@ def test_card_blocks_sections_the_user_did_not_tick(fresh):
     fresh.choose_card_sections(["contacts"])
     with pytest.raises(ToolError, match="did not pick"):
         fresh.make_fridge_card("Ruth", [], ["Eye drops at night"])
+    with pytest.raises(ToolError, match="did not pick"):
+        fresh.make_fridge_card("Ruth", [], [])  # name was not ticked either
     txt = card_text(fresh.make_fridge_card(
-        "Ruth", [{"name": "Marion", "relationship": "", "phone": "617-555-0142"}], []))
+        "", [{"name": "Marion", "relationship": "", "phone": "617-555-0142"}], []))
     assert "Marion" in txt and "MEDICATIONS" not in txt
 
 
@@ -305,7 +342,7 @@ def test_ticking_nothing_gives_just_the_emergency_lines(fresh):
     fresh.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
     fresh.user_edit_task("add", {"task": "Rides"})
     fresh.choose_card_sections([])
-    txt = card_text(fresh.make_fridge_card("Ruth", [], []))
+    txt = card_text(fresh.make_fridge_card("", [], []))
     assert "911" in txt and "988" in txt
     assert "MY PLAN" not in txt and "WHO IS HELPING" not in txt
 

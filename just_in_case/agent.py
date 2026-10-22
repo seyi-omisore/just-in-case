@@ -60,7 +60,7 @@ async def terminal_approver(short: str, data: dict):
     return answer.strip().lower().startswith("y")
 
 
-def make_gate(approver: Approver, trace=print):
+def make_gate(approver: Approver, trace=print, precheck=None):
     async def approval_gate(tool_name: str, input_data: dict, context):
         # 1. Only our own tools. Anything else (files, shell, web) is refused.
         if not tool_name.startswith(PREFIX):
@@ -69,12 +69,14 @@ def make_gate(approver: Approver, trace=print):
         short = tool_name.removeprefix(PREFIX)
         if short not in GATED_TOOLS:
             return PermissionResultAllow(updated_input=input_data)
-        # 2. Pre-check the note so the user is never asked to approve a bad draft.
-        if short == "draft_helper_note":
+        # 2. Check every rule BEFORE asking, so the user never approves
+        #    something that the tool would then refuse.
+        problem = precheck(short, input_data) if precheck else None
+        if not problem and short == "draft_helper_note":
             problem = check_helper_note(input_data.get("note_text", ""))
-            if problem:
-                trace(f"  [rule]  note sent back for rewrite: {problem}")
-                return PermissionResultDeny(message=f"RULE: {problem}")
+        if problem:
+            trace(f"  [rule]  blocked: {problem}")
+            return PermissionResultDeny(message=f"RULE: {problem}")
         # 3. Human checkpoint.
         answer = await approver(short, input_data)
         if short == "choose_card_sections" and isinstance(answer, list):
@@ -109,7 +111,7 @@ class JustInCaseAgent:
             mcp_servers={"jic": server},
             tools=[],                              # turn OFF built-ins (Bash, Read, Web...)
             allowed_tools=[n for n in tool_names if n not in gated],  # auto-approved
-            can_use_tool=make_gate(approver, trace),  # everything else comes here
+            can_use_tool=make_gate(approver, trace, precheck=self.box.precheck),  # everything else comes here
             setting_sources=[],                    # ignore CLAUDE.md, plugins, user settings
             env=runtime_env(),                     # route to OpenRouter
             max_turns=40,

@@ -54,12 +54,13 @@ class DemoAgent:
                            **({"out_dir": out_dir} if out_dir else {}))
         self.trace = trace
         self.on_tool = on_tool or (lambda *_: None)
-        self.gate = make_gate(approver, trace)
+        self.gate = make_gate(approver, trace, precheck=self.box.precheck)
         self.turn = 0
         self.task = ""
         self.contacts: list[dict] = []
         self.meds: list[str] = []
         self.pet = ""
+        self.name = ""
         self.queue: list[str] = []
         self.cost_usd = 0.0
         self.transcript: list[tuple[str, str]] = []
@@ -107,7 +108,8 @@ class DemoAgent:
 
     async def _next_card_step(self) -> str:
         """Ask about the next section the user ticked, or make the card."""
-        questions = {"contacts": "Who would you like on your card, and what are their phone numbers?",
+        questions = {"name": "What name would you like at the top of your card?",
+                     "contacts": "Who would you like on your card, and what are their phone numbers?",
                      "medications": "Which medications would you like listed? Please use your own words.",
                      "pet": "Tell me about your pet: their name, and who looks after them."}
         if self.queue:
@@ -115,11 +117,12 @@ class DemoAgent:
         self.turn = 9
         st = self.state
         me = re.search(r"\b(?:I'm|I am|my name is)\s+([A-Z][a-z]+)", st.heard())
-        card = await self._call("make_fridge_card", self.box.make_fridge_card, me.group(1) if me else "",
+        name = (self.name or (me.group(1) if me else "")) if "name" in (st.card_sections or []) else ""
+        card = await self._call("make_fridge_card", self.box.make_fridge_card, name,
                                 self.contacts, self.meds, self.pet, "")
         if card is None:
             return "Of course. What would you like to change on the card?"
-        return ("Your fridge card is ready. You can print it and put it on the fridge.\n\n"
+        return ("Your fridge card is ready. Press **See your fridge card** to look at it and print it.\n\n"
                 "Let's look at this plan again in a few months.")
 
     async def send(self, user_text: str, on_text=print) -> str:
@@ -203,12 +206,18 @@ class DemoAgent:
                         await self._call("add_helper_task", b.add_helper_task, self.task[0].upper() + self.task[1:], n, "", "")
                     lines.append(f"- **Note:** I wrote a short note to {who}. You can send it yourself.")
             await self._call("choose_card_sections", b.choose_card_sections, [])
-            self.queue = [k for k in ("contacts", "medications", "pet") if k in (st.card_sections or [])]
+            picked = st.card_sections or []
+            self.queue = [k for k in ("contacts", "medications", "pet") if k in picked]
+            if "name" in picked and not re.search(r"\b(?:I'm|I am|my name is)\s+[A-Z]", st.heard()):
+                self.queue.insert(0, "name")
             return "Here's your plan so far.\n\n" + "\n".join(lines) + "\n\n" + await self._next_card_step()
 
         if self.turn == 2:
             current = self.queue.pop(0) if self.queue else None
-            if current == "contacts" and not NO.search(text):
+            if current == "name":
+                found = re.findall(r"\b[A-Z][a-z]+\b", text) or [text.strip().split(" ")[0].capitalize()]
+                self.name = found[0] if not NO.search(text) else ""
+            elif current == "contacts" and not NO.search(text):
                 self.contacts = [{"name": n, "relationship": "", "phone": ph}
                                  for n, ph in re.findall(r"([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\D{0,20}?(" + PHONE + ")", text)]
             elif current == "medications" and not NO.search(text):

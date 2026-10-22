@@ -26,6 +26,7 @@ ROUTES = ("service", "preparation", "person", "blank")
 
 # What can go on the fridge card. The user ticks these; nothing is assumed.
 CARD_SECTIONS: dict[str, str] = {
+    "name": "My name at the top",
     "contacts": "People to contact",
     "medications": "My medications",
     "pet": "My pet and who looks after it",

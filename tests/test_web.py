@@ -150,3 +150,20 @@ def test_open_rows_from_the_page():
         ws.send_json({"type": "table", "action": "add", "row": {"task": "Rides to PT", "person": ""}})
         assert until(ws, "plan")["plan"]["tasks"][0]["person"] == ""
         assert "Open: add your name" in client.get(f"/table/{sid}").text
+
+
+def test_restart_warning_when_code_changes_under_a_running_server(monkeypatch):
+    import web.server as srv
+    assert client.get("/api/config").json()["needs_restart"] is False
+    monkeypatch.setattr(srv, "STARTED_WITH", "old-version")
+    assert client.get("/api/config").json()["needs_restart"] is True
+
+
+def test_spreadsheet_is_a_real_spreadsheet_not_the_page():
+    with client.websocket_connect("/ws") as ws:
+        sid = until(ws, "hello")["session"]
+        ws.send_json({"type": "table", "action": "add", "row": {"task": "Feed Fifi"}})
+        until(ws, "plan")
+        r = client.get(f"/table/{sid}.csv")
+    assert r.headers["content-type"].startswith("text/csv")
+    assert r.text.startswith("Task,Date,Time,Who is helping") and "<html" not in r.text

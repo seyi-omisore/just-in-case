@@ -270,6 +270,7 @@
       switch (m.type) {
         case "hello":
           sessionId = m.session; $("demo-banner").hidden = !m.demo;
+          $("table-download").href = `/table/${sessionId}.csv`;
           setBusy(false);
           if (!messages.children.length) addMessage("agent", m.greeting);
           if (!feed.children.length) feed.appendChild(el("li", "feed-empty", "Each step shows up here while Just in Case works."));
@@ -320,8 +321,8 @@
   let editingId = null, seenTasks = new Set(), tableUrls = {};
   const form = $("task-form");
   function renderTasks(plan) {
-    tableUrls = { csv: plan.table_csv, print: plan.table_print };
-    $("table-download").href = plan.table_csv || "#";
+    tableUrls = { csv: `/table/${sessionId}.csv`, print: `/table/${sessionId}` };
+    $("table-download").href = tableUrls.csv;
     const rows = $("helper-rows"); rows.replaceChildren();
     const tasks = plan.tasks || [];
     $("helper-table").hidden = !tasks.length;
@@ -447,6 +448,11 @@
   setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light", false);
   $("theme-light").onclick = () => setTheme("light");
   $("theme-dark").onclick = () => setTheme("dark");
+
+  // Warn if the code was updated (git pull) but the server was not restarted.
+  const checkRestart = () => fetch("/api/config").then((r) => r.json())
+    .then((c) => { $("restart-banner").hidden = c.needs_restart === false; })  // missing = older server.catch(() => {});
+  checkRestart(); setInterval(checkRestart, 60000);
 
   connect();
 })();

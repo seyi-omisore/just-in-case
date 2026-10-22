@@ -46,6 +46,9 @@ For Leya, Joan, Satoshi (and Seyi). No coding experience needed.
 
 ## Part 2. Running it
 
+**After every `git pull`, restart the site:** click the terminal, press Control+C, then run `python serve.py` again. The page shows an orange warning if you forget.
+
+
 | What | Command | Costs money? |
 |---|---|---|
 | **Open the website (live agent)** | `python serve.py` | yes (under 1 cent per chat) |

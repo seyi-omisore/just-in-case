@@ -34,6 +34,22 @@ from just_in_case.state import CARD_SECTIONS, NEEDS
 from web.share_store import ShareError, ShareStore
 
 STATIC = Path(__file__).parent / "static"
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def code_fingerprint() -> str:
+    """A short hash of the code on disk. If it changes while the server runs,
+    someone ran git pull without restarting, so the page shows a warning."""
+    import hashlib
+    h = hashlib.sha256()
+    for folder in ("just_in_case", "web"):
+        for f in sorted((ROOT / folder).rglob("*")):
+            if f.suffix in (".py", ".js", ".html", ".css") and "__pycache__" not in f.parts:
+                h.update(f.read_bytes())
+    return h.hexdigest()[:12]
+
+
+STARTED_WITH = code_fingerprint()
 DEMO = os.getenv("JIC_DEMO") == "1"
 
 app = FastAPI(title="Just in Case")
@@ -290,7 +306,8 @@ async def index():
 
 @app.get("/api/config")
 async def config():
-    return JSONResponse({"demo": DEMO, "greeting": GREETING})
+    return JSONResponse({"demo": DEMO, "greeting": GREETING,
+                         "needs_restart": code_fingerprint() != STARTED_WITH})
 
 
 @app.get("/api/support")
