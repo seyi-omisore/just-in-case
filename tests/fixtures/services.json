@@ -4,8 +4,13 @@
     {
       "id": "svc_escort_volunteer",
       "name": "SAMPLE Volunteer Medical Escort Program",
-      "needs": ["ride_home_after_procedure", "check_in_after_procedure"],
-      "areas": ["Boston"],
+      "needs": [
+        "ride_home_after_procedure",
+        "check_in_after_procedure"
+      ],
+      "areas": [
+        "Boston"
+      ],
       "cost": "free",
       "waitlist": false,
       "waitlist_note": "",
@@ -18,8 +23,13 @@
     {
       "id": "svc_coa_rides",
       "name": "SAMPLE Council on Aging Medical Rides",
-      "needs": ["ride_home_after_procedure", "transportation"],
-      "areas": ["Boston"],
+      "needs": [
+        "ride_home_after_procedure",
+        "transportation"
+      ],
+      "areas": [
+        "Boston"
+      ],
       "cost": "free",
       "waitlist": true,
       "waitlist_note": "Rides fill up. Call as soon as you have a date.",
@@ -32,8 +42,14 @@
     {
       "id": "svc_paid_companion",
       "name": "SAMPLE Paid Companion Escort Service",
-      "needs": ["ride_home_after_procedure", "check_in_after_procedure"],
-      "areas": ["Boston", "Cambridge"],
+      "needs": [
+        "ride_home_after_procedure",
+        "check_in_after_procedure"
+      ],
+      "areas": [
+        "Boston",
+        "Cambridge"
+      ],
       "cost": "paid",
       "waitlist": false,
       "waitlist_note": "",
@@ -46,8 +62,13 @@
     {
       "id": "svc_old_volunteer_drivers",
       "name": "SAMPLE Neighborhood Volunteer Drivers",
-      "needs": ["transportation", "ride_home_after_procedure"],
-      "areas": ["Boston"],
+      "needs": [
+        "transportation",
+        "ride_home_after_procedure"
+      ],
+      "areas": [
+        "Boston"
+      ],
       "cost": "free",
       "waitlist": false,
       "waitlist_note": "",
@@ -60,8 +81,12 @@
     {
       "id": "svc_utility_medical",
       "name": "SAMPLE Utility Medical Needs Registration",
-      "needs": ["power_outage"],
-      "areas": ["*"],
+      "needs": [
+        "power_outage"
+      ],
+      "areas": [
+        "*"
+      ],
       "cost": "free",
       "waitlist": false,
       "waitlist_note": "",
@@ -74,8 +99,12 @@
     {
       "id": "svc_pet_boarding",
       "name": "SAMPLE Low-Cost Pet Boarding",
-      "needs": ["pet_care_during_stay"],
-      "areas": ["Boston"],
+      "needs": [
+        "pet_care_during_stay"
+      ],
+      "areas": [
+        "Boston"
+      ],
       "cost": "low",
       "waitlist": false,
       "waitlist_note": "",
@@ -88,8 +117,12 @@
     {
       "id": "svc_home_repair",
       "name": "SAMPLE Senior Home Repair Program",
-      "needs": ["home_repair"],
-      "areas": ["Boston"],
+      "needs": [
+        "home_repair"
+      ],
+      "areas": [
+        "Boston"
+      ],
       "cost": "free",
       "waitlist": true,
       "waitlist_note": "Non-emergency repairs can take several weeks.",
@@ -97,6 +130,24 @@
       "phone": "TO BE VERIFIED",
       "url": "",
       "how_to_use": "Call to ask if you qualify. Emergency heating repairs may be faster.",
+      "sample": true
+    },
+    {
+      "id": "svc_no_phone",
+      "name": "SAMPLE Service With No Phone",
+      "needs": [
+        "help_at_home"
+      ],
+      "areas": [
+        "Boston"
+      ],
+      "cost": "free",
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2026-10-01",
+      "phone": "",
+      "url": "https://example.org",
+      "how_to_use": "Test entry.",
       "sample": true
     }
   ]

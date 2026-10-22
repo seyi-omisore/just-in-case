@@ -102,7 +102,7 @@ class Toolbox:
                     "comfortable asking, or she worries about being a burden). Use a "
                     "service, a preparation, or leave it blank."
                 )
-            label = "A person she chooses (see note)"
+            label = "Someone you chose (see your note)"
             ref_id = None
         else:  # blank
             label = "Not covered yet"
@@ -146,6 +146,20 @@ class Toolbox:
         self.state.log(f"checkpoint 3: card approved -> {path.name}")
         return {"status": "card created", "file": str(path),
                 "print_tip": "Open the file and print it. It works without Wi-Fi after printing."}
+
+    # ---- support (T7) --------------------------------------------------------
+    def get_support_lines(self) -> dict:
+        """Verified support lines to share when someone sounds hopeless or alone.
+
+        Read-only. The agent shares these; it never calls anyone.
+        """
+        self.state.log("support: shared verified support lines")
+        return {
+            "lines": [{k: l[k] for k in ("name", "how_to_reach", "hours", "what", "kind")}
+                      for l in self.dir.support_lines],
+            "emergency": "In an emergency, call 911.",
+            "reminder": "Share these gently. The person decides whether to call. Do not push the plan.",
+        }
 
     def review_plan(self) -> dict:
         s = self.state
@@ -255,13 +269,20 @@ def build_server(box: Toolbox, trace=print):
         return await run(box.make_fridge_card, args["name"], args["contacts"], args["medications"],
                          args.get("pet_name", ""), args.get("pet_caregiver", ""))
 
+    @tool("get_support_lines",
+          "Get verified support lines (988, Call2Talk, Mass 211, wellness check). Use when the user "
+          "sounds hopeless, alone, or unsafe, or asks who they can talk to.",
+          {"type": "object", "properties": {}})
+    async def get_support_lines(args):
+        return await run(box.get_support_lines)
+
     @tool("review_plan", "Read the current plan, including uncovered needs.",
           {"type": "object", "properties": {}})
     async def review_plan(args):
         return _ok(box.review_plan())
 
     tools = [confirm_needs, set_comfort, find_services, find_preparations,
-             add_to_plan, draft_helper_note, make_fridge_card, review_plan]
+             add_to_plan, draft_helper_note, make_fridge_card, get_support_lines, review_plan]
     server = create_sdk_mcp_server(name=SERVER_NAME, version="0.1.0", tools=tools)
     names = [PREFIX + t.name for t in tools]
     return server, names

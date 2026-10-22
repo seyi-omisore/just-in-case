@@ -20,6 +20,10 @@ class Directory:
         self.preparations = json.loads((data_dir / "preparations.json").read_text())[
             "preparations"
         ]
+        lines_file = data_dir / "support_lines.json"
+        self.support_lines = (
+            json.loads(lines_file.read_text())["lines"] if lines_file.exists() else []
+        )
         self.by_id = {s["id"]: s for s in self.services}
         self.by_id.update({p["id"]: p for p in self.preparations})
 
@@ -41,6 +45,8 @@ class Directory:
                 f"NOT RECENTLY CHECKED: last verified {svc['last_verified']}. "
                 "Call to confirm it still runs."
             )
+        if not svc.get("phone"):
+            flags.append("NO PHONE LISTED: use the website to find the right number, then call to confirm.")
         if svc.get("sample"):
             flags.append("SAMPLE ENTRY: placeholder for testing, not a real program.")
         return flags
@@ -60,7 +66,8 @@ class Directory:
                 "name": s["name"],
                 "cost": s["cost"],
                 "how_to_use": s["how_to_use"],
-                "phone": s["phone"],
+                "phone": s["phone"] or "see website",
+                "url": s.get("url", ""),
                 "flags": self.service_flags(s),
             }
             for s in matches
@@ -70,7 +77,8 @@ class Directory:
 
     def find_preparations(self, need: str) -> list[dict]:
         return [
-            {"id": p["id"], "name": p["name"], "what": p["what"], "rough_cost": p["rough_cost"]}
+            {"id": p["id"], "name": p["name"], "what": p["what"],
+             "rough_cost": p["rough_cost"], "url": p.get("url", "")}
             for p in self.preparations
             if need in p["needs"]
         ]

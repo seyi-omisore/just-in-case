@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .config import OUTPUT_DIR, REVIEW_AFTER_MONTHS
 from .directory import Directory
-from .safeguards import EMERGENCY_LINE
+from .safeguards import CRISIS_LINE, EMERGENCY_LINE
 from .state import NEEDS, PlanState
 
 
@@ -25,6 +25,7 @@ def build_card_lines(card: dict, state: PlanState, directory: Directory, today: 
     lines = [
         f"IF SOMETHING HAPPENS: {card['name']}",
         EMERGENCY_LINE.upper(),
+        CRISIS_LINE,
         "",
         "PEOPLE TO CONTACT",
     ]
@@ -51,7 +52,11 @@ def build_card_lines(card: dict, state: PlanState, directory: Directory, today: 
             lines.append(f"  {need}: not covered yet")
         else:
             ref = directory.by_id.get(item.ref_id or "", {})
-            lines.append(f"  {need}: {ref.get('name', item.label)}")
+            name = ref.get("name", item.label)
+            phone = ref.get("phone")
+            if item.route == "service":
+                name += f", {phone}" if phone else ", see website and call to confirm"
+            lines.append(f"  {need}: {name}")
     if not state.items:
         lines.append("  (no plan items yet)")
 

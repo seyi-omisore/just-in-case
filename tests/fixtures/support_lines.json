@@ -1,0 +1,55 @@
+{
+  "_readme": "Support lines the agent shares when someone sounds hopeless or alone (test case T7). Checked on official websites on 2026-10-21. The agent only shares these; it never calls anyone. Leya re-confirms each one. To add a local police non-emergency number for wellness checks, add an entry with kind 'wellness_check' after confirming it on the official police website.",
+  "lines": [
+    {
+      "id": "line_988",
+      "name": "988 Suicide and Crisis Lifeline",
+      "how_to_reach": "Call or text 988",
+      "hours": "24 hours, every day",
+      "kind": "crisis",
+      "what": "Talk with a trained, caring person about anything that feels too heavy.",
+      "url": "https://988lifeline.org",
+      "last_verified": "2026-10-21"
+    },
+    {
+      "id": "line_call2talk",
+      "name": "Call2Talk (Massachusetts)",
+      "how_to_reach": "Dial 2-1-1 and ask for Call2Talk (extension 25), or call 508-532-2255. You can also text C2T to 741741.",
+      "hours": "24 hours, every day",
+      "kind": "emotional_support",
+      "what": "A free, private line just to talk and be listened to. You do not need to be in crisis to call.",
+      "url": "https://mass211.org/node/155",
+      "last_verified": "2026-10-21"
+    },
+    {
+      "id": "line_mass211",
+      "name": "Mass 211",
+      "how_to_reach": "Dial 2-1-1 or call 877-211-6277",
+      "hours": "24 hours, every day",
+      "kind": "find_help",
+      "what": "Help finding local services of all kinds.",
+      "url": "https://mass211.org",
+      "last_verified": "2026-10-21"
+    },
+    {
+      "id": "line_age_info",
+      "name": "1-800-AGE-INFO (MassOptions)",
+      "how_to_reach": "Call 1-800-243-4636",
+      "hours": "Business hours",
+      "kind": "find_help",
+      "what": "Help finding services for older adults and caregivers in Massachusetts.",
+      "url": "https://www.mass.gov/info-details/find-your-local-council-on-aging",
+      "last_verified": "2026-10-21"
+    },
+    {
+      "id": "line_wellness_check",
+      "name": "Wellness check",
+      "how_to_reach": "Call your local police non-emergency number and ask for a wellness check.",
+      "hours": "Any time",
+      "kind": "wellness_check",
+      "what": "If you are worried about yourself or someone you love, the police can stop by to check that you are okay. You decide if and when to ask. In an emergency, call 911.",
+      "url": "",
+      "last_verified": "2026-10-21"
+    }
+  ]
+}

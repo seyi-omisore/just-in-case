@@ -107,3 +107,49 @@ def test_card_has_911_and_only_typed_meds(box):
     assert txt.count(EMERGENCY_LINE.upper()) + txt.count(EMERGENCY_LINE) >= 2
     assert "Eye drops, at night" in txt
     assert "Key lockbox" in txt
+
+
+# ---- Step 1 additions ------------------------------------------------------
+
+def test_missing_phone_is_flagged(box):
+    found = box.find_services("help_at_home")["services"]
+    entry = next(s for s in found if s["id"] == "svc_no_phone")
+    assert entry["phone"] == "see website"
+    assert any("NO PHONE LISTED" in f for f in entry["flags"])
+
+
+def test_usps_hold_mail_is_a_preparation_with_link(box):
+    preps = box.find_preparations("mail_while_away")["preparations"]
+    usps = next(p for p in preps if p["id"] == "prep_usps_hold_mail")
+    assert usps["url"].startswith("https://www.usps.com/")
+    box.confirm_needs(["mail_while_away"])
+    out = box.add_to_plan("mail_while_away", "preparation", "prep_usps_hold_mail")
+    assert out["added"]["label"] == "USPS Hold Mail"
+
+
+def test_support_lines_include_988_and_wellness_check(box):
+    lines = box.get_support_lines()["lines"]
+    text = " ".join(l["how_to_reach"] for l in lines)
+    assert "988" in text
+    assert any(l["kind"] == "wellness_check" for l in lines)
+    assert "911" in box.get_support_lines()["emergency"]
+
+
+def test_support_lines_do_not_touch_the_plan(box):
+    box.get_support_lines()
+    assert box.state.items == [] and box.state.confirmed_needs == []
+
+
+def test_card_has_988_line(box):
+    from just_in_case.safeguards import CRISIS_LINE
+    out = box.make_fridge_card("Ruth", [], [])
+    txt = open(out["file"].replace(".html", ".txt")).read()
+    assert CRISIS_LINE in txt
+
+
+def test_card_shows_service_phone(box):
+    box.confirm_needs(["ride_home_after_procedure"])
+    box.add_to_plan("ride_home_after_procedure", "service", "svc_escort_volunteer")
+    out = box.make_fridge_card("Ruth", [], [])
+    txt = open(out["file"].replace(".html", ".txt")).read()
+    assert "SAMPLE Volunteer Medical Escort Program, TO BE VERIFIED" in txt

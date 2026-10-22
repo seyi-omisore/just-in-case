@@ -24,6 +24,9 @@ def load(name):
 
 SERVICES = load("services.json")["services"]
 PREPS = load("preparations.json")["preparations"]
+LINES = load("support_lines.json")["lines"]
+LINE_FIELDS = {"id", "name", "how_to_reach", "hours", "kind", "what", "url", "last_verified"}
+LINE_KINDS = {"crisis", "emotional_support", "find_help", "wellness_check"}
 
 
 @pytest.mark.parametrize("svc", SERVICES, ids=lambda s: s.get("id", "?"))
@@ -52,7 +55,20 @@ def test_preparation_entry(prep):
     assert not bad, f"{prep['id']}: unknown needs {bad}"
 
 
+@pytest.mark.parametrize("line", LINES, ids=lambda l: l.get("id", "?"))
+def test_support_line_entry(line):
+    missing = LINE_FIELDS - line.keys()
+    assert not missing, f"{line.get('id')}: missing fields {missing}"
+    assert line["id"].startswith("line_"), f"{line['id']}: id must start with line_"
+    assert line["kind"] in LINE_KINDS, f"{line['id']}: kind must be one of {LINE_KINDS}"
+    date.fromisoformat(line["last_verified"])
+
+
+def test_988_is_listed():
+    assert any("988" in l["how_to_reach"] for l in LINES), "988 must always be in support_lines.json"
+
+
 def test_ids_are_unique():
-    ids = [s["id"] for s in SERVICES] + [p["id"] for p in PREPS]
+    ids = [s["id"] for s in SERVICES] + [p["id"] for p in PREPS] + [l["id"] for l in LINES]
     dupes = {i for i in ids if ids.count(i) > 1}
     assert not dupes, f"duplicate ids: {dupes}"

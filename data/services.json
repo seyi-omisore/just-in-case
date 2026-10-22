@@ -1,103 +1,173 @@
 {
-  "_readme": "SAMPLE DATA for building and testing. Every entry with sample=true is a placeholder, not a real program. Leya replaces these with 10 to 12 verified Boston-area services. Keep the same fields. last_verified must be the date someone actually confirmed the entry by phone or official website.",
+  "_readme": "Curated Greater Boston services for the prototype. Phone numbers and links were copied from each official website on 2026-10-21. Leya re-confirms each entry and updates last_verified to the date she checked. An empty phone means it was not confirmed, so the agent shows the website and 'call to confirm'. Only these services can appear in a plan.",
   "services": [
     {
-      "id": "svc_escort_volunteer",
-      "name": "SAMPLE Volunteer Medical Escort Program",
-      "needs": ["ride_home_after_procedure", "check_in_after_procedure"],
-      "areas": ["Boston"],
+      "id": "svc_fw_escort",
+      "name": "FriendshipWorks Medical Escort",
+      "needs": [
+        "ride_home_after_procedure",
+        "check_in_after_procedure"
+      ],
+      "areas": [
+        "Boston"
+      ],
       "cost": "free",
       "waitlist": false,
       "waitlist_note": "",
-      "last_verified": "2026-10-01",
-      "phone": "TO BE VERIFIED",
-      "url": "",
-      "how_to_use": "Book at least 2 weeks before the procedure. A trained volunteer rides with you and stays until you are settled at home.",
-      "sample": true
+      "last_verified": "2026-10-21",
+      "phone": "617-482-1510",
+      "url": "https://fw4elders.org",
+      "how_to_use": "A trained volunteer goes with you to the appointment and helps you get home. Call well ahead to book. Serves Greater Boston, so ask if they cover your town.",
+      "sample": false
     },
     {
-      "id": "svc_coa_rides",
-      "name": "SAMPLE Council on Aging Medical Rides",
-      "needs": ["ride_home_after_procedure", "transportation"],
-      "areas": ["Boston"],
+      "id": "svc_age_strong_shuttle",
+      "name": "Age Strong Shuttle (medical appointment rides)",
+      "needs": [
+        "ride_home_after_procedure",
+        "transportation"
+      ],
+      "areas": [
+        "Boston"
+      ],
+      "cost": "free",
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2026-10-21",
+      "phone": "617-635-4366",
+      "url": "https://www.boston.gov/departments/age-strong-commission/age-strong-shuttle",
+      "how_to_use": "Free rides to medical appointments in Boston for older adults. Call ahead to book. Ask if a driver can wait for you after a procedure.",
+      "sample": false
+    },
+    {
+      "id": "svc_age_strong",
+      "name": "City of Boston Age Strong Commission",
+      "needs": [
+        "help_at_home",
+        "transportation"
+      ],
+      "areas": [
+        "Boston"
+      ],
+      "cost": "free",
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2026-10-21",
+      "phone": "617-635-4366",
+      "url": "https://www.boston.gov/departments/age-strong-commission",
+      "how_to_use": "The city's office for older adults. They can connect you with rides, meals, and help at home.",
+      "sample": false
+    },
+    {
+      "id": "svc_mbta_ride",
+      "name": "MBTA The RIDE (door-to-door rides)",
+      "needs": [
+        "transportation",
+        "ride_home_after_procedure"
+      ],
+      "areas": [
+        "Boston"
+      ],
+      "cost": "low",
+      "waitlist": true,
+      "waitlist_note": "You must apply and be approved before your first ride. Apply weeks ahead.",
+      "last_verified": "2026-10-21",
+      "phone": "617-222-3200",
+      "url": "https://www.mbta.com/accessibility/the-ride",
+      "how_to_use": "Shared door-to-door rides for people who cannot use buses or trains. Low fare per trip. Covers Boston and many nearby towns in the MBTA area.",
+      "sample": false
+    },
+    {
+      "id": "svc_local_coa",
+      "name": "Your local Council on Aging",
+      "needs": [
+        "transportation",
+        "ride_home_after_procedure",
+        "help_at_home"
+      ],
+      "areas": [
+        "*"
+      ],
       "cost": "free",
       "waitlist": true,
-      "waitlist_note": "Rides fill up. Call as soon as you have a date.",
-      "last_verified": "2026-09-15",
-      "phone": "TO BE VERIFIED",
-      "url": "",
-      "how_to_use": "Call to register, then book each ride ahead of time.",
-      "sample": true
+      "waitlist_note": "Services and wait times differ from town to town.",
+      "last_verified": "2026-10-21",
+      "phone": "",
+      "url": "https://www.mass.gov/info-details/find-your-local-council-on-aging",
+      "how_to_use": "Every Massachusetts town has one. Use the website to find yours, then call to ask about rides and help at home.",
+      "sample": false
     },
     {
-      "id": "svc_paid_companion",
-      "name": "SAMPLE Paid Companion Escort Service",
-      "needs": ["ride_home_after_procedure", "check_in_after_procedure"],
-      "areas": ["Boston", "Cambridge"],
-      "cost": "paid",
-      "waitlist": false,
-      "waitlist_note": "",
-      "last_verified": "2026-08-20",
-      "phone": "TO BE VERIFIED",
-      "url": "",
-      "how_to_use": "Hourly fee. A trained companion picks you up and stays with you.",
-      "sample": true
-    },
-    {
-      "id": "svc_old_volunteer_drivers",
-      "name": "SAMPLE Neighborhood Volunteer Drivers",
-      "needs": ["transportation", "ride_home_after_procedure"],
-      "areas": ["Boston"],
-      "cost": "free",
-      "waitlist": false,
-      "waitlist_note": "",
-      "last_verified": "2024-11-02",
-      "phone": "TO BE VERIFIED",
-      "url": "",
-      "how_to_use": "Drivers take you to appointments within the city.",
-      "sample": true
-    },
-    {
-      "id": "svc_utility_medical",
-      "name": "SAMPLE Utility Medical Needs Registration",
-      "needs": ["power_outage"],
-      "areas": ["*"],
-      "cost": "free",
-      "waitlist": false,
-      "waitlist_note": "",
-      "last_verified": "2026-07-30",
-      "phone": "TO BE VERIFIED",
-      "url": "",
-      "how_to_use": "Ask your electric company about registering a medical need. It can mean protection from shutoff and priority contact during outages.",
-      "sample": true
-    },
-    {
-      "id": "svc_pet_boarding",
-      "name": "SAMPLE Low-Cost Pet Boarding",
-      "needs": ["pet_care_during_stay"],
-      "areas": ["Boston"],
+      "id": "svc_ethos",
+      "name": "Ethos (elder services)",
+      "needs": [
+        "help_at_home"
+      ],
+      "areas": [
+        "Boston"
+      ],
       "cost": "low",
       "waitlist": false,
       "waitlist_note": "",
-      "last_verified": "2026-09-01",
-      "phone": "TO BE VERIFIED",
-      "url": "",
-      "how_to_use": "Short stays for healthy cats and dogs. Book ahead. Cannot take pets that need medication or special care.",
-      "sample": true
+      "last_verified": "2026-10-21",
+      "phone": "",
+      "url": "https://www.ethocare.org",
+      "how_to_use": "Meals and help at home. Serves Jamaica Plain, Roslindale, West Roxbury, Hyde Park, and Mattapan. Some services are free; others use a sliding scale.",
+      "sample": false
     },
     {
-      "id": "svc_home_repair",
-      "name": "SAMPLE Senior Home Repair Program",
-      "needs": ["home_repair"],
-      "areas": ["Boston"],
+      "id": "svc_eversource_medical",
+      "name": "Eversource medical protection help",
+      "needs": [
+        "power_outage"
+      ],
+      "areas": [
+        "*"
+      ],
       "cost": "free",
-      "waitlist": true,
-      "waitlist_note": "Non-emergency repairs can take several weeks.",
-      "last_verified": "2026-06-10",
-      "phone": "TO BE VERIFIED",
-      "url": "",
-      "how_to_use": "Call to ask if you qualify. Emergency heating repairs may be faster.",
-      "sample": true
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2026-10-21",
+      "phone": "",
+      "url": "https://www.eversource.com",
+      "how_to_use": "If you use medical equipment that needs power, ask your electric company to note it on your account. This can protect you from shutoff and help them reach you in an outage.",
+      "sample": false
+    },
+    {
+      "id": "svc_mspca",
+      "name": "MSPCA-Angell",
+      "needs": [
+        "pet_care_during_stay"
+      ],
+      "areas": [
+        "Boston"
+      ],
+      "cost": "paid",
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2026-10-21",
+      "phone": "",
+      "url": "https://www.mspca.org",
+      "how_to_use": "An animal hospital and shelter. Call to ask if they offer short-term care or can refer you to someone who does. Costs vary.",
+      "sample": false
+    },
+    {
+      "id": "svc_arl",
+      "name": "Animal Rescue League of Boston",
+      "needs": [
+        "pet_care_during_stay"
+      ],
+      "areas": [
+        "Boston"
+      ],
+      "cost": "paid",
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2026-10-21",
+      "phone": "",
+      "url": "https://www.arl.org",
+      "how_to_use": "Call to ask about help with pet care while you are in the hospital, or for a referral. Costs vary.",
+      "sample": false
     }
   ]
 }

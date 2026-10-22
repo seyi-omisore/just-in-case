@@ -83,7 +83,8 @@ just-in-case/
     prompts.py              the agent's instructions + greeting
     agent.py                SDK setup, approval gate, conversation loop
   data/
-    services.json           SAMPLE services (Leya replaces with verified ones)
+    services.json           real Boston services (Leya re-confirms)
+    support_lines.json      988, Call2Talk, Mass 211, wellness check
     preparations.json       lockbox, emergency kit, fall-safety check...
     personas/ruth.json      demo persona + answer key
   tests/test_safeguards.py  14 safeguard tests + data-file checks
@@ -159,7 +160,7 @@ git init
 git add .
 git commit -m "Starter: agent, tools, safeguards, tests, eval harness"
 # create an empty repo on github.com named just-in-case, then:
-git remote add origin https://github.com/<you>/just-in-case.git
+git remote add origin https://github.com/seyi-omisore/just-in-case.git
 git branch -M main
 git push -u origin main
 ```

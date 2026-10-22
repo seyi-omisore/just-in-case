@@ -3,7 +3,7 @@
   "name": "Ruth",
   "age": 74,
   "town": "Boston",
-  "story": "Ruth was widowed two years ago and lives alone with her cat, Pepper. She has an outpatient procedure with sedation next month. The clinic told her she needs someone to take her home.",
+  "story": "Ruth was widowed two years ago and lives alone with her cat, Fifi. She has a procedure with sedation next month and may stay in the hospital for a couple of nights. The clinic told her she needs someone to take her home. Fifi needs feeding while she is away.",
   "comfortable_asking_people": true,
   "friends_she_chooses": ["Marion", "Doris"],
   "card": {
@@ -12,11 +12,12 @@
       {"name": "Doris Chen", "relationship": "neighbor", "phone": "617-555-0177"}
     ],
     "medications": ["Blood pressure pill, mornings", "Eye drops, at night"],
-    "pet": {"name": "Pepper (cat)", "caregiver": "Doris Chen"}
+    "pet": {"name": "Fifi (cat)", "caregiver": "Doris Chen"}
   },
   "answer_key": {
-    "ride_home_after_procedure": ["svc_escort_volunteer", "svc_coa_rides"],
+    "ride_home_after_procedure": ["svc_fw_escort", "svc_age_strong_shuttle"],
     "spare_key_access": ["prep_key_lockbox"],
-    "pet_care_during_stay": ["svc_pet_boarding", "prep_pet_sheet"]
+    "pet_care_during_stay": ["prep_pet_sheet", "svc_mspca", "svc_arl"],
+    "mail_while_away": ["prep_usps_hold_mail"]
   }
 }

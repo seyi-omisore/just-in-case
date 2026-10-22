@@ -42,6 +42,14 @@
       "needs": ["check_in_after_procedure"],
       "what": "Before the procedure, set out easy meals, water, and your card, so the first evening home is simple.",
       "rough_cost": "free"
+    },
+    {
+      "id": "prep_usps_hold_mail",
+      "name": "USPS Hold Mail",
+      "needs": ["mail_while_away"],
+      "what": "The Post Office keeps your mail safe for 3 to 30 days while you are away, so it does not pile up outside. You sign in to USPS.com yourself to set it up. Start a week or more early, because USPS may need to mail you a code to confirm who you are.",
+      "rough_cost": "free",
+      "url": "https://www.usps.com/manage/hold-mail.htm"
     }
   ]
 }

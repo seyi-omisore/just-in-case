@@ -64,7 +64,7 @@ Cards are saved in `output/` as printable HTML.
 
 ## Known limitations
 
-- Service data in this repo is **sample data** until replaced with verified entries.
+- Services were copied from official websites on 2026-10-21 and are being re-confirmed. Always call to confirm.
 - One area (Boston) only.
 - Check-ins over time are shown as a review date on the card; scheduled reminders are future work.
 - It is a planning tool. It does not detect falls or monitor anyone.

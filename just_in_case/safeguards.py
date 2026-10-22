@@ -7,7 +7,7 @@ each one has a unit test in tests/test_safeguards.py.
 import re
 
 EMERGENCY_LINE = "In an emergency, call 911."
-CRISIS_LINE = "If you are feeling hopeless or in crisis, call or text 988 any time."
+CRISIS_LINE = "Feeling alone or unsafe? Call or text 988, any time."
 FALLBACK_LINE = (
     "Nothing in our list fits this yet. Your local Council on Aging, Mass211 "
     "(dial 2-1-1), or 1-800-AGE-INFO can help you look."

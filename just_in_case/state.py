@@ -18,6 +18,8 @@ NEEDS: dict[str, str] = {
     "power_outage": "Staying safe in a winter power outage",
     "home_repair": "Urgent home problems, like a broken furnace",
     "transportation": "Rides to regular appointments",
+    "help_at_home": "Help with meals or chores at home while recovering",
+    "mail_while_away": "Keeping your mail safe while you are away or in the hospital",
 }
 
 ROUTES = ("service", "preparation", "person", "blank")
