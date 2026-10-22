@@ -99,6 +99,7 @@ def test_helper_cap(box):
 
 
 def test_card_has_911_and_only_typed_meds(box):
+    box.state.user_said.append("I'm Ruth. My friend Marion is 617-555-0142. I use eye drops at night.")
     box.confirm_needs(["spare_key_access"])
     box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
     out = box.make_fridge_card("Ruth", [{"name": "Marion", "relationship": "friend",
@@ -142,6 +143,7 @@ def test_support_lines_do_not_touch_the_plan(box):
 
 def test_card_has_988_line(box):
     from just_in_case.safeguards import CRISIS_LINE
+    box.state.user_said.append("I'm Ruth.")
     out = box.make_fridge_card("Ruth", [], [])
     txt = open(out["file"].replace(".html", ".txt")).read()
     assert CRISIS_LINE in txt
@@ -150,6 +152,109 @@ def test_card_has_988_line(box):
 def test_card_shows_service_phone(box):
     box.confirm_needs(["ride_home_after_procedure"])
     box.add_to_plan("ride_home_after_procedure", "service", "svc_escort_volunteer")
+    box.state.user_said.append("I'm Ruth.")
     out = box.make_fridge_card("Ruth", [], [])
     txt = open(out["file"].replace(".html", ".txt")).read()
     assert "SAMPLE Volunteer Medical Escort Program, TO BE VERIFIED" in txt
+
+
+
+# ---- No assumptions on the card --------------------------------------------
+
+def card_text(out):
+    return open(out["file"].replace(".html", ".txt")).read()
+
+
+def test_card_blocks_details_the_user_never_said(box):
+    box.state.user_said.append("I'm Ruth and I live alone.")
+    with pytest.raises(ToolError, match="Not said by the user"):
+        box.make_fridge_card("Ruth", [], [], "Fifi (cat)", "")
+    with pytest.raises(ToolError, match="medication"):
+        box.make_fridge_card("Ruth", [], ["Lisinopril 10mg"])
+    with pytest.raises(ToolError, match="phone"):
+        box.make_fridge_card("Ruth", [{"name": "Ruth", "relationship": "", "phone": "617-555-0199"}], [])
+
+
+def test_card_leaves_out_sections_the_user_did_not_give(box):
+    box.state.user_said.append("I'm Ruth.")
+    txt = card_text(box.make_fridge_card("Ruth", [], []))
+    assert "MEDICATIONS" not in txt and "MY PET" not in txt and "PEOPLE TO CONTACT" not in txt
+    assert "none listed" not in txt
+
+
+def test_card_accepts_the_users_own_words(box):
+    box.state.user_said += ["My cat Max. Doris Chen 617-555-0177 feeds him.",
+                            "I take a blood pressure pill in the morning."]
+    txt = card_text(box.make_fridge_card("", [{"name": "Doris Chen", "relationship": "neighbor",
+                                               "phone": "(617) 555-0177"}],
+                                         ["Blood pressure pill, mornings"], "Max (cat)", "Doris Chen"))
+    assert "Max (cat), looked after by Doris Chen" in txt
+    assert "Blood pressure pill, mornings" in txt
+
+
+def test_note_only_to_people_the_user_named(box):
+    box.set_comfort(True, False)
+    box.state.user_said.append("I could ask Samantha.")
+    with pytest.raises(ToolError, match="has not named"):
+        box.draft_helper_note(["Marion"], "feed the cat", "Hi Marion. Could you feed my cat? No pressure at all.")
+    box.draft_helper_note(["Samantha"], "feed the cat", "Hi Samantha. Could you feed my cat? No pressure at all.")
+
+
+# ---- Helper table ------------------------------------------------------------
+
+def test_agent_adds_helper_row_only_for_named_people(box):
+    box.set_comfort(True, False)
+    box.state.user_said.append("Samantha could feed the cat on the 14th.")
+    with pytest.raises(ToolError, match="has not named"):
+        box.add_helper_task("Feed the cat", "Marion")
+    row = box.add_helper_task("Feed the cat", "Samantha", "Nov 14", "Evening")["added"]
+    assert row["person"] == "Samantha" and row["id"] == 1
+
+
+def test_no_helper_rows_in_burden_mode(box):
+    box.set_comfort(True, True)
+    box.state.user_said.append("Samantha")
+    with pytest.raises(ToolError, match="People are not part"):
+        box.add_helper_task("Feed the cat", "Samantha")
+
+
+def test_user_can_add_edit_and_remove_rows(box):
+    box.user_edit_task("add", {"task": "Drive me home", "person": "Leo", "date": "Nov 14"})
+    rid = box.state.helper_tasks[0]["id"]
+    box.user_edit_task("update", {"id": rid, "task": "Drive me home", "person": "Leo", "time": "2 pm"})
+    assert box.state.helper_tasks[0]["time"] == "2 pm"
+    box.user_edit_task("delete", {"id": rid})
+    assert box.state.helper_tasks == []
+    with pytest.raises(ToolError):
+        box.user_edit_task("add", {"task": "", "person": "Leo"})
+
+
+def test_spreadsheet_download_cannot_run_formulas(box):
+    box.user_edit_task("add", {"task": "=HYPERLINK(\"http://bad\")", "person": "+Leo"})
+    csv_text = box.tasks_csv()
+    assert csv_text.splitlines()[0] == "Task,Date,Time,Who is helping"
+    assert "'=HYPERLINK" in csv_text and "'+Leo" in csv_text
+
+
+def test_card_lists_who_is_helping(box):
+    box.state.user_said.append("I'm Ruth.")
+    box.user_edit_task("add", {"task": "Feed the cat", "person": "Samantha", "date": "Nov 14"})
+    assert "Samantha: Feed the cat (Nov 14)" in card_text(box.make_fridge_card("Ruth", [], []))
+
+
+def test_card_refreshes_when_table_changes(box):
+    box.state.user_said.append("I'm Ruth.")
+    out = box.make_fridge_card("Ruth", [], [])
+    box.user_edit_task("add", {"task": "Drive me home", "person": "Leo"})
+    assert "Leo: Drive me home" in card_text(out)
+    box.user_edit_task("delete", {"id": box.state.helper_tasks[0]["id"]})
+    assert "Leo" not in card_text(out)
+
+
+def test_card_names_the_chosen_helper(box):
+    box.set_comfort(True, False)
+    box.state.user_said.append("I'm Ruth. I could ask Tasha.")
+    box.confirm_needs(["pet_care_during_stay"])
+    box.add_to_plan("pet_care_during_stay", "person")
+    box.draft_helper_note(["Tasha"], "feed my dog", "Hi Tasha. Could you feed my dog? No pressure at all.")
+    assert "Care for a pet during a hospital stay: Tasha" in card_text(box.make_fridge_card("Ruth", [], []))

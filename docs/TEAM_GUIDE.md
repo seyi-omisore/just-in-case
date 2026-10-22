@@ -102,9 +102,8 @@ Also try declining an approval (`n`) to see the agent ask what to change.
 |---|---|---|---|
 | `.env` | `sk-or-v1-paste-your-key-here` | the real OpenRouter key (never committed) | everyone, locally |
 | `data/services.json` | `last_verified` dates | the date YOU re-confirmed each service | Leya |
-| `data/services.json` | `"phone": ""` (MSPCA, ARL, Ethos, Eversource, Council on Aging) | a phone number confirmed on the official site, or leave empty | Leya |
+| `data/services.json` | `"phone": ""` (MSPCA, ARL, Ethos, Eversource) | a phone number confirmed on the official site, or leave empty | Leya |
 | `data/services.json` | `areas` | add towns each service really covers | Leya |
-| `data/support_lines.json` | wellness check entry | a confirmed local police non-emergency number, if you want one shown | Leya |
 | `data/support_lines.json` | all lines | re-confirm numbers and hours | Leya |
 | `data/preparations.json` | `prep_home_safety_check` wording | text grounded in the CDC STEADI home checklist | exercise science teammate |
 | `data/preparations.json` | `rough_cost` values | checked prices | Joan |

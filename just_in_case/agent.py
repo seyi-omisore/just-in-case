@@ -116,6 +116,7 @@ class JustInCaseAgent:
     async def send(self, user_text: str, on_text=print) -> str:
         """Send one user message and return the agent's full text reply."""
         self.transcript.append(("user", user_text))
+        self.state.user_said.append(user_text)
         await self.client.query(user_text)
         reply_parts = []
         async for msg in self.client.receive_response():

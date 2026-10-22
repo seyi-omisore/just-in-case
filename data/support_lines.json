@@ -1,5 +1,5 @@
 {
-  "_readme": "Support lines the agent shares when someone sounds hopeless or alone (test case T7). Checked on official websites on 2026-10-21. The agent only shares these; it never calls anyone. Leya re-confirms each one. Boston Police 617-343-4200 was provided by the team and matches the Operations line on police.boston.gov. To add another town, add an entry with kind 'wellness_check' after confirming it on that town's official police website.",
+  "_readme": "Support lines the agent shares when someone sounds hopeless or alone (test case T7). Checked on official websites on 2026-10-21. The agent only shares these; it never calls anyone. Leya re-confirms each one. Boston Police 617-343-4200 was provided by the team and matches the Operations line on police.boston.gov.",
   "lines": [
     {
       "id": "line_988",
@@ -42,24 +42,14 @@
       "last_verified": "2026-10-21"
     },
     {
-      "id": "line_boston_police_nonemergency",
-      "name": "Boston Police non-emergency line",
-      "how_to_reach": "Call 617-343-4200 and ask for a wellness check.",
-      "hours": "Any time",
-      "kind": "wellness_check",
-      "what": "For people in Boston. Police can stop by to check that you are okay. You decide if and when to ask. In an emergency, call 911.",
-      "url": "https://police.boston.gov/?p=11261",
-      "last_verified": "2026-10-22"
-    },
-    {
       "id": "line_wellness_check",
-      "name": "Wellness check (outside Boston)",
-      "how_to_reach": "Call your local police non-emergency number and ask for a wellness check.",
+      "name": "Wellness check",
+      "how_to_reach": "Call the Boston Police non-emergency line at 617-343-4200 and ask for a wellness check.",
       "hours": "Any time",
       "kind": "wellness_check",
       "what": "If you are worried about yourself or someone you love, the police can stop by to check that you are okay. You decide if and when to ask. In an emergency, call 911.",
-      "url": "",
-      "last_verified": "2026-10-21"
+      "url": "https://police.boston.gov/?p=11261",
+      "last_verified": "2026-10-22"
     }
   ]
 }

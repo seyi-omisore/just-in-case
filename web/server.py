@@ -23,7 +23,9 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse
+import html as htmlmod
+
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from just_in_case.config import DATA_DIR, OUTPUT_DIR
@@ -55,6 +57,7 @@ def describe_tool(short: str, data: dict) -> tuple[str, str] | None:
         "find_preparations": ("search", f"Looking for simple ways to get ready: {need.lower()}"),
         "add_to_plan": ("add", f"Adding to your plan: {need.lower()}"),
         "draft_helper_note": ("write", "Writing a note for you to look over"),
+        "add_helper_task": ("add", "Adding a row to your helper table"),
         "make_fridge_card": ("card", "Making your fridge card"),
         "get_support_lines": ("heart", "Finding people you can talk to"),
         "review_plan": ("search", "Checking your plan"),
@@ -121,6 +124,8 @@ class Session:
         if short == "draft_helper_note":
             return {"to": data.get("helper_names", []), "role": data.get("role", ""),
                     "text": data.get("note_text", "")}
+        if short == "add_helper_task":
+            return {k: data.get(k, "") for k in ("task", "person", "date", "time")}
         if short == "make_fridge_card":
             return {"name": data.get("name", ""), "contacts": data.get("contacts", []),
                     "medications": data.get("medications", []),
@@ -153,8 +158,23 @@ class Session:
         return {
             "items": items,
             "notes": state.helper_notes,
+            "tasks": state.helper_tasks,
             "card": f"/card/{self.id}" if state.card_path else None,
+            "table_csv": f"/table/{self.id}.csv",
+            "table_print": f"/table/{self.id}",
         }
+
+    def edit_table(self, action: str, row: dict) -> None:
+        from just_in_case.tools import ToolError
+        try:
+            self.agent.box.user_edit_task(action, row)
+            self.emit({"type": "activity", "kind": "human", "text": {
+                "add": "You added a row to your helper table",
+                "update": "You changed a row in your helper table",
+                "delete": "You removed a row from your helper table"}.get(action, "You edited your table")})
+        except ToolError as e:
+            self.emit({"type": "table_error", "text": str(e)})
+        self.emit({"type": "plan", "plan": self.plan()})
 
     # -- lifecycle -----------------------------------------------------------
     async def start(self):
@@ -223,6 +243,45 @@ async def card(sid: str):
     return FileResponse(s.agent.state.card_path, media_type="text/html")
 
 
+def _session_or_404(sid: str):
+    s = SESSIONS.get(sid)
+    return s if s and s.agent else None
+
+
+@app.get("/table/{sid}.csv")
+async def table_csv(sid: str):
+    s = _session_or_404(sid)
+    if not s:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return Response(s.agent.box.tasks_csv(), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="who-is-helping.csv"'})
+
+
+@app.get("/table/{sid}")
+async def table_print(sid: str):
+    s = _session_or_404(sid)
+    if not s:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    e = htmlmod.escape
+    rows = "".join(f"<tr><td>{e(t['task'])}</td><td>{e(t['date'])}</td><td>{e(t['time'])}</td>"
+                   f"<td>{e(t['person'])}</td></tr>" for t in s.agent.state.helper_tasks)
+    rows = rows or '<tr><td colspan="4">No rows yet.</td></tr>'
+    return HTMLResponse(f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>Who is helping</title>
+<style>
+ body {{ font-family: "Atkinson Hyperlegible", Verdana, Arial, sans-serif; font-size: 16pt; color: #000; max-width: 9in; margin: .4in auto; }}
+ h1 {{ font-size: 24pt; }} table {{ width: 100%; border-collapse: collapse; }}
+ th, td {{ border: 2px solid #000; padding: .08in .12in; text-align: left; vertical-align: top; }}
+ th {{ background: #eee; }} .print {{ margin-top: .3in; font: inherit; font-weight: 700; padding: .1in .35in; border: 0; border-radius: 10px; background: #0072B2; color: #fff; }}
+ @media print {{ .print {{ display: none; }} }}
+</style></head><body>
+<h1>Who is helping</h1>
+<table><thead><tr><th>Task</th><th>Date</th><th>Time</th><th>Who is helping</th></tr></thead><tbody>{rows}</tbody></table>
+<p>In an emergency, call 911.</p>
+<button class="print" onclick="window.print()">Print this table</button>
+</body></html>""")
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
@@ -246,6 +305,8 @@ async def ws_endpoint(ws: WebSocket):
                 t.add_done_callback(tasks.discard)
             elif msg.get("type") == "answer":
                 s.answer(str(msg.get("id")), bool(msg.get("ok")))
+            elif msg.get("type") == "table" and isinstance(msg.get("row"), dict):
+                s.edit_table(str(msg.get("action")), msg["row"])
     except WebSocketDisconnect:
         pass
     except Exception as e:

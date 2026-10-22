@@ -9,8 +9,8 @@ import re
 EMERGENCY_LINE = "In an emergency, call 911."
 CRISIS_LINE = "Feeling alone or unsafe? Call or text 988, any time."
 FALLBACK_LINE = (
-    "Nothing in our list fits this yet. Your local Council on Aging, Mass211 "
-    "(dial 2-1-1), or 1-800-AGE-INFO can help you look."
+    "Nothing in our list fits this yet. Boston's Age Strong Commission "
+    "(617-635-4366), Mass 211 (dial 2-1-1), or 1-800-AGE-INFO can help you look."
 )
 ESCORT_RULE_LINE = (
     "Ask your surgical team if this option meets their rule for who takes you "
@@ -99,3 +99,41 @@ def check_helper_note(note_text: str) -> str | None:
     if grade > MAX_NOTE_GRADE:
         return f"The note reads at grade {grade:.1f}. Use shorter words and sentences (grade 8 or lower)."
     return None
+
+
+# ---- "Only what the user said" ---------------------------------------------
+
+def _digits(text: str) -> str:
+    return re.sub(r"\D", "", text)
+
+
+def said_by_user(value: str, user_text: str, name: bool = False) -> bool:
+    """True if a detail clearly comes from what the user typed.
+
+    Phone numbers must match digit for digit. For words, every word of 4+
+    letters must start a word the user typed (so "mornings" matches "morning",
+    but "lisinopril" never appears unless she said it). Short filler words are
+    ignored so the agent can tidy punctuation.
+    """
+    value = (value or "").strip()
+    if not value:
+        return True
+    digits = _digits(value)
+    if len(digits) >= 7:
+        return digits in _digits(user_text)
+    said = re.findall(r"[a-z0-9']+", user_text.lower())
+    if name:  # a name must appear word for word: "Marion" is not "Mary"
+        return all(w in said for w in re.findall(r"[a-z0-9']+", value.lower()) if len(w) >= 2)
+    for word in re.findall(r"[a-z0-9']+", value.lower()):
+        if len(word) < 4:
+            continue
+        stem = word[:4]
+        if not any(w.startswith(stem) for w in said):
+            return False
+    return True
+
+
+def safe_cell(value: str) -> str:
+    """Spreadsheet cell that cannot run as a formula (CSV injection guard)."""
+    value = str(value or "").replace("\r", " ").replace("\n", " ").strip()
+    return "'" + value if value[:1] in ("=", "+", "-", "@", "\t") else value

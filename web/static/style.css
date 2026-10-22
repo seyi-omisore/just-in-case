@@ -195,7 +195,7 @@ a[href^="tel:"] { white-space: nowrap; }
 .slip dd { margin: 0; }
 
 /* ---- Fridge -------------------------------------------------------------- */
-.side { display: grid; gap: 1.25rem; position: sticky; top: 1rem; }
+.side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; position: sticky; top: 1rem; }
 @media (max-width: 900px) { .side { position: static; } }
 
 .fridge {
@@ -372,6 +372,51 @@ a[href^="tel:"] { white-space: nowrap; }
 
 .usps-steps { margin: 0 0 1rem; padding-left: 1.4rem; display: grid; gap: .45rem; }
 .tag-action { margin-top: .6rem; min-height: 2.8rem; font-size: .9rem; }
+
+/* ---- Helper table ------------------------------------------------------- */
+.helpers { background: var(--paper); border: 2px solid var(--line); border-radius: 22px; padding: 1.1rem 1.25rem; }
+.helpers h2 { font-size: 1.15rem; display: flex; gap: .5rem; align-items: center; margin-bottom: .35rem; }
+.helpers h2 .icon { color: var(--orange); }
+.table-empty { color: var(--ink-soft); font-style: italic; margin-bottom: .6rem; }
+.helper-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: .92rem; }
+.helper-table th { text-align: left; font-size: .8rem; color: var(--ink-soft); padding: .35rem .4rem; border-bottom: 2px solid var(--line); }
+.helper-table td { padding: .55rem .4rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.helper-table td.who { font-weight: 700; }
+.row-actions { display: flex; flex-direction: column; gap: .3rem; align-items: stretch; }
+.row-actions button {
+  min-height: 2.4rem; padding: 0 .55rem; border-radius: 10px; border: 2px solid var(--ink-soft);
+  background: var(--paper); cursor: pointer; display: flex; gap: .3rem; align-items: center;
+  font-size: .8rem; font-weight: 700; white-space: nowrap;
+}
+@media (max-width: 560px) { .row-actions { flex-direction: row; margin-top: .3rem; } }
+.row-actions button:hover { background: var(--wall); }
+.helper-table tr.new-row td { animation: rowin .6s ease-out; }
+@keyframes rowin { from { background: var(--yellow-tint); } to { background: transparent; } }
+
+.task-form { display: grid; gap: .6rem; padding: .9rem; border-radius: 16px; background: var(--enamel); border: 2px dashed var(--line); }
+.task-form-title { font-weight: 700; }
+.task-form label { display: grid; gap: .2rem; font-size: .9rem; font-weight: 700; }
+.task-form input {
+  min-height: 2.9rem; padding: .45rem .75rem; border: 2px solid var(--ink-soft); border-radius: 12px;
+  background: var(--paper); font-weight: 400; width: 100%; min-width: 0;
+}
+.task-form input::placeholder { color: var(--ink-soft); opacity: .8; }
+.task-form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.task-form-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.task-error { color: var(--route-person); font-weight: 700; font-size: .9rem; }
+.task-error:empty { display: none; }
+.table-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+.table-actions .btn { flex: 1 1 12rem; }
+
+/* On narrow screens each row becomes a small card. */
+@media (max-width: 560px) {
+  .helper-table thead { display: none; }
+  .helper-table, .helper-table tbody, .helper-table tr, .helper-table td { display: block; width: 100%; }
+  .helper-table tr { border: 2px solid var(--line); border-radius: 14px; padding: .4rem .6rem; margin-bottom: .6rem; }
+  .helper-table td { border: 0; padding: .15rem 0; }
+  .helper-table td[data-label]::before { content: attr(data-label) ": "; color: var(--ink-soft); font-weight: 700; }
+  .task-form-pair { grid-template-columns: 1fr; }
+}
 
 /* ---- Fridge card viewer -------------------------------------------------- */
 .card-dialog {

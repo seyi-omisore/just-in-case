@@ -44,12 +44,12 @@
     {
       "id": "line_wellness_check",
       "name": "Wellness check",
-      "how_to_reach": "Call your local police non-emergency number and ask for a wellness check.",
+      "how_to_reach": "Call the Boston Police non-emergency line at 617-343-4200 and ask for a wellness check.",
       "hours": "Any time",
       "kind": "wellness_check",
       "what": "If you are worried about yourself or someone you love, the police can stop by to check that you are okay. You decide if and when to ask. In an emergency, call 911.",
-      "url": "",
-      "last_verified": "2026-10-21"
+      "url": "https://police.boston.gov/?p=11261",
+      "last_verified": "2026-10-22"
     }
   ]
 }

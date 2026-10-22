@@ -20,14 +20,16 @@ from claude_agent_sdk import create_sdk_mcp_server, tool
 from .card import write_card
 from .config import MAX_HELPERS, OUTPUT_DIR
 from .directory import Directory
-from .safeguards import ESCORT_RULE_LINE, FALLBACK_LINE, check_helper_note
+from .safeguards import ESCORT_RULE_LINE, FALLBACK_LINE, check_helper_note, safe_cell, said_by_user
 from .state import NEEDS, ROUTES, PlanItem, PlanState
 
 SERVER_NAME = "jic"
 PREFIX = f"mcp__{SERVER_NAME}__"
 
 # Tools that pause for the user's approval (the three human checkpoints).
-GATED_TOOLS = {"confirm_needs", "draft_helper_note", "make_fridge_card"}
+GATED_TOOLS = {"confirm_needs", "draft_helper_note", "add_helper_task", "make_fridge_card"}
+TASK_FIELDS = ("task", "date", "time", "person")
+MAX_FIELD = 120
 
 
 class ToolError(Exception):
@@ -126,6 +128,9 @@ class Toolbox:
             raise ToolError("Do not draft a note. People are not part of this plan.")
         if not helper_names:
             raise ToolError("Name at least one person the user chose.")
+        unheard = [n for n in helper_names if not said_by_user(n, s.heard(), name=True)]
+        if unheard:
+            raise ToolError(f"The user has not named {', '.join(unheard)}. Ask who they would like to ask.")
         if s.helper_count() + len(helper_names) > MAX_HELPERS:
             raise ToolError(f"Keep the plan small: at most {MAX_HELPERS} people in total.")
         problem = check_helper_note(note_text)
@@ -139,13 +144,97 @@ class Toolbox:
     # ---- checkpoint 3 -------------------------------------------------------
     def make_fridge_card(self, name: str, contacts: list[dict], medications: list[str],
                          pet_name: str = "", pet_caregiver: str = "") -> dict:
+        # Every detail must come from what the user typed. Nothing assumed.
+        heard = self.state.heard()
+        missing = []
+        if name and not said_by_user(name, heard, name=True):
+            missing.append(f"the name '{name}'")
+        for c in contacts:
+            if not said_by_user(c.get("name", ""), heard, name=True):
+                missing.append(f"contact '{c.get('name')}'")
+            if not said_by_user(c.get("phone", ""), heard):
+                missing.append(f"phone number '{c.get('phone')}'")
+        for m in medications:
+            if not said_by_user(m, heard):
+                missing.append(f"medication '{m}'")
+        if pet_name and not said_by_user(pet_name, heard):
+            missing.append(f"pet '{pet_name}'")
+        if pet_caregiver and not said_by_user(pet_caregiver, heard, name=True):
+            missing.append(f"pet caregiver '{pet_caregiver}'")
+        if missing:
+            raise ToolError(
+                "The card can only use details the user typed. Not said by the user: "
+                + "; ".join(missing) + ". Ask the user instead of filling it in, or leave it off."
+            )
         card = {"name": name, "contacts": contacts, "medications": medications,
                 "pet": {"name": pet_name, "caregiver": pet_caregiver} if pet_name else None}
+        self.card = card  # kept so the card can refresh when the plan or table changes
         path = write_card(card, self.state, self.dir, self.today, self.out_dir)
         self.state.card_path = str(path)
         self.state.log(f"checkpoint 3: card approved -> {path.name}")
         return {"status": "card created", "file": str(path),
                 "print_tip": "Open the file and print it. It works without Wi-Fi after printing."}
+
+    # ---- helper table ---------------------------------------------------------
+    def _clean_task(self, row: dict) -> dict:
+        out = {k: str(row.get(k, "") or "").strip()[:MAX_FIELD] for k in TASK_FIELDS}
+        if not out["task"] or not out["person"]:
+            raise ToolError("Each row needs a task and a person.")
+        return out
+
+    def add_helper_task(self, task: str, person: str, date: str = "", time: str = "") -> dict:
+        """Agent adds a row (checkpoint). Only for people the user named and chose."""
+        s = self.state
+        if not s.people_allowed():
+            raise ToolError("People are not part of this plan, so do not add helper rows.")
+        if not said_by_user(person, s.heard(), name=True):
+            raise ToolError(f"The user has not named {person}. Ask who they would like to ask.")
+        people = {t["person"].lower() for t in s.helper_tasks} | {person.lower()}
+        if len(people) > MAX_HELPERS:
+            raise ToolError(f"Keep the plan small: at most {MAX_HELPERS} people in the table.")
+        row = self._clean_task({"task": task, "person": person, "date": date, "time": time})
+        row["id"] = s.next_task_id
+        s.next_task_id += 1
+        s.helper_tasks.append(row)
+        s.log(f"checkpoint: helper row added for {row['person']}")
+        self.refresh_card()
+        return {"added": row, "note": "The user can edit or remove this row any time."}
+
+    def user_edit_task(self, action: str, row: dict) -> list[dict]:
+        """The user edits the table on the page. Their table, their choice."""
+        s = self.state
+        if action == "add":
+            new = self._clean_task(row)
+            new["id"] = s.next_task_id
+            s.next_task_id += 1
+            s.helper_tasks.append(new)
+        elif action == "update":
+            clean = self._clean_task(row)
+            for t in s.helper_tasks:
+                if t["id"] == row.get("id"):
+                    t.update(clean)
+        elif action == "delete":
+            s.helper_tasks = [t for t in s.helper_tasks if t["id"] != row.get("id")]
+        else:
+            raise ToolError("Unknown table action.")
+        s.log(f"user edited helper table ({action})")
+        self.refresh_card()
+        return s.helper_tasks
+
+    def refresh_card(self) -> None:
+        """Rebuild an approved card from the same approved details, with the latest plan."""
+        if getattr(self, "card", None) and self.state.card_path:
+            write_card(self.card, self.state, self.dir, self.today, self.out_dir)
+
+    def tasks_csv(self) -> str:
+        import csv
+        import io
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["Task", "Date", "Time", "Who is helping"])
+        for t in self.state.helper_tasks:
+            w.writerow([safe_cell(t["task"]), safe_cell(t["date"]), safe_cell(t["time"]), safe_cell(t["person"])])
+        return buf.getvalue()
 
     # ---- support (T7) --------------------------------------------------------
     def get_support_lines(self) -> dict:
@@ -170,6 +259,7 @@ class Toolbox:
             "items": [vars(i) for i in s.items],
             "uncovered": [n for n in s.confirmed_needs if n not in {i.need for i in s.items}],
             "helper_notes": s.helper_notes,
+            "helper_tasks": s.helper_tasks,
             "card": s.card_path,
         }
 
@@ -254,6 +344,17 @@ def build_server(box: Toolbox, trace=print):
     async def draft_helper_note(args):
         return await run(box.draft_helper_note, args["helper_names"], args["role"], args["note_text"])
 
+    @tool("add_helper_task",
+          "CHECKPOINT. Add one row to the user's helper table: a task, the person the user chose, "
+          "and a date and time if the user gave them. Only for people the user named.",
+          {"type": "object", "properties": {
+              "task": {"type": "string"}, "person": {"type": "string"},
+              "date": {"type": "string"}, "time": {"type": "string"}},
+           "required": ["task", "person"]})
+    async def add_helper_task(args):
+        return await run(box.add_helper_task, args["task"], args["person"],
+                         args.get("date", ""), args.get("time", ""))
+
     @tool("make_fridge_card",
           "CHECKPOINT. Create the printable card. Use ONLY details the user typed. Never add medical content.",
           {"type": "object", "properties": {
@@ -282,7 +383,8 @@ def build_server(box: Toolbox, trace=print):
         return _ok(box.review_plan())
 
     tools = [confirm_needs, set_comfort, find_services, find_preparations,
-             add_to_plan, draft_helper_note, make_fridge_card, get_support_lines, review_plan]
+             add_to_plan, draft_helper_note, add_helper_task, make_fridge_card,
+             get_support_lines, review_plan]
     server = create_sdk_mcp_server(name=SERVER_NAME, version="0.1.0", tools=tools)
     names = [PREFIX + t.name for t in tools]
     return server, names

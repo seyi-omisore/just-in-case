@@ -1,5 +1,5 @@
 {
-  "_readme": "Curated Greater Boston services for the prototype. Phone numbers and links were copied from each official website on 2026-10-21. Leya re-confirms each entry and updates last_verified to the date she checked. An empty phone means it was not confirmed, so the agent shows the website and 'call to confirm'. Only these services can appear in a plan.",
+  "_readme": "Curated Boston services for the prototype. Phone numbers and links were copied from each official website on 2026-10-21. Leya re-confirms each entry and updates last_verified to the date she checked. An empty phone means it was not confirmed, so the agent shows the website and 'call to confirm'. Only these services can appear in a plan.",
   "services": [
     {
       "id": "svc_fw_escort",
@@ -17,7 +17,7 @@
       "last_verified": "2026-10-21",
       "phone": "617-482-1510",
       "url": "https://fw4elders.org",
-      "how_to_use": "A trained volunteer goes with you to the appointment and helps you get home. Call well ahead to book. Serves Greater Boston, so ask if they cover your town.",
+      "how_to_use": "A trained volunteer goes with you to the appointment and helps you get home. Call well ahead to book.",
       "sample": false
     },
     {
@@ -41,10 +41,11 @@
     },
     {
       "id": "svc_age_strong",
-      "name": "City of Boston Age Strong Commission",
+      "name": "City of Boston Age Strong Commission (Boston's Council on Aging)",
       "needs": [
         "help_at_home",
-        "transportation"
+        "transportation",
+        "ride_home_after_procedure"
       ],
       "areas": [
         "Boston"
@@ -55,7 +56,7 @@
       "last_verified": "2026-10-21",
       "phone": "617-635-4366",
       "url": "https://www.boston.gov/departments/age-strong-commission",
-      "how_to_use": "The city's office for older adults. They can connect you with rides, meals, and help at home.",
+      "how_to_use": "Boston's Council on Aging. They can connect you with rides, meals, and help at home.",
       "sample": false
     },
     {
@@ -74,27 +75,7 @@
       "last_verified": "2026-10-21",
       "phone": "617-222-3200",
       "url": "https://www.mbta.com/accessibility/the-ride",
-      "how_to_use": "Shared door-to-door rides for people who cannot use buses or trains. Low fare per trip. Covers Boston and many nearby towns in the MBTA area.",
-      "sample": false
-    },
-    {
-      "id": "svc_local_coa",
-      "name": "Your local Council on Aging",
-      "needs": [
-        "transportation",
-        "ride_home_after_procedure",
-        "help_at_home"
-      ],
-      "areas": [
-        "*"
-      ],
-      "cost": "free",
-      "waitlist": true,
-      "waitlist_note": "Services and wait times differ from town to town.",
-      "last_verified": "2026-10-21",
-      "phone": "",
-      "url": "https://www.mass.gov/info-details/find-your-local-council-on-aging",
-      "how_to_use": "Every Massachusetts town has one. Use the website to find yours, then call to ask about rides and help at home.",
+      "how_to_use": "Shared door-to-door rides for people who cannot use buses or trains. Low fare per trip.",
       "sample": false
     },
     {
@@ -122,7 +103,7 @@
         "power_outage"
       ],
       "areas": [
-        "*"
+        "Boston"
       ],
       "cost": "free",
       "waitlist": false,

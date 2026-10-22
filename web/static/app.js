@@ -94,6 +94,7 @@
     confirm_needs: "Does this list look right?",
     draft_helper_note: "Here is a note you can send",
     make_fridge_card: "Here is what goes on your fridge card",
+    add_helper_task: "Add this to your helper table?",
   };
   function addApproval(msg) {
     const { id, kind, data } = msg;
@@ -110,13 +111,21 @@
       body.appendChild(el("p", null, "For " + data.to.join(" and ") + ". We never send it. You send it yourself if you like."));
       const note = el("div", "sticky"); const nh = el("span", "sticky-head"); nh.append(icon("note"), document.createTextNode("Your note"));
       note.append(nh, el("p", null, data.text)); body.appendChild(note);
+    } else if (kind === "add_helper_task") {
+      const dl = el("dl");
+      const row = (t, d) => { if (d) dl.append(el("dt", null, t), el("dd", null, d)); };
+      row("Task", data.task); row("Who is helping", data.person); row("Date", data.date); row("Time", data.time);
+      body.appendChild(dl);
+      body.appendChild(el("p", "helper-small", "You can change or remove it later."));
     } else if (kind === "make_fridge_card") {
       const dl = el("dl");
       const row = (t, d) => { dl.append(el("dt", null, t), el("dd", null, d)); };
-      row("Name", data.name);
-      row("People to contact", data.contacts.map((c) => `${c.name} (${c.relationship}), ${c.phone}`).join("; ") || "None");
-      row("Medications, in your words", data.medications.join("; ") || "None");
-      if (data.pet) row("Pet", `${data.pet}, looked after by ${data.pet_caregiver || "not set yet"}`);
+      // Only what the user gave. Empty parts are left off, not shown as "None".
+      if (data.name) row("Name", data.name);
+      if (data.contacts.length) row("People to contact", data.contacts.map((c) => `${c.name}${c.relationship ? " (" + c.relationship + ")" : ""}, ${c.phone}`).join("; "));
+      if (data.medications.length) row("Medications, in your words", data.medications.join("; "));
+      if (data.pet) row("Pet", data.pet + (data.pet_caregiver ? `, looked after by ${data.pet_caregiver}` : ""));
+      if (!dl.children.length) dl.appendChild(el("dd", null, "Just the emergency lines and your plan."));
       body.appendChild(dl);
     }
 
@@ -203,6 +212,7 @@
       s.append(h, el("p", null, n.text)); notes.appendChild(s);
     }
 
+    renderTasks(plan);
     const card = $("card-link");
     cardUrl = plan.card;
     card.hidden = !plan.card;
@@ -240,6 +250,7 @@
         case "approval": addApproval(m); break;
         case "plan": renderPlan(m.plan); break;
         case "busy": setBusy(m.on); break;
+        case "table_error": $("task-error").textContent = m.text; break;
         case "error": addMessage("agent", m.text, "msg-error"); setBusy(false); break;
       }
     };
@@ -276,10 +287,70 @@
   $("bigger").onclick = () => { sizeIdx = Math.min(SIZES.length - 1, sizeIdx + 1); applySize(); };
   $("smaller").onclick = () => { sizeIdx = Math.max(0, sizeIdx - 1); applySize(); };
 
+  // ---- helper table ------------------------------------------------------
+  let editingId = null, seenTasks = new Set(), tableUrls = {};
+  const form = $("task-form");
+  function renderTasks(plan) {
+    tableUrls = { csv: plan.table_csv, print: plan.table_print };
+    $("table-download").href = plan.table_csv || "#";
+    const rows = $("helper-rows"); rows.replaceChildren();
+    const tasks = plan.tasks || [];
+    $("helper-table").hidden = !tasks.length;
+    $("table-empty").hidden = !!tasks.length;
+    for (const t of tasks) {
+      const tr = el("tr", seenTasks.has(t.id) ? "" : "new-row"); seenTasks.add(t.id);
+      const td = (v, label, cls) => { const c = el("td", cls || "", v || ""); if (label) c.dataset.label = label; return c; };
+      tr.append(td(t.task, "Task"), td(t.date, "Date"), td(t.time, "Time"), td(t.person, "Who", "who"));
+      const act = el("td"); const box = el("div", "row-actions");
+      const edit = el("button"); edit.type = "button"; edit.setAttribute("aria-label", "Change " + t.task); edit.title = "Change";
+      edit.append(icon("pencil"), document.createTextNode("Change"));
+      edit.onclick = () => startEdit(t);
+      const del = el("button"); del.type = "button"; del.setAttribute("aria-label", "Remove " + t.task); del.title = "Remove";
+      del.append(icon("dash"), document.createTextNode("Remove"));
+      del.onclick = () => { if (confirm(`Remove "${t.task}" from your table?`)) sendTable("delete", { id: t.id }); };
+      box.append(edit, del); act.appendChild(box); tr.appendChild(act);
+      rows.appendChild(tr);
+    }
+  }
+  function sendTable(action, row) {
+    if (!ws || ws.readyState !== 1) return;
+    $("task-error").textContent = "";
+    ws.send(JSON.stringify({ type: "table", action, row }));
+  }
+  function startEdit(t) {
+    editingId = t.id;
+    for (const k of ["task", "person", "date", "time"]) form.elements[k].value = t[k] || "";
+    $("task-form-title").textContent = "Change this row";
+    $("task-save").querySelector("span").textContent = "Save changes";
+    $("task-cancel").hidden = false;
+    form.elements.task.focus();
+  }
+  function resetForm() {
+    editingId = null; form.reset();
+    $("task-form-title").textContent = "Add a row";
+    $("task-save").querySelector("span").textContent = "Add row";
+    $("task-cancel").hidden = true;
+  }
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const row = {}; for (const k of ["task", "person", "date", "time"]) row[k] = form.elements[k].value.trim();
+    if (!row.task || !row.person) { $("task-error").textContent = "Please add a task and who is helping."; return; }
+    if (editingId != null) { row.id = editingId; sendTable("update", row); } else sendTable("add", row);
+    resetForm();
+  });
+  $("task-cancel").onclick = resetForm;
+  $("table-print").addEventListener("click", () => {
+    if (!tableUrls.print) return;
+    $("card-dialog-title").textContent = "Who's helping";
+    frame.src = tableUrls.print + "?t=" + Date.now();
+    dialog.showModal();
+  });
+
   // ---- fridge card viewer ------------------------------------------------
   const dialog = $("card-dialog"), frame = $("card-frame");
   $("card-link").addEventListener("click", () => {
     if (!cardUrl) return;
+    $("card-dialog-title").textContent = "Your fridge card";
     frame.src = cardUrl + "?t=" + Date.now();
     dialog.showModal();
   });

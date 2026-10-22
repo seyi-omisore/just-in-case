@@ -44,12 +44,20 @@ class PlanState:
     helper_notes: list[dict] = field(default_factory=list)
     card_path: str | None = None
     trace: list[str] = field(default_factory=list)  # decisions, for the demo and evals
+    # Everything the user typed this visit. The card may only use details found here.
+    user_said: list[str] = field(default_factory=list)
+    # The helper table: [{"id", "task", "date", "time", "person"}]
+    helper_tasks: list[dict] = field(default_factory=list)
+    next_task_id: int = 1
 
     def people_allowed(self) -> bool:
         return self.comfortable_asking_people and not self.worried_about_burden
 
     def helper_count(self) -> int:
         return sum(len(n["helpers"]) for n in self.helper_notes)
+
+    def heard(self) -> str:
+        return "\n".join(self.user_said)
 
     def log(self, line: str) -> None:
         self.trace.append(line)
