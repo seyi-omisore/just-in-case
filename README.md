@@ -50,7 +50,9 @@ pip install -r requirements.txt
 cp .env.example .env             # then paste your OpenRouter key into .env
 python run.py --check            # free: checks setup
 pytest -q                        # free: tests every safeguard
-python run.py                    # talk to the agent
+python serve.py                  # the website, with the live agent
+python serve.py --demo           # the website, scripted demo (no AI, no cost)
+python run.py                    # talk to the agent in the terminal
 python eval/run_eval.py          # scripted test cases, writes eval/results.md
 ```
 

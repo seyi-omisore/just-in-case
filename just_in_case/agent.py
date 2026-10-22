@@ -79,10 +79,14 @@ def make_gate(approver: Approver, trace=print):
 
 class JustInCaseAgent:
     def __init__(self, approver: Approver = terminal_approver, town: str = "Boston",
-                 directory: Directory | None = None, trace=print, model: str | None = None):
+                 directory: Directory | None = None, trace=print, model: str | None = None,
+                 on_tool=None):
         self.state = PlanState(town=town)
         self.box = Toolbox(self.state, directory or Directory())
         self.trace = trace
+        # Optional hook: on_tool(short_name, input_dict). The website uses it for
+        # the live "what Just in Case is doing" feed.
+        self.on_tool = on_tool
         server, tool_names = build_server(self.box, trace=trace)
         gated = {PREFIX + t for t in GATED_TOOLS}
         self.options = ClaudeAgentOptions(
@@ -120,7 +124,10 @@ class JustInCaseAgent:
                         reply_parts.append(block.text)
                         on_text(f"\nJust in Case: {block.text}")
                     elif isinstance(block, ToolUseBlock):
-                        self.trace(f"  [tool]  {block.name.removeprefix(PREFIX)}")
+                        short = block.name.removeprefix(PREFIX)
+                        self.trace(f"  [tool]  {short}")
+                        if self.on_tool:
+                            self.on_tool(short, block.input or {})
             elif isinstance(msg, ResultMessage):
                 # Estimate only (priced at Anthropic list rates). The OpenRouter
                 # Activity page is the real bill.

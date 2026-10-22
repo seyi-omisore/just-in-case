@@ -72,7 +72,11 @@ Keep them on in the demo: they are how judges *see* that it is agentic. `--quiet
 
 ```
 just-in-case/
-  run.py                    start here: terminal chat
+  serve.py                  start here: the website (add --demo for no AI)
+  run.py                    terminal chat
+  web/server.py             web server: runs the agent, keeps the key hidden
+  web/demo_agent.py         scripted Ruth story for demos and testing
+  web/static/               the page: index.html, style.css, app.js
   just_in_case/
     config.py               settings + OpenRouter connection
     state.py                the plan in memory; list of allowed needs

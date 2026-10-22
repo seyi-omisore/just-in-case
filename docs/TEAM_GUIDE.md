@@ -48,13 +48,15 @@ For Leya, Joan, Satoshi (and Seyi). No coding experience needed.
 
 | What | Command | Costs money? |
 |---|---|---|
-| Talk to the agent as a user | `python run.py` | yes (under 1 cent) |
+| **Open the website (live agent)** | `python serve.py` | yes (under 1 cent per chat) |
+| Open the website in demo mode (set Ruth story) | `python serve.py --demo` | **no** |
+| Talk to the agent in the terminal | `python run.py` | yes (under 1 cent) |
 | Same, without the grey decision lines | `python run.py --quiet` | yes |
 | Run the scripted test cases | `python eval/run_eval.py` | yes (a few cents) |
 | Run only some cases | `python eval/run_eval.py T2 T7` | yes |
 | Check safeguards + data files | `pytest -q` | **no** |
 
-Type `quit` to end a chat. The fridge card is saved in the `output/` folder: open the `.html`
+The website opens at http://localhost:8000. Press Control+C in the terminal to stop it. In the terminal chat, type `quit` to end. The fridge card is saved in the `output/` folder: open the `.html`
 file in a browser and print it. Answer `y` or `n` when the agent asks you to approve something.
 
 **The grey lines** show what the agent is doing:
