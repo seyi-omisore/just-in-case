@@ -141,6 +141,36 @@
           </button>
         </div>
         <p class="helper-small">The spreadsheet opens in Excel, Numbers, or Google Sheets. You choose who gets it.</p>
+
+        <div class="share-zone">
+          <button type="button" id="share-open" class="btn btn-primary btn-block">
+            <svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> Share with family
+          </button>
+          <div id="share-box" class="share-box" hidden>
+            <p class="share-box-title">
+              <svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg>
+              Your list is shared
+            </p>
+            <p>Send this link to the people you choose. They can add their name to open tasks.</p>
+            <div class="share-link-row">
+              <input id="share-link" readonly aria-label="Link to your helper list">
+              <button type="button" id="share-copy" class="btn btn-quiet">Copy link</button>
+            </div>
+            <a id="share-email" class="btn btn-quiet btn-block" href="#">
+              <svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg> Email the link
+            </a>
+            <p class="helper-small" id="share-expiry"></p>
+            <details class="share-owner">
+              <summary>Your private link, to change or delete the list later</summary>
+              <p class="helper-small">Keep this one to yourself.</p>
+              <div class="share-link-row">
+                <input id="share-owner-link" readonly aria-label="Your private link">
+                <button type="button" id="share-owner-copy" class="btn btn-quiet">Copy</button>
+              </div>
+            </details>
+            <button type="button" id="share-stop" class="btn btn-quiet btn-block">Stop sharing and delete</button>
+          </div>
+        </div>
       </section>
 
       <details id="support" class="helper-box support-box">
@@ -176,6 +206,28 @@
       </section>
     </aside>
   </main>
+
+  <dialog id="consent-dialog" class="consent-dialog" aria-labelledby="consent-title">
+    <form method="dialog" class="consent-form">
+      <h2 id="consent-title">Before we share your list</h2>
+      <p>Just in Case does not save anything unless you say yes. To share, we need to save your helper list.</p>
+      <ul class="consent-facts">
+        <li><strong>What we save:</strong> only your helper list (tasks, dates, times, and names). Not your chat, card, contacts, or medications.</li>
+        <li><strong>Who can see it:</strong> anyone you give the link to.</li>
+        <li><strong>How long:</strong> it is deleted after 30 days, or right away when you stop sharing.</li>
+        <li><strong>What helpers can do:</strong> add their own name to an open task, or remove it.</li>
+      </ul>
+      <label class="consent-label">Name to show on the list <span class="optional">(optional)</span>
+        <input id="consent-name" maxlength="60" placeholder="For example: Gloria">
+      </label>
+      <div class="consent-actions">
+        <button type="button" id="consent-yes" class="btn btn-primary">
+          <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Yes, save and make a link
+        </button>
+        <button type="submit" value="no" class="btn btn-quiet">No, thank you</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="card-dialog" class="card-dialog" aria-labelledby="card-dialog-title">
     <div class="card-dialog-bar">

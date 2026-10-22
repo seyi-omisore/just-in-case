@@ -241,6 +241,7 @@
     }
 
     renderTasks(plan);
+    renderShare(plan);
     const card = $("card-link");
     cardUrl = plan.card;
     card.hidden = !plan.card;
@@ -374,6 +375,42 @@
     $("card-dialog-title").textContent = "Who's helping";
     frame.src = tableUrls.print + "?t=" + Date.now();
     dialog.showModal();
+  });
+
+  // ---- sharing (only after the consent box) -----------------------------
+  const consent = $("consent-dialog");
+  let shareState = null;
+  function renderShare(plan) {
+    shareState = plan.share;
+    const has = (plan.tasks || []).length > 0;
+    $("share-open").hidden = !!plan.share;
+    $("share-open").disabled = !has;
+    $("share-open").title = has ? "" : "Add a task first";
+    $("share-box").hidden = !plan.share;
+    if (plan.share) {
+      const url = location.origin + plan.share.url;
+      $("share-link").value = url;
+      $("share-owner-link").value = location.origin + plan.share.owner_url;
+      $("share-email").href = "mailto:?subject=" + encodeURIComponent("Could you help with my plan?") +
+        "&body=" + encodeURIComponent("I made a small backup plan. If you'd like to help with something, you can add your name here. No pressure at all.\n\n" + url);
+      const d = new Date(plan.share.expires * 1000);
+      $("share-expiry").textContent = "This list will be deleted on " + d.toLocaleDateString(undefined, { month: "long", day: "numeric" }) + ".";
+    }
+  }
+  $("share-open").addEventListener("click", () => { $("consent-name").value = ""; consent.showModal(); });
+  $("consent-yes").addEventListener("click", () => {
+    ws.send(JSON.stringify({ type: "share_create", consent: true, label: $("consent-name").value.trim() }));
+    consent.close();
+  });
+  const copy = async (inputId, btn) => {
+    const v = $(inputId).value;
+    try { await navigator.clipboard.writeText(v); } catch (_) { $(inputId).select(); document.execCommand("copy"); }
+    const old = btn.textContent; btn.textContent = "Copied"; setTimeout(() => (btn.textContent = old), 1800);
+  };
+  $("share-copy").onclick = (e) => copy("share-link", e.currentTarget);
+  $("share-owner-copy").onclick = (e) => copy("share-owner-link", e.currentTarget);
+  $("share-stop").addEventListener("click", () => {
+    if (confirm("Stop sharing? Your list will be deleted and the link will stop working.")) ws.send(JSON.stringify({ type: "share_delete" }));
   });
 
   // ---- fridge card viewer ------------------------------------------------

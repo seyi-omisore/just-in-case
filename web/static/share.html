@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Helper list</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("jic-theme"); } catch (e) {}
+      if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 15 16 4l12 11v13H4z' fill='%230072B2'/%3E%3Cpath d='M16 25s-6-3.6-6-7.6a3.3 3.3 0 0 1 6-1.9 3.3 3.3 0 0 1 6 1.9c0 4-6 7.6-6 7.6z' fill='%23E69F00'/%3E%3C/svg%3E">
+</head>
+<body class="share-body">
+  <div class="safety-strip" role="note">
+    <p class="safety-911">
+      <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg>
+      <strong>In an emergency, call 911.</strong>
+    </p>
+  </div>
+
+  <header class="site-header">
+    <span class="brand">
+      <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M6 22 24 6l18 16v20H6z" fill="#0072B2"/>
+        <path d="M24 37s-9-5.4-9-11.4a5 5 0 0 1 9-2.9 5 5 0 0 1 9 2.9c0 6-9 11.4-9 11.4z" fill="#E69F00"/>
+      </svg>
+      <span class="brand-name">Just in Case</span>
+    </span>
+    <span class="tagline"></span>
+    <div class="theme-switch" role="group" aria-label="Light or dark mode">
+      <button type="button" id="theme-light" aria-label="Light mode" title="Light mode"><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg></button>
+      <button type="button" id="theme-dark" aria-label="Dark mode" title="Dark mode"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg></button>
+    </div>
+    <div class="text-size" role="group" aria-label="Text size">
+      <button type="button" id="smaller" aria-label="Make text smaller">A<span aria-hidden="true">−</span></button>
+      <button type="button" id="bigger" aria-label="Make text bigger">A<span aria-hidden="true">+</span></button>
+    </div>
+  </header>
+
+  <main class="share-main">
+    <div id="owner-banner" class="owner-banner" hidden>
+      <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+      <div>
+        <p><strong>This is your private link.</strong> Keep it to yourself. With it you can remove names or delete this list.</p>
+        <button type="button" id="delete-list" class="btn btn-quiet">Delete this list</button>
+      </div>
+    </div>
+
+    <section class="share-card">
+      <h1 id="share-title">A helper list</h1>
+      <p id="share-intro" class="share-intro"></p>
+      <p id="share-status" class="share-status" role="status"></p>
+      <ul id="share-rows" class="share-rows"></ul>
+      <p id="share-expires" class="helper-small"></p>
+    </section>
+  </main>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.6 3h3l1.5 4.5-2 1.5a11 11 0 0 0 5.9 5.9l1.5-2L21 14.4v3A2.6 2.6 0 0 1 18.4 20 15.4 15.4 0 0 1 4 5.6 2.6 2.6 0 0 1 6.6 3z" fill="currentColor"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m9.5 16.2-4-4L4 13.7l5.5 5.5L20 8.7l-1.5-1.5z" fill="currentColor"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z" fill="currentColor"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6-8 11-8 11z" fill="currentColor"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5zm-1.2 14.2-3.5-3.5 1.4-1.4 2.1 2.1 4.6-4.6 1.4 1.4z" fill="currentColor"/></symbol>
+      <symbol id="i-dash" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zM7 11v2h10v-2z" fill="currentColor"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.8A8.5 8.5 0 0 1 9.2 3.5a8.5 8.5 0 1 0 11.3 11.3z" fill="currentColor"/></symbol>
+    </defs>
+  </svg>
+  <script src="/static/share.js"></script>
+</body>
+</html>

@@ -22,7 +22,7 @@ import shutil
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 import html as htmlmod
 
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
@@ -31,12 +31,16 @@ from fastapi.staticfiles import StaticFiles
 from just_in_case.config import DATA_DIR, OUTPUT_DIR
 from just_in_case.prompts import GREETING
 from just_in_case.state import CARD_SECTIONS, NEEDS
+from web.share_store import ShareError, ShareStore
 
 STATIC = Path(__file__).parent / "static"
 DEMO = os.getenv("JIC_DEMO") == "1"
 
 app = FastAPI(title="Just in Case")
 SESSIONS: dict[str, "Session"] = {}
+SHARES = ShareStore(OUTPUT_DIR / "shared")
+SHARE_OWNERS: dict[str, "Session"] = {}  # share id -> the owner's open visit
+SHARES.purge_expired()
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +93,9 @@ class Session:
         self.lock = asyncio.Lock()  # one user message at a time
         # Each visit gets its own folder for the card, deleted when the visit ends.
         self.out_dir = OUTPUT_DIR / "sessions" / self.id
+        self.share_id: str | None = None
+        self.owner_token: str | None = None
+        self.share_expires: float | None = None
 
     def emit(self, msg: dict) -> None:
         self.out.put_nowait(msg)
@@ -105,6 +112,7 @@ class Session:
         d = describe_trace(line)
         if d:
             self.emit({"type": "activity", "kind": d[0], "text": d[1]})
+        self.sync_share()
         self.emit({"type": "plan", "plan": self.plan()})
 
     async def approver(self, short: str, data: dict):
@@ -169,7 +177,57 @@ class Session:
             "card": f"/card/{self.id}" if state.card_path else None,
             "table_csv": f"/table/{self.id}.csv",
             "table_print": f"/table/{self.id}",
+            "share": {"url": f"/share/{self.share_id}",
+                      "owner_url": f"/share/{self.share_id}?owner={self.owner_token}",
+                      "expires": self.share_expires} if self.share_id else None,
         }
+
+    # -- sharing (only with consent) -----------------------------------------
+    def share_create(self, consent: bool, label: str) -> None:
+        if consent is not True:
+            self.emit({"type": "table_error", "text": "Nothing was shared. Sharing needs your OK first."})
+            return
+        tasks = self.agent.state.helper_tasks
+        if not tasks:
+            self.emit({"type": "table_error", "text": "Add at least one task before sharing."})
+            return
+        rec, token = SHARES.create(label, tasks)
+        self.share_id, self.owner_token, self.share_expires = rec["id"], token, rec["expires"]
+        SHARE_OWNERS[rec["id"]] = self
+        self.emit({"type": "activity", "kind": "human",
+                   "text": "You saved and shared your helper list. Only people with the link can see it."})
+        self.emit({"type": "plan", "plan": self.plan()})
+
+    def share_delete(self) -> None:
+        if self.share_id:
+            try:
+                SHARES.delete(self.share_id, self.owner_token)
+            except ShareError:
+                pass
+            SHARE_OWNERS.pop(self.share_id, None)
+        self.share_id = self.owner_token = self.share_expires = None
+        self.emit({"type": "activity", "kind": "human", "text": "You stopped sharing. Your list was deleted."})
+        self.emit({"type": "plan", "plan": self.plan()})
+
+    def sync_share(self) -> None:
+        """Push the owner's latest table to the shared copy."""
+        if not self.share_id:
+            return
+        try:
+            SHARES.update_tasks(self.share_id, self.agent.state.helper_tasks)
+        except ShareError:  # deleted from the owner link, or expired
+            SHARE_OWNERS.pop(self.share_id, None)
+            self.share_id = self.owner_token = self.share_expires = None
+
+    def apply_share(self, rec: dict, activity: str) -> None:
+        """A helper signed up or stepped back: update the owner's table live."""
+        people = {t["id"]: t["person"] for t in rec["tasks"]}
+        for t in self.agent.state.helper_tasks:
+            if t["id"] in people:
+                t["person"] = people[t["id"]]
+        self.agent.box.refresh_card()
+        self.emit({"type": "activity", "kind": "heart", "text": activity})
+        self.emit({"type": "plan", "plan": self.plan()})
 
     def edit_table(self, action: str, row: dict) -> None:
         from just_in_case.tools import ToolError
@@ -181,6 +239,7 @@ class Session:
                 "delete": "You removed a row from your helper table"}.get(action, "You edited your table")})
         except ToolError as e:
             self.emit({"type": "table_error", "text": str(e)})
+        self.sync_share()
         self.emit({"type": "plan", "plan": self.plan()})
 
     # -- lifecycle -----------------------------------------------------------
@@ -250,6 +309,72 @@ async def card(sid: str):
     return FileResponse(s.agent.state.card_path, media_type="text/html")
 
 
+# ---------------------------------------------------------------------------
+# The family page: /share/<id>
+# ---------------------------------------------------------------------------
+
+def _share_json(rec: dict, owner: bool) -> JSONResponse:
+    return JSONResponse({**ShareStore.public(rec), "owner": owner})
+
+
+def _notify_owner(rec: dict, text: str) -> None:
+    s = SHARE_OWNERS.get(rec["id"])
+    if s and s.agent:
+        s.apply_share(rec, text)
+
+
+@app.get("/share/{share_id}")
+async def share_page(share_id: str):
+    return FileResponse(STATIC / "share.html")
+
+
+@app.get("/api/share/{share_id}")
+async def share_get(share_id: str, owner: str = ""):
+    try:
+        rec = SHARES.get(share_id)
+    except ShareError:
+        return JSONResponse({"error": "This list was not found. It may have been deleted."}, status_code=404)
+    return _share_json(rec, SHARES.is_owner(rec, owner))
+
+
+@app.post("/api/share/{share_id}/claim")
+async def share_claim(share_id: str, request: Request):
+    body = await request.json()
+    try:
+        rec, token = SHARES.claim(share_id, int(body.get("task_id", -1)), str(body.get("name", "")))
+    except (ShareError, ValueError) as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    row = next(t for t in rec["tasks"] if t["id"] == int(body["task_id"]))
+    _notify_owner(rec, f"{row['person']} signed up to help: {row['task']}")
+    return JSONResponse({**ShareStore.public(rec), "claim_token": token, "task_id": row["id"]})
+
+
+@app.post("/api/share/{share_id}/unclaim")
+async def share_unclaim(share_id: str, request: Request):
+    body = await request.json()
+    try:
+        rec = SHARES.unclaim(share_id, int(body.get("task_id", -1)), str(body.get("token", "")))
+    except (ShareError, ValueError) as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    row = next(t for t in rec["tasks"] if t["id"] == int(body["task_id"]))
+    _notify_owner(rec, f"Someone stepped back from: {row['task']}. It is open again.")
+    return JSONResponse(ShareStore.public(rec))
+
+
+@app.post("/api/share/{share_id}/delete")
+async def share_delete_route(share_id: str, request: Request):
+    body = await request.json()
+    try:
+        SHARES.delete(share_id, str(body.get("owner", "")))
+    except ShareError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    s = SHARE_OWNERS.pop(share_id, None)
+    if s:
+        s.share_id = s.owner_token = s.share_expires = None
+        s.emit({"type": "plan", "plan": s.plan()})
+    return JSONResponse({"deleted": True})
+
+
 def _session_or_404(sid: str):
     s = SESSIONS.get(sid)
     return s if s and s.agent else None
@@ -314,6 +439,10 @@ async def ws_endpoint(ws: WebSocket):
                 s.answer(str(msg.get("id")), bool(msg.get("ok")), msg.get("choice"))
             elif msg.get("type") == "table" and isinstance(msg.get("row"), dict):
                 s.edit_table(str(msg.get("action")), msg["row"])
+            elif msg.get("type") == "share_create":
+                s.share_create(msg.get("consent"), str(msg.get("label", "")))
+            elif msg.get("type") == "share_delete":
+                s.share_delete()
     except WebSocketDisconnect:
         pass
     except Exception as e:
@@ -327,6 +456,8 @@ async def ws_endpoint(ws: WebSocket):
         writer_task.cancel()
         await s.stop()
         SESSIONS.pop(s.id, None)
+        if s.share_id:
+            SHARE_OWNERS.pop(s.share_id, None)  # the shared list stays, as she agreed
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

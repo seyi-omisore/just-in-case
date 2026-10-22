@@ -36,6 +36,11 @@ See [docs/workflow.md](docs/workflow.md) for the diagram and [docs/TEAM_GUIDE.md
 | Ride-home items always get the "check your clinic's escort rule" line | `tools.py` |
 | Card built by code from user-typed details; 911 line top and bottom | `card.py` |
 | No file, shell, web, or messaging tools available to the model | `agent.py` (`tools=[]`, permission gate) |
+| Card uses only details the user typed, and only sections the user ticked | `tools.py` `make_fridge_card`, `safeguards.py` `said_by_user` |
+| Notes and table rows only name people the user named | `tools.py` |
+| Nothing is saved unless the user agrees; the agent has no sharing tool | `web/server.py`, consent box on the page |
+| Shared lists: random links, separate owner key, hashed sign-up keys, 30-day deletion | `web/share_store.py` |
+| Spreadsheet download cannot run formulas (CSV injection guard) | `safeguards.py` `safe_cell` |
 
 Each rule has an offline test in `tests/test_safeguards.py`.
 
@@ -70,6 +75,7 @@ Cards are saved in `output/` as printable HTML.
 - One area (Boston) only.
 - Check-ins over time are shown as a review date on the card; scheduled reminders are future work.
 - It is a planning tool. It does not detect falls or monitor anyone.
+- Shared helper lists are saved as small files on the server (with the user's consent) and deleted after 30 days.
 
 ## AI use disclosure
 

@@ -442,6 +442,53 @@ a[href^="tel:"] { white-space: nowrap; }
   .task-form-pair { grid-template-columns: 1fr; }
 }
 
+/* ---- Sharing ------------------------------------------------------------ */
+.share-zone { margin-top: 1rem; padding-top: 1rem; border-top: 2px dashed var(--line); }
+.share-box { display: grid; gap: .65rem; padding: .9rem; border-radius: 16px; background: var(--purple-tint); border: 2px solid var(--purple); }
+.share-box-title { display: flex; gap: .5rem; align-items: center; font-weight: 700; font-size: 1.05rem; }
+.share-link-row { display: flex; gap: .5rem; }
+.share-link-row input {
+  flex: 1; min-width: 0; min-height: 2.9rem; padding: .4rem .7rem; border: 2px solid var(--ink-soft);
+  border-radius: 12px; background: var(--paper); font-size: .85rem;
+}
+.share-owner summary { cursor: pointer; font-weight: 700; font-size: .9rem; min-height: 2.4rem; display: flex; align-items: center; }
+
+.consent-dialog { width: min(620px, calc(100% - 2rem)); border: 0; border-radius: 20px; padding: 0; background: var(--paper); color: var(--ink); }
+.consent-dialog::backdrop { background: rgba(10, 18, 32, .6); }
+.consent-form { display: grid; gap: .9rem; padding: 1.4rem; }
+.consent-form h2 { font-size: 1.35rem; }
+.consent-facts { margin: 0; padding-left: 1.2rem; display: grid; gap: .5rem; }
+.consent-label { display: flex; flex-wrap: wrap; gap: .3rem .4rem; align-items: baseline; font-weight: 700; }
+.consent-label input { flex: 1 1 100%; }
+.consent-label input { min-height: 2.9rem; padding: .45rem .75rem; border: 2px solid var(--ink-soft); border-radius: 12px; background: var(--paper); font-weight: 400; }
+.consent-actions { display: flex; flex-wrap: wrap; gap: .7rem; }
+
+/* ---- The family page ----------------------------------------------------- */
+.share-main { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; display: grid; gap: 1rem; }
+.share-card { background: var(--paper); border: 2px solid var(--line); border-radius: 22px; padding: 1.4rem; display: grid; gap: .9rem; }
+.share-card h1 { font-size: 1.8rem; }
+.share-intro { font-size: 1.05rem; }
+.share-status { font-weight: 700; color: var(--ok); }
+.share-status:empty { display: none; }
+.share-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: .8rem; }
+.share-row {
+  display: grid; gap: .45rem; padding: 1rem 1.1rem; border-radius: 16px;
+  background: var(--enamel); border: 2px solid var(--line);
+}
+.share-row.taken { border-style: solid; border-color: var(--route-prep); }
+.share-task { font-weight: 700; font-size: 1.1rem; }
+.share-when { color: var(--ink-soft); }
+.share-who { display: flex; gap: .4rem; align-items: center; font-weight: 700; color: var(--route-prep); }
+.share-small { justify-self: start; max-width: 100%; }
+.share-row .open-chip { justify-self: start; }
+.share-form { display: grid; gap: .6rem; }
+.share-form label { display: grid; gap: .3rem; font-weight: 700; }
+.share-form input { min-height: 3rem; padding: .45rem .75rem; border: 2px solid var(--ink-soft); border-radius: 12px; background: var(--paper); font-weight: 400; }
+.share-form-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.owner-banner { display: flex; gap: .8rem; align-items: flex-start; padding: 1rem 1.1rem; border-radius: 16px; background: var(--yellow-tint); border: 2px solid var(--ink-soft); }
+.owner-banner .icon { width: 1.6rem; height: 1.6rem; margin-top: .1rem; }
+.owner-banner .btn { margin-top: .6rem; }
+
 /* ---- Fridge card viewer -------------------------------------------------- */
 .card-dialog {
   width: min(860px, calc(100% - 2rem)); height: min(92vh, 1100px);
