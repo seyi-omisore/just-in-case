@@ -280,7 +280,7 @@ def test_user_can_add_edit_and_remove_rows(box):
 def test_spreadsheet_download_cannot_run_formulas(box):
     box.user_edit_task("add", {"task": "=HYPERLINK(\"http://bad\")", "person": "+Leo"})
     csv_text = box.tasks_csv()
-    assert csv_text.splitlines()[0] == "Task,Date,Time,Who is helping"
+    assert csv_text.splitlines()[0] == "Task,Date,Time,Who is helping,Status"
     assert "'=HYPERLINK" in csv_text and "'+Leo" in csv_text
 
 
@@ -498,3 +498,107 @@ def test_names_the_user_never_said_are_dropped(fresh):
     fresh.state.user_said.append("I'm helping my mom.")
     fresh.confirm_helping_someone("Margaret", agreed=True)
     assert fresh.state.planning_for == ""
+
+
+# ---- Progress counts only what the user said yes to ---------------------------
+
+def test_items_start_unconfirmed_and_no_thanks_removes_them(box):
+    box.confirm_needs(["spare_key_access", "power_outage"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    box.add_to_plan("power_outage", "blank")
+    assert [i.user_ok for i in box.state.items] == [False, False]
+    box.user_confirm_item("spare_key_access", True)
+    assert box.state.items[0].user_ok is True
+    with pytest.raises(ToolError):
+        box.user_confirm_item("power_outage", True)  # "Not covered yet" is not something to accept
+    box.user_confirm_item("spare_key_access", False)
+    assert [i.need for i in box.state.items] == ["power_outage"]
+
+
+def test_replacing_an_item_asks_again(box):
+    box.confirm_needs(["spare_key_access"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    box.user_confirm_item("spare_key_access", True)
+    box.add_to_plan("spare_key_access", "blank")
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    assert box.state.items[0].user_ok is False
+
+
+def test_saved_yes_answers_come_back(box, tmp_path):
+    box.confirm_needs(["spare_key_access"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    box.user_confirm_item("spare_key_access", True)
+    again = _new_box(tmp_path / "again")
+    again.restore(box.export())
+    assert again.state.items[0].user_ok is True
+
+
+# ---- Getting ready timeline -----------------------------------------------------
+
+def test_timeline_uses_the_users_date_and_only_confirmed_parts(box):
+    from just_in_case import timeline
+    box.confirm_needs(["ride_home_after_procedure", "spare_key_access"])
+    ride = box.find_services("ride_home_after_procedure")["services"][0]["id"]
+    box.add_to_plan("ride_home_after_procedure", "service", ride)
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    assert timeline.build(box.state, TODAY)["steps"] == []  # nothing said yes to yet
+    box.user_confirm_item("spare_key_access", True)
+    tl = timeline.build(box.state, TODAY)
+    assert tl["date"] == "" and all(s["date"] == "" for s in tl["steps"])  # no date until the user picks one
+    assert any("lockbox" in s["text"] for s in tl["steps"]) and not any("ride" in s["text"] for s in tl["steps"])
+    box.user_set_event_date("2026-11-02")
+    tl = timeline.build(box.state, TODAY)
+    assert tl["countdown"] == "14 days to go." and tl["label"] == "procedure"
+    key = next(s for s in tl["steps"] if s["text"] == "Put a key in the lockbox.")
+    assert key["date"] == "2026-11-01" and key["when"] == "The day before"
+    assert tl["steps"][-1]["when"] == "The morning of"  # in order, ending on the day
+
+
+def test_timeline_date_must_be_a_real_date_in_the_next_year(box):
+    with pytest.raises(ToolError):
+        box.user_set_event_date("next month")
+    with pytest.raises(ToolError):
+        box.user_set_event_date("2030-01-01")
+    box.user_set_event_date("")  # clearing is fine
+
+
+def test_ticking_a_step_and_countdown_words(box):
+    from datetime import date
+    from just_in_case import timeline
+    box.confirm_needs(["mail_while_away"])
+    box.add_to_plan("mail_while_away", "preparation", "prep_usps_hold_mail")
+    box.user_confirm_item("mail_while_away", True)
+    box.user_set_event_date("2026-10-20")
+    step = timeline.build(box.state, TODAY)["steps"][0]
+    box.user_tick_step(step["id"], True)
+    assert timeline.build(box.state, TODAY)["steps"][0]["done"] is True
+    with pytest.raises(ToolError):
+        box.user_tick_step("made:up", True)
+    assert timeline.countdown(date(2026, 10, 19), TODAY) == "Today is the day."
+    assert timeline.countdown(date(2026, 10, 20), TODAY) == "Tomorrow."
+    assert "passed" in timeline.countdown(date(2026, 10, 1), TODAY)
+
+
+def test_timeline_wording_is_plain(box):
+    from just_in_case import timeline
+    from just_in_case.safeguards import reading_grade
+    texts = [t for steps in timeline.STEPS.values() for _, t in steps] + [t for _, t in timeline.ALWAYS]
+    assert all(reading_grade(t) <= 8 for t in texts), [t for t in texts if reading_grade(t) > 8]
+
+
+# ---- Helper task status ----------------------------------------------------------
+
+def test_task_status_open_helping_confirmed(box):
+    from just_in_case.tools import task_status
+    box.user_edit_task("add", {"task": "Feed the cat"})
+    t = box.state.helper_tasks[0]
+    assert task_status(t) == "open"
+    with pytest.raises(ToolError, match="Add who is helping"):
+        box.user_edit_task("confirm", {"id": t["id"], "confirmed": True})
+    box.user_edit_task("update", {"id": t["id"], "task": "Feed the cat", "person": "Doris"})
+    assert task_status(t) == "helping"
+    box.user_edit_task("confirm", {"id": t["id"], "confirmed": True})
+    assert task_status(t) == "confirmed"
+    assert box.tasks_csv().splitlines()[1].endswith(",Doris,Confirmed")
+    box.user_edit_task("update", {"id": t["id"], "task": "Feed the cat", "person": "Marion"})
+    assert task_status(t) == "helping"  # a confirmation never moves to a new name

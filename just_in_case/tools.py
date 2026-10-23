@@ -17,6 +17,7 @@ from typing import Any
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
 
+from . import timeline
 from .card import write_card
 from .config import MAX_HELPERS, OUTPUT_DIR
 from .directory import Directory
@@ -34,12 +35,20 @@ NOT_AGREED = ("The person this plan is for has not agreed yet. Do not plan. Kind
               "talks with them first, and ask the agreement checkpoint again only when the user says they agree.")
 TASK_FIELDS = ("task", "date", "time", "person")
 MAX_FIELD = 120
+# A helper task is Open (no name), Someone's helping (a name), or Confirmed (the owner checked).
+TASK_STATUS = {"open": "Open", "helping": "Someone's helping", "confirmed": "Confirmed"}
 MAX_SAVED_SAID = 200   # messages kept in a saved plan
 MAX_SAVED_TASKS = 50
 
 
 class ToolError(Exception):
     """Raised for a rule violation. The message goes back to the model."""
+
+
+def task_status(t: dict) -> str:
+    if not t.get("person"):
+        return "open"
+    return "confirmed" if t.get("confirmed") else "helping"
 
 
 class Toolbox:
@@ -321,6 +330,32 @@ class Toolbox:
             return f"Unknown needs {unknown}. Use only: {list(NEEDS)}" if unknown else None
         return None
 
+    def user_confirm_item(self, need: str, ok: bool) -> None:
+        """The user answers a plan item on the page: "Yes, add this" or "No thanks"."""
+        s = self.state
+        item = next((i for i in s.items if i.need == need), None)
+        if item is None or item.route == "blank":
+            raise ToolError("That part of the plan is not there anymore.")
+        if ok:
+            item.user_ok = True
+        else:
+            s.items = [i for i in s.items if i.need != need]  # back to "still to plan"
+        s.log(f"user {'confirmed' if ok else 'said no thanks to'} {need}")
+        self.refresh_card()
+
+    # ---- "Getting ready" timeline (the user's own date and ticks) -------------
+    def user_set_event_date(self, value: str) -> None:
+        if value and timeline.parse_day(value, self.today) is None:
+            raise ToolError("Please pick a date within the next year.")
+        self.state.event_date = str(value or "")
+        self.state.log("user set the date for their timeline" if value else "user cleared the timeline date")
+
+    def user_tick_step(self, step_id: str, done: bool) -> None:
+        ids = {s["id"] for s in timeline.build(self.state, self.today)["steps"]}
+        if step_id not in ids:
+            raise ToolError("That step is not on the timeline anymore.")
+        (self.state.steps_done.add if done else self.state.steps_done.discard)(step_id)
+
     def user_edit_task(self, action: str, row: dict) -> list[dict]:
         """The user edits the table on the page. Their table, their choice."""
         s = self.state
@@ -333,7 +368,16 @@ class Toolbox:
             clean = self._clean_task(row)
             for t in s.helper_tasks:
                 if t["id"] == row.get("id"):
+                    if clean["person"].lower() != t["person"].lower():
+                        t["confirmed"] = False  # a confirmation never moves to a new name
                     t.update(clean)
+        elif action == "confirm":
+            t = next((t for t in s.helper_tasks if t["id"] == row.get("id")), None)
+            if t is None:
+                raise ToolError("That row is not in your table anymore.")
+            if not t["person"]:
+                raise ToolError("Add who is helping before marking it confirmed.")
+            t["confirmed"] = row.get("confirmed") is True
         elif action == "delete":
             s.helper_tasks = [t for t in s.helper_tasks if t["id"] != row.get("id")]
         else:
@@ -349,8 +393,10 @@ class Toolbox:
         return {"v": 1, "user_said": s.user_said[-MAX_SAVED_SAID:], "needs": s.confirmed_needs,
                 "helping": [s.helping_someone, s.person_agreed, s.planning_for],
                 "comfort": [s.comfortable_asking_people, s.worried_about_burden, s.no_one_to_ask],
-                "items": [{"need": i.need, "route": i.route, "ref_id": i.ref_id} for i in s.items],
+                "items": [{"need": i.need, "route": i.route, "ref_id": i.ref_id, "user_ok": i.user_ok}
+                          for i in s.items],
                 "notes": s.helper_notes, "tasks": s.helper_tasks, "sections": s.card_sections,
+                "event_date": s.event_date, "steps_done": sorted(s.steps_done),
                 "card": getattr(self, "card", None)}
 
     def restore(self, saved: dict) -> list[str]:
@@ -381,8 +427,11 @@ class Toolbox:
         comfort = [bool(c) for c in as_list(saved.get("comfort"), 3)] + [False] * 3
         attempt("comfort", lambda: self.set_comfort(*comfort[:3]))
         for it in as_list(saved.get("items"), len(NEEDS)):
-            attempt("a plan item", lambda it=it: self.add_to_plan(
-                str(it["need"]), str(it["route"]), str(it["ref_id"]) if it.get("ref_id") else None))
+            def add_item(it=it):
+                self.add_to_plan(str(it["need"]), str(it["route"]), str(it["ref_id"]) if it.get("ref_id") else None)
+                if it.get("user_ok") is True and it["route"] != "blank":
+                    self.user_confirm_item(str(it["need"]), True)  # the user's own earlier "yes"
+            attempt("a plan item", add_item)
         for n in as_list(saved.get("notes"), MAX_HELPERS):
             attempt("a note", lambda n=n: self.draft_helper_note(
                 [str(h) for h in n["helpers"]], str(n.get("role", "")), str(n["text"])))
@@ -400,6 +449,8 @@ class Toolbox:
                     str(pet.get("name", "")), str(pet.get("caregiver", "")),
                     [str(a) for a in as_list(card.get("allergies"), 20)], str(card.get("papers", "")))
             attempt("the card", remake)
+        attempt("the timeline date", lambda: self.user_set_event_date(str(saved.get("event_date") or "")))
+        s.steps_done = {str(x)[:80] for x in as_list(saved.get("steps_done"), 100)}
         s.log(f"restored a saved plan; left out: {skipped or 'nothing'}")
         return skipped
 
@@ -413,9 +464,10 @@ class Toolbox:
         import io
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow(["Task", "Date", "Time", "Who is helping"])
+        w.writerow(["Task", "Date", "Time", "Who is helping", "Status"])
         for t in self.state.helper_tasks:
-            w.writerow([safe_cell(t["task"]), safe_cell(t["date"]), safe_cell(t["time"]), safe_cell(t["person"])])
+            w.writerow([safe_cell(t["task"]), safe_cell(t["date"]), safe_cell(t["time"]), safe_cell(t["person"]),
+                        TASK_STATUS[task_status(t)]])
         return buf.getvalue()
 
     # ---- support (T7) --------------------------------------------------------

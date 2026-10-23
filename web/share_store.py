@@ -101,6 +101,7 @@ class ShareStore:
         for t in tasks[:MAX_ROWS]:
             row = {k: _clean(t.get(k)) for k in ("task", "date", "time", "person")}
             row["id"] = int(t["id"])
+            row["confirmed"] = bool(t.get("confirmed")) and bool(row["person"])
             row["claim_hash"] = claims.get(row["id"]) if row["person"] else None
             out.append(row)
         return out
@@ -145,7 +146,7 @@ class ShareStore:
             mine = row.get("claim_hash") and secrets.compare_digest(row["claim_hash"], _hash(token or ""))
             if not (mine or self.is_owner(rec, token)):
                 raise ShareError("You can only remove your own name.")
-            row["person"], row["claim_hash"] = "", None
+            row["person"], row["claim_hash"], row["confirmed"] = "", None, False
             self._save(rec)
             return rec
 
@@ -159,7 +160,8 @@ class ShareStore:
         return {
             "label": first_name(rec["label"]),
             "expires": rec["expires"],
-            "tasks": [{**{k: t[k] for k in ("id", "task", "date", "time")}, "person": first_name(t["person"])}
+            "tasks": [{**{k: t[k] for k in ("id", "task", "date", "time")}, "person": first_name(t["person"]),
+                       "status": "open" if not t["person"] else ("confirmed" if t.get("confirmed") else "helping")}
                       for t in rec["tasks"]],
         }
 

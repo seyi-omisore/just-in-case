@@ -14,11 +14,11 @@
     (function () {
       var t = null;
       try { t = localStorage.getItem("jic-theme"); } catch (e) {}
-      if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      if (t !== "light" && t !== "dark" && t !== "contrast") t = "light";  // Light is the default
       document.documentElement.dataset.theme = t;
     })();
   </script>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 15 16 4l12 11v13H4z' fill='%230072B2'/%3E%3Cpath d='M16 25s-6-3.6-6-7.6a3.3 3.3 0 0 1 6-1.9 3.3 3.3 0 0 1 6 1.9c0 4-6 7.6-6 7.6z' fill='%23E69F00'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 15 16 4l12 11v13H4z' fill='%231F6F78'/%3E%3Cpath d='M16 25s-6-3.6-6-7.6a3.3 3.3 0 0 1 6-1.9 3.3 3.3 0 0 1 6 1.9c0 4-6 7.6-6 7.6z' fill='%23E07A5F'/%3E%3C/svg%3E">
 </head>
 <body class="share-body">
   <div class="safety-strip" role="note">
@@ -31,15 +31,16 @@
   <header class="site-header">
     <span class="brand">
       <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M6 22 24 6l18 16v20H6z" fill="#0072B2"/>
-        <path d="M24 37s-9-5.4-9-11.4a5 5 0 0 1 9-2.9 5 5 0 0 1 9 2.9c0 6-9 11.4-9 11.4z" fill="#E69F00"/>
+        <path d="M6 22 24 6l18 16v20H6z" fill="#1F6F78"/>
+        <path d="M24 37s-9-5.4-9-11.4a5 5 0 0 1 9-2.9 5 5 0 0 1 9 2.9c0 6-9 11.4-9 11.4z" fill="#E07A5F"/>
       </svg>
       <span class="brand-name">Just in Case</span>
     </span>
     <span class="tagline"></span>
-    <div class="theme-switch" role="group" aria-label="Light or dark mode">
+    <div class="theme-switch" role="group" aria-label="Color theme">
       <button type="button" id="theme-light" aria-label="Light mode"><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg> <span aria-hidden="true">Light</span></button>
       <button type="button" id="theme-dark" aria-label="Dark mode"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> <span aria-hidden="true">Dark</span></button>
+      <button type="button" id="theme-contrast" aria-label="High contrast"><svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg> <span aria-hidden="true">High contrast</span></button>
     </div>
     <div class="text-size" role="group" aria-label="Text size">
       <button type="button" id="smaller" aria-label="Make text smaller">A<span aria-hidden="true">−</span></button>
@@ -85,10 +86,27 @@
       <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5zm-1.2 14.2-3.5-3.5 1.4-1.4 2.1 2.1 4.6-4.6 1.4 1.4z" fill="currentColor"/></symbol>
       <symbol id="i-stop" viewBox="0 0 24 24"><path d="M6 6h12v12H6z" fill="currentColor"/></symbol>
       <symbol id="i-dash"viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zM7 11v2h10v-2z" fill="currentColor"/></symbol>
+      <symbol id="i-contrast" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2v16a8 8 0 0 0 0-16z" fill="currentColor"/></symbol>
       <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
       <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.8A8.5 8.5 0 0 1 9.2 3.5a8.5 8.5 0 1 0 11.3 11.3z" fill="currentColor"/></symbol>
     </defs>
   </svg>
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <section aria-labelledby="f-help">
+        <h2 id="f-help">Help, any time</h2>
+        <ul class="footer-help">
+          <li><a href="tel:911">911</a> In an emergency</li>
+          <li><a href="tel:988">988</a> Call or text if you feel alone or unsafe</li>
+          <li><a href="tel:211">2-1-1</a> Mass 211, to find local help</li>
+        </ul>
+      </section>
+      <section aria-labelledby="f-privacy">
+        <h2 id="f-privacy">Privacy</h2>
+        <p>This list shows first names and tasks only. It is deleted after 30 days, or sooner if its owner stops sharing.</p>
+      </section>
+    </div>
+  </footer>
   <script src="/static/share.js"></script>
 </body>
 </html>

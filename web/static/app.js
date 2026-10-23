@@ -35,6 +35,16 @@
     a.setAttribute("aria-hidden", "true");
     return a;
   };
+  // Each situation keeps one color and icon everywhere, always beside its name.
+  const SITUATION = {
+    ride_home_after_procedure: "ride", transportation: "ride", spare_key_access: "key",
+    pet_care_during_stay: "pet", mail_while_away: "mail",
+  };
+  const sitBadge = (need) => {
+    const b = el("span", "sit-badge"); b.dataset.sit = SITUATION[need] || "other";
+    b.setAttribute("aria-hidden", "true"); b.appendChild(icon(NEED_ICON[need] || "check"));
+    return b;
+  };
   const NEED_ICON = {
     ride_home_after_procedure: "car", transportation: "car", spare_key_access: "key",
     pet_care_during_stay: "paw", mail_while_away: "mail", power_outage: "bolt",
@@ -90,7 +100,7 @@
     if (who === "agent") {
       const av = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       av.setAttribute("viewBox", "0 0 48 48"); av.setAttribute("class", "msg-avatar"); av.setAttribute("aria-hidden", "true");
-      av.innerHTML = '<circle cx="24" cy="24" r="24" fill="#D9EEFA"/><path d="M11 24 24 12l13 12v14H11z" fill="#0072B2"/><path d="M24 34s-6-3.6-6-7.6a3.3 3.3 0 0 1 6-1.9 3.3 3.3 0 0 1 6 1.9c0 4-6 7.6-6 7.6z" fill="#E69F00"/>';
+      av.innerHTML = '<circle cx="24" cy="24" r="24" style="fill:var(--primary-tint)"/><path d="M11 24 24 12l13 12v14H11z" style="fill:var(--primary)"/><path d="M24 34s-6-3.6-6-7.6a3.3 3.3 0 0 1 6-1.9 3.3 3.3 0 0 1 6 1.9c0 4-6 7.6-6 7.6z" style="fill:var(--accent)"/>';
       li.appendChild(av);
     }
     const body = el("div", "msg-body");
@@ -277,7 +287,7 @@
     if (kind === "confirm_needs") {
       body.appendChild(el("p", null, "Here is what we'll plan for:"));
       const ul = el("ul", "slip-needs");
-      for (const n of data.needs) { const i = el("li"); i.append(icon(NEED_ICON[n.key] || "check"), document.createTextNode(n.label)); ul.appendChild(i); }
+      for (const n of data.needs) { const i = el("li"); i.append(sitBadge(n.key), document.createTextNode(n.label)); ul.appendChild(i); }
       body.appendChild(ul);
     } else if (kind === "draft_helper_note") {
       body.appendChild(el("p", null, "For " + data.to.join(" and ") + ". We never send it. You send it yourself if you like."));
@@ -376,15 +386,17 @@
     $("fridge-empty").hidden = plan.items.length > 0 || plan.notes.length > 0;
     const prog = plan.progress || { covered: 0, total: 0 };
     $("plan-progress").textContent = prog.total ? `: ${prog.covered} of ${prog.total} covered` : "";
-    $("progress-bar").hidden = !prog.total;
-    $("progress-bar").firstElementChild.style.width = prog.total ? (100 * prog.covered / prog.total) + "%" : "0";
+    // The ring is decoration; the words above say the same thing.
+    const ring = $("progress-ring"), C = 2 * Math.PI * 20;
+    ring.toggleAttribute("hidden", !prog.total);  // an SVG has no .hidden property
+    ring.querySelector(".ring-fill").style.strokeDashoffset = String(prog.total ? C * (1 - prog.covered / prog.total) : C);
     $("plan-ready").hidden = !plan.ready;
     planEl.replaceChildren();
     for (const item of plan.items) {
       const key = item.need + ":" + item.route + ":" + item.name;
       const li = el("li", "tag" + (seenItems.has(key) ? "" : " new"));
       seenItems.add(key);
-      li.dataset.need = item.need;
+      li.dataset.need = item.need; li.dataset.sit = SITUATION[item.need] || "other";
       const mag = el("span", "magnet"); mag.appendChild(icon(NEED_ICON[item.need] || "check"));
       li.appendChild(mag);
       li.appendChild(el("p", "tag-need", item.need_label));
@@ -392,6 +404,7 @@
       const [rWord, rIcon] = ROUTE[item.route] || ["", "check"];
       const r = el("span", "tag-route route-" + item.route); r.append(icon(rIcon), document.createTextNode(rWord));
       li.appendChild(r);
+      if (item.route !== "blank") li.appendChild(itemAnswer(item));
 
       const links = el("p", "tag-links");
       if (item.phone && item.phone !== "see website") {
@@ -438,6 +451,7 @@
     renderTasks(plan);
     renderShare(plan);
     renderServicesOnly(plan);
+    renderTimeline(plan.timeline);
     const card = $("card-link");
     cardUrl = plan.card;
     card.hidden = !plan.card;
@@ -472,6 +486,136 @@
     const m = /^(\d{4})-(\d{2})/.exec(iso || "");
     return m && MONTHS[+m[2] - 1] ? `Info checked ${MONTHS[+m[2] - 1]} ${m[1]}` : "";
   }
+  // ---- "Getting ready": the user's date, steps to tick, calendar files ----
+  const isoToLocal = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); };
+  const dayWords = (iso) => isoToLocal(iso).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  function renderTimeline(tl) {
+    const box = $("getting-ready");
+    box.hidden = !tl || !tl.steps.length;
+    if (box.hidden) return;
+    $("event-label").textContent = tl.label;
+    const pick = $("event-date");
+    if (document.activeElement !== pick) pick.value = tl.date;
+    $("countdown").replaceChildren();
+    if (tl.countdown) $("countdown").append(icon("calendar"), document.createTextNode(" " + tl.countdown));
+    $("steps-hint").hidden = !!tl.date;
+    const ol = $("steps"); ol.replaceChildren();
+    for (const s of tl.steps) {
+      const li = el("li", "step" + (s.done ? " done" : ""));
+      const lab = el("label", "step-check");
+      const cb = el("input"); cb.type = "checkbox"; cb.checked = s.done;
+      cb.onchange = () => ws.send(JSON.stringify({ type: "step", id: s.id, done: cb.checked }));
+      const words = el("span", "step-text", s.text);
+      lab.append(cb, words);
+      const meta = el("p", "step-when");
+      if (s.need) meta.append(sitBadge(s.need));
+      meta.append(document.createTextNode(s.when + (s.date ? " · " + dayWords(s.date) : "")));
+      if (s.done) meta.append(" ", el("strong", "step-done-word", "Done"));
+      li.append(lab, meta);
+      if (s.date && !s.past) li.appendChild(calendarButton(s.text, s.date, `Just in Case: ${s.when.toLowerCase()} your ${tl.label}.`));
+      ol.appendChild(li);
+    }
+  }
+  // A standard .ics file, made here in the browser. No calendar account is touched,
+  // nothing goes to our server, and there is no alarm: the user's calendar decides.
+  function makeICS(title, iso, details) {
+    const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+    const ymd = (d) => d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+    const start = isoToLocal(iso), end = new Date(start); end.setDate(end.getDate() + 1);
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+    const uid = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)) + "@justincase";
+    // Lines longer than 75 bytes are folded: CRLF, then a space.
+    const fold = (line) => {
+      const bytes = new TextEncoder().encode(line);
+      if (bytes.length <= 75) return line;
+      const parts = []; let cur = "", n = 0;
+      for (const ch of line) {
+        const len = new TextEncoder().encode(ch).length;
+        if (n + len > (parts.length ? 74 : 75)) { parts.push(cur); cur = ""; n = 0; }
+        cur += ch; n += len;
+      }
+      parts.push(cur);
+      return parts.join("\r\n ");
+    };
+    return [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Just in Case//Backup plan//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+      "BEGIN:VEVENT", `UID:${uid}`, `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${ymd(start)}`, `DTEND;VALUE=DATE:${ymd(end)}`,
+      `SUMMARY:${esc(title)}`, `DESCRIPTION:${esc(details)}`, "TRANSP:TRANSPARENT",
+      "END:VEVENT", "END:VCALENDAR",
+    ].map(fold).join("\r\n") + "\r\n";
+  }
+  function calendarButton(title, iso, details) {
+    const b = el("button", "btn btn-quiet btn-small cal-btn"); b.type = "button";
+    b.append(icon("calendar"), document.createTextNode("Add to my calendar"));
+    b.setAttribute("aria-label", `Add to my calendar: ${title}, ${dayWords(iso)}`);
+    b.onclick = () => {
+      const url = URL.createObjectURL(new Blob([makeICS(title, iso, details)], { type: "text/calendar" }));
+      const a = el("a"); a.href = url;
+      a.download = "just-in-case-" + (title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "step") + ".ics";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    return b;
+  }
+  // Helper-table dates are typed freely. Only dates we can read for sure get a button.
+  const MONTH_NAMES = ["january", "february", "march", "april", "may", "june", "july", "august",
+                       "september", "october", "november", "december"];
+  function readTaskDate(text) {
+    const s = String(text || "").trim().toLowerCase(), now = new Date();
+    let y = null, m = null, d = null, hit;
+    if ((hit = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s))) [y, m, d] = [+hit[1], +hit[2], +hit[3]];
+    else if ((hit = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/.exec(s))) [m, d, y] = [+hit[1], +hit[2], hit[3] ? +hit[3] : null];
+    else if ((hit = /^([a-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?$/.exec(s))) {
+      const word = hit[1] === "sept" ? "sep" : hit[1];  // "Nov", "November", "Sept"
+      m = MONTH_NAMES.findIndex((n) => n.startsWith(word) && (word.length >= 3)) + 1;
+      if (!m || !(word === MONTH_NAMES[m - 1] || word.length === 3)) return null;
+      d = +hit[2]; y = hit[3] ? +hit[3] : null;
+    } else return null;
+    if (y !== null && y < 100) y += 2000;
+    if (y === null) {  // no year: the next time that date comes around
+      y = now.getFullYear();
+      if (new Date(y, m - 1, d) < new Date(now.getFullYear(), now.getMonth(), now.getDate())) y += 1;
+    }
+    const date = new Date(y, m - 1, d);
+    if (date.getMonth() !== m - 1 || date.getDate() !== d) return null;  // like "2/31"
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+
+  $("event-date").addEventListener("change", (e) => {
+    $("timeline-error").textContent = "";
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "event_date", date: e.target.value }));
+  });
+
+  // Each part counts toward progress only after the user says "Yes, add this".
+  const justAdded = new Set();  // for the check mark, shown once
+  function itemAnswer(item) {
+    if (item.user_ok) {
+      const done = el("p", "tag-ok" + (justAdded.has(item.need) ? " pop" : ""));
+      justAdded.delete(item.need);
+      done.append(icon("check"), document.createTextNode("Added to your plan"));
+      return done;
+    }
+    const box = el("div", "tag-answer");
+    box.appendChild(el("p", "tag-waiting", "")).append(icon("wait"), document.createTextNode("Waiting for your OK"));
+    const row = el("div", "tag-answer-row");
+    const yes = el("button", "btn btn-primary btn-small"); yes.type = "button";
+    yes.append(icon("check"), document.createTextNode("Yes, add this"));
+    yes.setAttribute("aria-label", "Yes, add this: " + item.need_label);
+    const no = el("button", "btn btn-quiet btn-small"); no.type = "button";
+    no.append(icon("dash"), document.createTextNode("No thanks"));
+    no.setAttribute("aria-label", "No thanks: " + item.need_label);
+    const answer = (ok) => {
+      if (!ws || ws.readyState !== 1) return;
+      if (ok) justAdded.add(item.need);
+      ws.send(JSON.stringify({ type: "item", need: item.need, ok }));
+    };
+    yes.onclick = () => answer(true);
+    no.onclick = () => answer(false);
+    row.append(yes, no); box.appendChild(row);
+    return box;
+  }
+
   // Flags come from the rules in code; show them in friendlier words.
   function plainFlag(f) {
     return f.replace(/^WAITLIST:\s*/, "")
@@ -518,6 +662,7 @@
         case "busy": setBusy(m.on); if (!m.on) exampleNext(); break;
         case "table_error": $("task-error").textContent = m.text; break;
         case "notice": addNotice(m.text); break;
+        case "timeline_error": $("timeline-error").textContent = m.text; break;
         case "error": addMessage("agent", m.text, "msg-error"); setBusy(false); break;
       }
     };
@@ -618,19 +763,40 @@
       const tr = el("tr", seenTasks.has(t.id) ? "" : "new-row"); seenTasks.add(t.id);
       const td = (v, label, cls) => { const c = el("td", cls || "", v || ""); if (label) c.dataset.label = label; return c; };
       const whoCell = td(t.person, "Who", "who");
-      if (!t.person) { whoCell.replaceChildren(); const chip = el("span", "open-chip"); chip.append(icon("plus"), document.createTextNode("Open")); whoCell.appendChild(chip); }
+      if (!t.person) whoCell.textContent = "No one yet";  // the Status label says "Open"
       else { const who = el("span", "who-name"); who.append(avatar(t.person), document.createTextNode(t.person)); whoCell.replaceChildren(who); }
       tr.append(td(t.task, "Task"), td(t.date, "Date"), td(t.time, "Time"), whoCell);
+      const statusCell = td("", "Status"); statusCell.appendChild(statusLabel(taskStatus(t))); tr.appendChild(statusCell);
       const act = el("td"); const box = el("div", "row-actions");
+      if (t.person) {
+        const c = el("button"); c.type = "button";
+        c.append(icon(t.confirmed ? "dash" : "check"), document.createTextNode(t.confirmed ? "Not confirmed" : "Mark confirmed"));
+        c.setAttribute("aria-label", (t.confirmed ? "Mark not confirmed: " : "Mark confirmed: ") + t.task);
+        c.onclick = () => sendTable("confirm", { id: t.id, confirmed: !t.confirmed });
+        box.appendChild(c);
+      }
       const edit = el("button"); edit.type = "button"; edit.setAttribute("aria-label", "Change " + t.task); edit.title = "Change";
       edit.append(icon("pencil"), document.createTextNode("Change"));
       edit.onclick = () => startEdit(t);
       const del = el("button"); del.type = "button"; del.setAttribute("aria-label", "Remove " + t.task); del.title = "Remove";
       del.append(icon("dash"), document.createTextNode("Remove"));
       del.onclick = () => { if (confirm(`Remove "${t.task}" from your table?`)) sendTable("delete", { id: t.id }); };
-      box.append(edit, del); act.appendChild(box); tr.appendChild(act);
+      box.append(edit, del);
+      const iso = readTaskDate(t.date);
+      if (iso && isoToLocal(iso) >= new Date(new Date().toDateString()))
+        box.appendChild(calendarButton(t.task, iso, `Just in Case helper list: ${t.task}` +
+          (t.person ? `, with ${t.person}` : "") + (t.time ? `, ${t.time}` : "") + "."));
+      act.appendChild(box); tr.appendChild(act);
       rows.appendChild(tr);
     }
+  }
+  // Status is always a word with an icon, never color alone.
+  const STATUS = { open: ["Open", "plus"], helping: ["Someone's helping", "person"], confirmed: ["Confirmed", "check"] };
+  const taskStatus = (t) => (!t.person ? "open" : t.confirmed ? "confirmed" : "helping");
+  function statusLabel(key) {
+    const [word, ic] = STATUS[key];
+    const s = el("span", "status status-" + key); s.append(icon(ic), document.createTextNode(word));
+    return s;
   }
   function sendTable(action, row) {
     if (!ws || ws.readyState !== 1) return;
@@ -739,6 +905,15 @@
   $("card-close").addEventListener("click", () => dialog.close());
   dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
 
+  // ---- "By the numbers": counted by the server from the app itself -------
+  fetch("/api/facts").then((r) => r.json()).then((f) => {
+    for (const n of document.querySelectorAll("[data-fact]")) {
+      const v = f[n.dataset.fact];
+      if (v == null) n.closest("li").remove(); else n.textContent = v;
+    }
+    $("facts").hidden = false;
+  }).catch(() => {});  // if it can't load, the section stays hidden rather than showing a guess
+
   // ---- people you can talk to ---------------------------------------------
   fetch("/api/support").then((r) => r.json()).then((lines) => {
     const ul = $("support-lines");
@@ -754,13 +929,13 @@
   // ---- light / dark (remembered on this device only) ---------------------
   const setTheme = (t, save = true) => {
     document.documentElement.dataset.theme = t;
-    $("theme-light").setAttribute("aria-pressed", String(t === "light"));
-    $("theme-dark").setAttribute("aria-pressed", String(t === "dark"));
+    for (const k of ["light", "dark", "contrast"]) $("theme-" + k).setAttribute("aria-pressed", String(t === k));
     if (save) { try { localStorage.setItem("jic-theme", t); } catch (_) {} }
   };
-  setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light", false);
+  setTheme(["dark", "contrast"].includes(document.documentElement.dataset.theme) ? document.documentElement.dataset.theme : "light", false);
   $("theme-light").onclick = () => setTheme("light");
   $("theme-dark").onclick = () => setTheme("dark");
+  $("theme-contrast").onclick = () => setTheme("contrast");
 
   // Warn if the code was updated (git pull) but the server was not restarted.
   const checkRestart = () => fetch("/api/config").then((r) => r.json())

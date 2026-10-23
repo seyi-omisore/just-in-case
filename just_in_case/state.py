@@ -63,6 +63,7 @@ class PlanItem:
     ref_id: str | None  # service or preparation id, if any
     label: str  # what shows on the plan
     flags: list[str] = field(default_factory=list)
+    user_ok: bool = False  # the user tapped "Yes, add this". Progress counts only these.
 
 
 @dataclass
@@ -87,6 +88,9 @@ class PlanState:
     # Card sections the user picked. None means we have not asked yet.
     card_sections: list[str] | None = None
     next_task_id: int = 1
+    # "Getting ready" timeline: the date the user picked, and the steps they ticked.
+    event_date: str = ""
+    steps_done: set = field(default_factory=set)
 
     def people_allowed(self) -> bool:
         return self.comfortable_asking_people and not self.worried_about_burden

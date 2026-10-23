@@ -191,3 +191,20 @@ def test_helper_full_name_is_not_shown_to_other_family():
     assert out["tasks"][0]["person"] == "Doris" and page["tasks"][0]["person"] == "Doris"
     assert "Chen" not in str(page)
     assert owner_view == "Doris Chen"  # the owner's own table keeps what was typed
+
+
+def test_family_page_shows_status_and_stepping_back_clears_confirmed():
+    with client.websocket_connect("/ws") as ws:
+        sid, _ = _shared_list(ws)
+        tid = client.get(f"/api/share/{sid}").json()["tasks"][0]["id"]
+        assert client.get(f"/api/share/{sid}").json()["tasks"][0]["status"] == "open"
+        token = client.post(f"/api/share/{sid}/claim", json={"task_id": tid, "name": "Doris"}).json()["claim_token"]
+        until(ws, "plan")
+        ws.send_json({"type": "table", "action": "confirm", "row": {"id": tid, "confirmed": True}})
+        assert until(ws, "plan")["plan"]["tasks"][0]["confirmed"] is True
+        assert client.get(f"/api/share/{sid}").json()["tasks"][0]["status"] == "confirmed"
+        client.post(f"/api/share/{sid}/unclaim", json={"task_id": tid, "token": token})
+        after = until(ws, "plan")["plan"]["tasks"][0]
+        page = client.get(f"/api/share/{sid}").json()["tasks"][0]
+        ws.send_json({"type": "share_delete"})
+    assert after["confirmed"] is False and page["status"] == "open"

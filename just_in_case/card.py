@@ -177,6 +177,7 @@ def render_plan_html(state: PlanState, directory: Directory, today: date | None 
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>My plan</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>
  @page {{ size: letter; margin: 0.5in; }}
  body {{ font-family: "Atkinson Hyperlegible", Verdana, Arial, sans-serif; font-size: 15pt; line-height: 1.35;
@@ -195,7 +196,7 @@ def render_plan_html(state: PlanState, directory: Directory, today: date | None 
  .small li::before {{ content: "- "; }}
  .foot {{ margin-top: 0.12in; font-weight: 700; }}
  .print {{ display: block; margin: 0.25in auto 0; font: inherit; font-weight: 700; padding: 0.1in 0.35in;
-          border: 0; border-radius: 10px; background: #0072B2; color: #fff; cursor: pointer; }}
+          border: 0; border-radius: 10px; background: #1F6F78; color: #fff; cursor: pointer; }}
  @media print {{ .print {{ display: none; }} body {{ margin: 0; }} }}
 </style></head>
 <body>
@@ -259,7 +260,7 @@ def render_card_html(lines: list[str]) -> str:
  li:first-child {{ border-top: 0; }}
  .foot {{ margin-top: 0.14in; font-weight: 700; }}
  .print {{ display: block; margin: 0.25in auto 0; font: inherit; font-weight: 700; font-size: 16pt;
-          padding: 0.12in 0.4in; border: 0; border-radius: 12px; background: #0072B2; color: #fff; cursor: pointer; }}
+          padding: 0.12in 0.4in; border: 0; border-radius: 12px; background: #1F6F78; color: #fff; cursor: pointer; }}
  @media print {{ .print {{ display: none; }} body {{ margin: 0; }} }}
 </style></head>
 <body>

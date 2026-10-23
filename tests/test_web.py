@@ -178,11 +178,25 @@ def test_see_an_example_runs_the_ruth_demo_on_a_live_server(monkeypatch):
         assert until(ws, "approval")["kind"] == "confirm_needs"  # the real checkpoint still asks
 
 
-def test_plan_progress_counts_covered_needs():
+def test_progress_starts_at_zero_and_fills_in_as_the_user_says_yes():
     with client.websocket_connect("/ws") as ws:
         *_, plan = ruth_flow(ws)
-    # procedure + spare key + pet + mail, all covered in the Ruth story
-    assert plan["progress"] == {"covered": 4, "total": 4}
+        # The agent found something for all 4 parts, but the user has not said yes yet.
+        assert plan["progress"] == {"covered": 0, "total": 4} and plan["ready"] is False
+        seen = []
+        for item in plan["items"]:
+            ws.send_json({"type": "item", "need": item["need"], "ok": True})
+            seen.append(until(ws, "plan")["plan"]["progress"]["covered"])
+    assert seen == [1, 2, 3, 4]
+
+
+def test_no_thanks_takes_a_part_off_the_plan_and_tells_the_agent_next_turn():
+    with client.websocket_connect("/ws") as ws:
+        *_, plan = ruth_flow(ws)
+        ws.send_json({"type": "item", "need": "spare_key_access", "ok": False})
+        after = until(ws, "plan")["plan"]
+    assert "spare_key_access" not in [i["need"] for i in after["items"]]
+    assert after["progress"] == {"covered": 0, "total": 4}
 
 
 def test_pages_say_we_never_ask_for_money_or_ssn():
@@ -311,10 +325,15 @@ def test_plan_ready_is_said_once_calmly_when_every_need_is_covered():
         while "agent" not in kinds:
             kinds.append(ws.receive_json()["type"])
         plan = until(ws, "plan")["plan"]
+        assert "ready" not in kinds and plan["ready"] is False  # nothing confirmed yet
+        for item in plan["items"]:
+            ws.send_json({"type": "item", "need": item["need"], "ok": True})
+        later = []
+        while len([k for k in later if k == "plan"]) < len(plan["items"]):
+            later.append(ws.receive_json()["type"])
         ws.send_json({"type": "table", "action": "add", "row": {"task": "Rides"}})
-        until(ws, "plan")
-    assert kinds.count("ready") == 1 and kinds.index("recap") < kinds.index("ready") < kinds.index("agent")
-    assert plan["ready"] is True
+        final = until(ws, "plan")["plan"]
+    assert later.count("ready") == 1 and final["ready"] is True
 
 
 def test_ready_message_has_no_pressure():
@@ -327,8 +346,10 @@ def test_ready_message_has_no_pressure():
 
     class A:  # just enough of an agent for the message
         from just_in_case.state import PlanItem, PlanState
-        state = PlanState(confirmed_needs=["power_outage"], items=[PlanItem("power_outage", "preparation", None, "Kit")])
+        state = PlanState(confirmed_needs=["power_outage"], items=[PlanItem("power_outage", "preparation", None, "Kit", user_ok=True)])
         class box:
+            from datetime import date
+            today = date(2026, 10, 23)
             class dir:
                 by_id, support_lines = {}, []
     s.agent, s.share_id, s.owner_token, s.share_expires, s.id = A, None, None, None, "x"
@@ -341,7 +362,7 @@ def test_helper_updates_are_described_as_non_urgent_with_911_first():
     home = client.get("/").text
     updates = home[home.index('id="notices-wrap"'):home.index('id="notices"')]
     assert "In an emergency, call 911." in updates and "not urgent" in updates
-    features = home[home.index("<strong>Helper updates</strong>"):]
+    features = home[home.index("<h3>Helper updates</h3>"):]
     assert features.index("911") < features.index("non-urgent")
     consent = home[home.index('class="consent-facts"'):]
     assert consent.index("call 911") < consent.index("What we save")
@@ -376,3 +397,28 @@ def test_every_button_has_visible_words_not_just_an_icon_or_color():
         assert p.found, page
         icon_only = [name for name, words in p.found if not words.strip()]
         assert not icon_only, f"{page}: buttons with no visible words: {icon_only}"
+
+
+def test_by_the_numbers_are_counted_from_the_app():
+    import json
+    from just_in_case.config import DATA_DIR
+    from just_in_case.tools import GATED_TOOLS
+    f = client.get("/api/facts").json()
+    services = [s for s in json.loads((DATA_DIR / "services.json").read_text())["services"] if not s["sample"]]
+    assert f["services"] == len(services) and f["free_services"] == sum(s["cost"] == "free" for s in services)
+    assert f["checkpoints"] == len(GATED_TOOLS) and f["safeguard_tests"] >= 50
+
+
+def test_faq_says_this_is_not_an_emergency_service():
+    page = client.get("/").text
+    faq = page[page.index('class="faq"'):]
+    answer = faq[faq.index("Is this an emergency service?"):]
+    assert "No. In an emergency, always call 911." in answer[:300]
+    assert "Example story" in page and "made-up example" in page  # Ruth is labeled
+
+
+def test_comparison_is_honest_that_pendants_can_call_for_help():
+    page = client.get("/").text
+    table = page[page.index('class="compare-table"'):page.index("</table>")]
+    row = table[table.index("Calls for help in an emergency"):table.index("</tr>", table.index("Calls for help"))]
+    assert "No. Always call 911" in row and "Yes, that is what it is for" in row
