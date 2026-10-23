@@ -82,6 +82,9 @@ def make_gate(approver: Approver, trace=print, precheck=None):
         if short == "choose_card_sections" and isinstance(answer, list):
             # The user's own ticks replace whatever the agent suggested.
             return PermissionResultAllow(updated_input={"sections": answer})
+        if short == "confirm_helping_someone":
+            # Both answers are recorded. "agreed" is always the user's tap, never the agent's input.
+            return PermissionResultAllow(updated_input={**input_data, "agreed": bool(answer)})
         if answer:
             return PermissionResultAllow(updated_input=input_data)
         trace(f"  [human] user declined {short}")
@@ -128,11 +131,16 @@ class JustInCaseAgent:
     async def __aexit__(self, *exc):
         await self.client.disconnect()
 
-    async def send(self, user_text: str, on_text=print) -> str:
-        """Send one user message and return the agent's full text reply."""
+    async def send(self, user_text: str, on_text=print, context: str = "") -> str:
+        """Send one user message and return the agent's full text reply.
+
+        `context` is a note for the model only (for example, "returning to a saved
+        plan"). It is never added to user_said, so it can never count as something
+        the user said.
+        """
         self.transcript.append(("user", user_text))
         self.state.user_said.append(user_text)
-        await self.client.query(user_text)
+        await self.client.query(f"{context}\n\n{user_text}" if context else user_text)
         reply_parts = []
         async for msg in self.client.receive_response():
             if isinstance(msg, AssistantMessage):

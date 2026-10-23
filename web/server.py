@@ -30,7 +30,8 @@ from fastapi.staticfiles import StaticFiles
 
 from just_in_case.config import DATA_DIR, OUTPUT_DIR
 from just_in_case.prompts import GREETING
-from just_in_case.state import CARD_SECTIONS, NEEDS
+from just_in_case import timeline
+from just_in_case.state import CARD_SECTIONS, NEED_WHY, NEEDS
 from web.share_store import ShareError, ShareStore
 
 STATIC = Path(__file__).parent / "static"
@@ -71,6 +72,7 @@ def describe_tool(short: str, data: dict) -> tuple[str, str] | None:
     """(kind, text) shown in the feed when the agent uses a tool."""
     need = need_label(data.get("need", "")) if data.get("need") else ""
     return {
+        "confirm_helping_someone": ("ask", "Checking that the person you're helping agrees"),
         "confirm_needs": ("ask", "Checking the list of things to plan for with you"),
         "set_comfort": ("note", "Noting who you feel comfortable asking"),
         "find_services": ("search", f"Looking for services: {need.lower()}"),
@@ -100,9 +102,10 @@ def describe_trace(line: str) -> tuple[str, str] | None:
 # ---------------------------------------------------------------------------
 
 class Session:
-    def __init__(self, ws: WebSocket):
+    def __init__(self, ws: WebSocket, demo: bool = False):
         self.id = uuid.uuid4().hex
         self.ws = ws
+        self.demo = demo  # the scripted Ruth example: same tools and gate, no AI
         self.out: asyncio.Queue = asyncio.Queue()
         self.pending: dict[str, asyncio.Future] = {}
         self.agent = None
@@ -112,6 +115,10 @@ class Session:
         self.share_id: str | None = None
         self.owner_token: str | None = None
         self.share_expires: float | None = None
+        self.recapped: tuple = ()  # the plan as of the last "So far" recap
+        self.returning = False  # restored a saved plan; tell the live agent once
+        self.ready_said = False  # "Your plan is ready" is said once per visit
+        self.declined: list[str] = []  # parts the user said "No thanks" to, for the agent's next turn
 
     def emit(self, msg: dict) -> None:
         self.out.put_nowait(msg)
@@ -154,10 +161,13 @@ class Session:
             return {"options": [{"key": k, "label": v} for k, v in CARD_SECTIONS.items()]}
         if short == "add_helper_task":
             return {k: data.get(k, "") for k in ("task", "person", "date", "time")}
+        if short == "confirm_helping_someone":
+            return {"name": data.get("person_name", "")}
         if short == "make_fridge_card":
             return {"name": data.get("name", ""), "contacts": data.get("contacts", []),
-                    "medications": data.get("medications", []),
-                    "pet": data.get("pet_name", ""), "pet_caregiver": data.get("pet_caregiver", "")}
+                    "medications": data.get("medications", []), "allergies": data.get("allergies", []),
+                    "pet": data.get("pet_name", ""), "pet_caregiver": data.get("pet_caregiver", ""),
+                    "papers": data.get("papers", "")}
         return data
 
     def answer(self, aid: str, ok: bool, choice=None) -> None:
@@ -184,19 +194,117 @@ class Session:
                 "need": i.need, "need_label": need_label(i.need), "route": i.route,
                 "name": name, "phone": ref.get("phone", ""),
                 "url": ref.get("url", ""), "what": ref.get("what") or ref.get("how_to_use", ""),
-                "flags": i.flags,
+                "flags": i.flags, "why": NEED_WHY.get(i.need, ""), "user_ok": i.user_ok,
+                "checked": ref.get("last_verified", "") if i.route == "service" else "",
             })
+        covered = {i.need for i in state.items if i.route != "blank" and i.user_ok}
         return {
             "items": items,
+            # No one to ask (or would rather not): show where to find more help, not an empty table.
+            "services_only": state.services_only(),
+            "help_lines": [{"name": l["name"], "how_to_reach": l["how_to_reach"]}
+                           for l in d.support_lines if l["id"] in ("line_age_strong", "line_mass211")],
+            "progress": {"covered": len(covered & set(state.confirmed_needs)),
+                         "total": len(state.confirmed_needs)},
+            "ready": self.is_ready(),
+            "timeline": timeline.build(state, self.agent.box.today),
             "notes": state.helper_notes,
             "tasks": state.helper_tasks,
             "card": f"/card/{self.id}" if state.card_path else None,
+            "plan_print": f"/plan/{self.id}" if state.items else None,
             "table_csv": f"/table/{self.id}.csv",
             "table_print": f"/table/{self.id}",
             "share": {"url": f"/share/{self.share_id}",
                       "owner_url": f"/share/{self.share_id}?owner={self.owner_token}",
                       "expires": self.share_expires} if self.share_id else None,
         }
+
+    # -- "So far, we've planned..." (built from the plan, never by the model) -
+    def recap(self) -> str | None:
+        plan = self.plan()
+        if not plan["items"]:
+            return None
+        lines = [f"- {i['need_label']}: {'not covered yet' if i['route'] == 'blank' else i['name']}"
+                 + ("" if i["user_ok"] or i["route"] == "blank" else " (waiting for your OK)")
+                 for i in plan["items"]]
+        planned = {i["need"] for i in plan["items"]}
+        left = [need_label(n).lower() for n in self.agent.state.confirmed_needs if n not in planned]
+        text = "So far, we've planned:\n\n" + "\n".join(lines)
+        if left:
+            text += "\n\nStill to plan: " + "; ".join(left) + "."
+        return text
+
+    def maybe_recap(self) -> None:
+        """Show a recap once each time the plan changes, before the agent's next words."""
+        if not self.agent:
+            return
+        key = tuple((i.need, i.route, i.ref_id) for i in self.agent.state.items)
+        if key != self.recapped:
+            self.recapped = key
+            text = self.recap()
+            if text:
+                self.emit({"type": "recap", "text": text})
+        if self.is_ready() and not self.ready_said:
+            self.ready_said = True
+            st = self.agent.state
+            next_step = ("You can print your plan or your fridge card any time." if st.card_path else
+                         "You can print your plan any time. When you'd like, we can make your fridge card too.")
+            self.emit({"type": "ready", "text": "Your plan is ready. Everything you asked to plan for is covered. "
+                       f"{next_step} There's nothing you need to do right now."})
+
+    def is_ready(self) -> bool:
+        st = self.agent.state
+        covered = {i.need for i in st.items if i.route != "blank" and i.user_ok}
+        return bool(st.confirmed_needs) and set(st.confirmed_needs) <= covered
+
+    # -- "Yes, add this" / "No thanks" on each plan item ------------------------
+    def answer_item(self, need: str, ok: bool) -> None:
+        from just_in_case.tools import ToolError
+        try:
+            self.agent.box.user_confirm_item(need, ok)
+        except ToolError as e:
+            self.emit({"type": "table_error", "text": str(e)})
+            return
+        self.emit({"type": "activity", "kind": "human",
+                   "text": f"You {'added' if ok else 'said no thanks to'}: {need_label(need).lower()}"})
+        if not ok:
+            self.declined.append(need_label(need).lower())
+        self.maybe_recap()
+        self.sync_share()
+        self.emit({"type": "plan", "plan": self.plan()})
+
+    # -- "Getting ready" timeline: the user's date and ticks -------------------
+    def timeline_edit(self, msg: dict) -> None:
+        from just_in_case.tools import ToolError
+        try:
+            if msg.get("type") == "event_date":
+                self.agent.box.user_set_event_date(str(msg.get("date", ""))[:10])
+            else:
+                self.agent.box.user_tick_step(str(msg.get("id", ""))[:80], msg.get("done") is True)
+        except ToolError as e:
+            self.emit({"type": "timeline_error", "text": str(e)})
+        self.emit({"type": "plan", "plan": self.plan()})
+
+    # -- save and continue later (kept in the user's own browser) -------------
+    def save(self) -> None:
+        if self.demo and self.ws.query_params.get("example") == "1":
+            return  # Ruth's example is not saved
+        self.emit({"type": "saved", "state": self.agent.box.export()})
+
+    def restore(self, saved) -> None:
+        st = self.agent.state
+        if st.user_said or st.items or not isinstance(saved, dict):
+            self.emit({"type": "table_error", "text": "A saved plan can only be opened at the start of a visit."})
+            return
+        skipped = self.agent.box.restore(saved)
+        if hasattr(self.agent, "turn") and st.items:
+            self.agent.turn = 3  # the scripted demo has no more steps for a restored plan
+        self.returning = True
+        self.recapped = ()
+        self.emit({"type": "restored", "skipped": skipped})
+        self.maybe_recap()
+        self.sync_share()
+        self.emit({"type": "plan", "plan": self.plan()})
 
     # -- sharing (only with consent) -----------------------------------------
     def share_create(self, consent: bool, label: str) -> None:
@@ -240,6 +348,8 @@ class Session:
         people = {t["id"]: t["person"] for t in rec["tasks"]}
         for t in self.agent.state.helper_tasks:
             if t["id"] in people:
+                if people[t["id"]] != t["person"]:
+                    t["confirmed"] = False  # a new name, or none: not confirmed yet
                 t["person"] = people[t["id"]]
         self.agent.box.refresh_card()
         self.emit({"type": "activity", "kind": "heart", "text": activity})
@@ -252,7 +362,8 @@ class Session:
             self.emit({"type": "activity", "kind": "human", "text": {
                 "add": "You added a row to your helper table",
                 "update": "You changed a row in your helper table",
-                "delete": "You removed a row from your helper table"}.get(action, "You edited your table")})
+                "delete": "You removed a row from your helper table",
+                "confirm": "You updated whether a helper is confirmed"}.get(action, "You edited your table")})
         except ToolError as e:
             self.emit({"type": "table_error", "text": str(e)})
         self.sync_share()
@@ -260,7 +371,7 @@ class Session:
 
     # -- lifecycle -----------------------------------------------------------
     async def start(self):
-        if DEMO:
+        if self.demo:
             from web.demo_agent import DemoAgent
             self.agent = DemoAgent(self.approver, trace=self.on_trace, on_tool=self.on_tool,
                                    out_dir=self.out_dir)
@@ -284,13 +395,26 @@ class Session:
     async def handle_say(self, text: str):
         async with self.lock:
             self.emit({"type": "busy", "on": True})
+            def on_text(t: str) -> None:
+                self.maybe_recap()
+                self.emit({"type": "agent", "text": t.removeprefix("\nJust in Case: ")})
+            notes = []
+            if self.returning:
+                self.returning = False
+                notes.append("the user is returning to a plan they saved earlier. Call review_plan first, "
+                             "then continue from there.")
+            if self.declined:
+                notes.append("on the page, the user said no thanks to: " + ", ".join(self.declined)
+                             + ". Those parts are off the plan. Ask what they would prefer, if anything.")
+                self.declined = []
+            context = f"[Note from the app, not the user: {' '.join(notes)}]" if notes else ""
             try:
-                await self.agent.send(text, on_text=lambda t: self.emit(
-                    {"type": "agent", "text": t.removeprefix("\nJust in Case: ")}))
+                await self.agent.send(text, on_text=on_text, context=context)
             except Exception as e:  # keep the page usable, say what happened
                 self.emit({"type": "error", "text": f"Something went wrong on our side: {e}. "
                            "Please try sending your message again."})
             finally:
+                self.maybe_recap()
                 self.emit({"type": "plan", "plan": self.plan()})
                 self.emit({"type": "busy", "on": False})
 
@@ -308,6 +432,23 @@ async def index():
 async def config():
     return JSONResponse({"demo": DEMO, "greeting": GREETING,
                          "needs_restart": code_fingerprint() != STARTED_WITH})
+
+
+@app.get("/api/facts")
+async def facts():
+    """"By the numbers" on the About tab. Counted from the code and data, so it stays true."""
+    import re
+    from just_in_case.tools import GATED_TOOLS
+    services = [s for s in json.loads((DATA_DIR / "services.json").read_text())["services"] if not s.get("sample")]
+    lines = json.loads((DATA_DIR / "support_lines.json").read_text())["lines"]
+    tests = ROOT / "tests" / "test_safeguards.py"
+    return JSONResponse({
+        "services": len(services),
+        "free_services": sum(s["cost"] == "free" for s in services),
+        "support_lines": len(lines),
+        "checkpoints": len(GATED_TOOLS),
+        "safeguard_tests": len(re.findall(r"^def test_", tests.read_text(), re.M)) if tests.exists() else None,
+    })
 
 
 @app.get("/api/support")
@@ -334,10 +475,12 @@ def _share_json(rec: dict, owner: bool) -> JSONResponse:
     return JSONResponse({**ShareStore.public(rec), "owner": owner})
 
 
-def _notify_owner(rec: dict, text: str) -> None:
+def _notify_owner(rec: dict, text: str, notice: str = "") -> None:
     s = SHARE_OWNERS.get(rec["id"])
     if s and s.agent:
         s.apply_share(rec, text)
+        if notice:
+            s.emit({"type": "notice", "text": notice})
 
 
 @app.get("/share/{share_id}")
@@ -369,13 +512,27 @@ async def share_claim(share_id: str, request: Request):
 @app.post("/api/share/{share_id}/unclaim")
 async def share_unclaim(share_id: str, request: Request):
     body = await request.json()
+    token = str(body.get("token", ""))
     try:
-        rec = SHARES.unclaim(share_id, int(body.get("task_id", -1)), str(body.get("token", "")))
+        before = SHARES.get(share_id)
+        task_id = int(body.get("task_id", -1))
+        was = next((t["person"] for t in before["tasks"] if t["id"] == task_id), "")
+        by_owner = SHARES.is_owner(before, token)
+        rec = SHARES.unclaim(share_id, task_id, token)
     except (ShareError, ValueError) as e:
         return JSONResponse({"error": str(e)}, status_code=400)
-    row = next(t for t in rec["tasks"] if t["id"] == int(body["task_id"]))
-    _notify_owner(rec, f"Someone stepped back from: {row['task']}. It is open again.")
+    row = next(t for t in rec["tasks"] if t["id"] == task_id)
+    _notify_owner(rec, f"Someone stepped back from: {row['task']}. It is open again.",
+                  notice=_stepped_back_notice(was, row["task"], by_owner))
     return JSONResponse(ShareStore.public(rec))
+
+
+def _stepped_back_notice(name: str, task: str, by_owner: bool) -> str:
+    """A calm, non-urgent update for the owner. 911 is for emergencies; this is not one."""
+    if by_owner:
+        return f'You removed {name or "a name"} from "{task}". It\'s open again.'
+    return (f'{name or "Someone"} can no longer help with "{task}". It\'s open again. That\'s okay. '
+            "You can ask someone else, or leave it open for family to sign up.")
 
 
 @app.post("/api/share/{share_id}/delete")
@@ -412,29 +569,45 @@ async def table_print(sid: str):
     if not s:
         return JSONResponse({"error": "Not found"}, status_code=404)
     e = htmlmod.escape
+    from just_in_case.tools import TASK_STATUS, task_status
     rows = "".join(f"<tr><td>{e(t['task'])}</td><td>{e(t['date'])}</td><td>{e(t['time'])}</td>"
-                   f"<td>{e(t['person']) or '<em>Open: add your name</em>'}</td></tr>" for t in s.agent.state.helper_tasks)
-    rows = rows or '<tr><td colspan="4">No rows yet.</td></tr>'
+                   f"<td>{e(t['person']) or '<em>Open: add your name</em>'}</td>"
+                   f"<td>{TASK_STATUS[task_status(t)]}</td></tr>" for t in s.agent.state.helper_tasks)
+    rows = rows or '<tr><td colspan="5">No rows yet.</td></tr>'
     return HTMLResponse(f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>Who is helping</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>
  body {{ font-family: "Atkinson Hyperlegible", Verdana, Arial, sans-serif; font-size: 16pt; color: #000; max-width: 9in; margin: .4in auto; }}
  h1 {{ font-size: 24pt; }} table {{ width: 100%; border-collapse: collapse; }}
  th, td {{ border: 2px solid #000; padding: .08in .12in; text-align: left; vertical-align: top; }}
- th {{ background: #eee; }} .print {{ margin-top: .3in; font: inherit; font-weight: 700; padding: .1in .35in; border: 0; border-radius: 10px; background: #0072B2; color: #fff; }}
+ th {{ background: #eee; }} .print {{ margin-top: .3in; font: inherit; font-weight: 700; padding: .1in .35in; border: 0; border-radius: 10px; background: #1F6F78; color: #fff; }}
  @media print {{ .print {{ display: none; }} }}
 </style></head><body>
 <h1>Who is helping</h1>
-<table><thead><tr><th>Task</th><th>Date</th><th>Time</th><th>Who is helping</th></tr></thead><tbody>{rows}</tbody></table>
+<table><thead><tr><th>Task</th><th>Date</th><th>Time</th><th>Who is helping</th><th>Status</th></tr></thead><tbody>{rows}</tbody></table>
 <p>In an emergency, call 911.</p>
 <button class="print" onclick="window.print()">Print this table</button>
 </body></html>""")
 
 
+@app.get("/plan/{sid}")
+async def plan_print(sid: str):
+    """"Print my plan": the whole plan on one clean page."""
+    from just_in_case.card import render_plan_html
+    s = _session_or_404(sid)
+    if not s:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    st, d = s.agent.state, s.agent.box.dir
+    return HTMLResponse(render_plan_html(st, d, s.agent.box.today,
+                                         s.plan()["help_lines"] if st.services_only() else None))
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
-    s = Session(ws)
+    # "See an example" opens /ws?example=1: this visit runs the Ruth demo, even on a live server.
+    s = Session(ws, demo=DEMO or ws.query_params.get("example") == "1")
     SESSIONS[s.id] = s
 
     async def writer():
@@ -445,7 +618,7 @@ async def ws_endpoint(ws: WebSocket):
     tasks: set[asyncio.Task] = set()
     try:
         await s.start()
-        s.emit({"type": "hello", "session": s.id, "demo": DEMO, "greeting": GREETING})
+        s.emit({"type": "hello", "session": s.id, "demo": s.demo, "greeting": GREETING})
         while True:
             msg = await ws.receive_json()
             if msg.get("type") == "say" and str(msg.get("text", "")).strip():
@@ -460,6 +633,14 @@ async def ws_endpoint(ws: WebSocket):
                 s.share_create(msg.get("consent"), str(msg.get("label", "")))
             elif msg.get("type") == "share_delete":
                 s.share_delete()
+            elif msg.get("type") == "save":
+                s.save()
+            elif msg.get("type") in ("event_date", "step"):
+                s.timeline_edit(msg)
+            elif msg.get("type") == "item":
+                s.answer_item(str(msg.get("need", "")), msg.get("ok") is True)
+            elif msg.get("type") == "restore":
+                s.restore(msg.get("state"))
     except WebSocketDisconnect:
         pass
     except Exception as e:

@@ -12,6 +12,12 @@ FALLBACK_LINE = (
     "Nothing in our list fits this yet. Boston's Age Strong Commission "
     "(617-635-4366), Mass 211 (dial 2-1-1), or 1-800-AGE-INFO can help you look."
 )
+# Said when the user has no one to ask. Same places as FALLBACK_LINE.
+NO_ONE_LINE = (
+    "That's okay. Your plan can use services and simple steps only. For more help "
+    "finding services, Boston's Age Strong Commission (617-635-4366), which is "
+    "Boston's Council on Aging, or Mass 211 (dial 2-1-1) can help."
+)
 ESCORT_RULE_LINE = (
     "Ask your surgical team if this option meets their rule for who takes you "
     "home. Some clinics do not accept rides or paid services."

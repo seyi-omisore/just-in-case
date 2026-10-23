@@ -280,7 +280,7 @@ def test_user_can_add_edit_and_remove_rows(box):
 def test_spreadsheet_download_cannot_run_formulas(box):
     box.user_edit_task("add", {"task": "=HYPERLINK(\"http://bad\")", "person": "+Leo"})
     csv_text = box.tasks_csv()
-    assert csv_text.splitlines()[0] == "Task,Date,Time,Who is helping"
+    assert csv_text.splitlines()[0] == "Task,Date,Time,Who is helping,Status"
     assert "'=HYPERLINK" in csv_text and "'+Leo" in csv_text
 
 
@@ -350,3 +350,255 @@ def test_ticking_nothing_gives_just_the_emergency_lines(fresh):
 def test_unknown_section_rejected(fresh):
     with pytest.raises(ToolError):
         fresh.choose_card_sections(["social_security_number"])
+
+
+# ---- "Why this matters" tips ------------------------------------------------
+
+def test_every_need_has_a_plain_why_tip():
+    from just_in_case.safeguards import reading_grade
+    from just_in_case.state import NEED_WHY, NEEDS
+    assert set(NEED_WHY) == set(NEEDS)
+    for need, text in NEED_WHY.items():
+        assert reading_grade(text) <= 8, f"{need}: grade {reading_grade(text):.1f}"
+
+
+# ---- Allergies and important papers on the card ----------------------------
+
+def test_card_shows_allergies_and_papers_in_the_users_words(fresh):
+    fresh.state.user_said += ["I'm allergic to penicillin and shellfish.",
+                              "My papers are in the blue folder in my desk drawer."]
+    fresh.choose_card_sections(["allergies", "papers"])
+    txt = card_text(fresh.make_fridge_card("", [], [], allergies=["Penicillin", "Shellfish"],
+                                           papers="Blue folder, desk drawer"))
+    assert "MY ALLERGIES" in txt and "Penicillin" in txt and "Shellfish" in txt
+    assert "WHERE MY IMPORTANT PAPERS ARE" in txt and "Blue folder, desk drawer" in txt
+
+
+def test_card_blocks_allergies_and_papers_the_user_never_said(fresh):
+    fresh.state.user_said.append("I'm allergic to penicillin.")
+    fresh.choose_card_sections(["allergies", "papers"])
+    with pytest.raises(ToolError, match="allergy"):
+        fresh.make_fridge_card("", [], [], allergies=["Peanuts"])
+    with pytest.raises(ToolError, match="papers"):
+        fresh.make_fridge_card("", [], [], papers="In the safe in the closet")
+    assert "allergy" in fresh.precheck("make_fridge_card", {"name": "", "allergies": ["Latex"]})
+
+
+def test_card_blocks_allergies_and_papers_the_user_did_not_tick(fresh):
+    fresh.state.user_said.append("Penicillin. My papers are in the desk.")
+    fresh.choose_card_sections(["contacts"])
+    with pytest.raises(ToolError, match="did not pick"):
+        fresh.make_fridge_card("", [], [], allergies=["Penicillin"])
+    with pytest.raises(ToolError, match="did not pick"):
+        fresh.make_fridge_card("", [], [], papers="In the desk")
+
+
+def test_card_sections_have_icons_next_to_their_titles(fresh):
+    import glob
+    fresh.state.user_said.append("Penicillin.")
+    fresh.choose_card_sections(["allergies"])
+    fresh.make_fridge_card("", [], [], allergies=["Penicillin"])
+    page = open(sorted(glob.glob(str(CARD_DIR[0] / "*.html")))[-1]).read()
+    assert '<h2><svg class="sec-icon"' in page and "My allergies, in my own words</h2>" in page
+
+
+# ---- No one to ask: a services-only plan -------------------------------------
+
+def test_no_one_to_ask_gives_a_services_only_plan(box):
+    out = box.set_comfort(True, False, no_one_to_ask=True)
+    assert box.state.people_allowed() is False and box.state.services_only()
+    assert "617-635-4366" in out["tell_the_user"] and "2-1-1" in out["tell_the_user"]
+    assert "Council on Aging" in out["tell_the_user"]
+    box.confirm_needs(["pet_care_during_stay"])
+    with pytest.raises(ToolError, match="People are not part"):
+        box.add_to_plan("pet_care_during_stay", "person")
+    assert "has not said" in box.precheck("add_helper_task", {"task": "Feed the cat"})
+
+
+def test_naming_someone_later_ends_services_only(fresh):
+    fresh.set_comfort(False, False, no_one_to_ask=True)
+    fresh.state.user_said.append("Actually, could you write a note to my neighbor Tasha?")
+    fresh.draft_helper_note(["Tasha"], "feed the cat",
+                            "Hi Tasha. Could you feed my cat one day? No pressure at all.")
+    assert fresh.state.people_allowed() and not fresh.state.services_only()
+
+
+# ---- Save and continue later --------------------------------------------------
+
+def _new_box(tmp_path):
+    return Toolbox(PlanState(town="Boston"), Directory(FIXTURES, today=TODAY), out_dir=tmp_path, today=TODAY)
+
+
+def test_saved_plan_round_trip(box, tmp_path):
+    box.state.user_said += ["I'm Ruth. I'd like to ask Tasha. Tasha 617-555-0142."]
+    box.set_comfort(True, False)
+    box.confirm_needs(["ride_home_after_procedure", "pet_care_during_stay"])
+    ride = box.find_services("ride_home_after_procedure")["services"][0]["id"]
+    box.add_to_plan("ride_home_after_procedure", "service", ride)
+    box.add_to_plan("pet_care_during_stay", "person")
+    box.draft_helper_note(["Tasha"], "feed the cat", "Hi Tasha. Could you feed my cat? No pressure at all.")
+    box.user_edit_task("add", {"task": "Feed the cat", "person": "Tasha"})
+    box.make_fridge_card("Ruth", [{"name": "Tasha", "relationship": "", "phone": "617-555-0142"}], [])
+    again = _new_box(tmp_path / "again")
+    assert again.restore(box.export()) == []
+    assert [(i.need, i.route) for i in again.state.items] == [(i.need, i.route) for i in box.state.items]
+    assert again.state.helper_tasks[0]["person"] == "Tasha" and again.state.card_path
+
+
+def test_tampered_save_cannot_get_around_the_rules(fresh, tmp_path):
+    saved = {"user_said": ["I have a procedure."], "needs": ["ride_home_after_procedure"],
+             "comfort": [False, False, False],
+             "items": [{"need": "ride_home_after_procedure", "route": "service", "ref_id": "svc_made_up"},
+                       {"need": "ride_home_after_procedure", "route": "person", "ref_id": None}],
+             "notes": [{"helpers": ["Gloria"], "role": "", "text": "You must drive me. No pressure."}],
+             "sections": ["medications"],
+             "card": {"name": "", "contacts": [], "medications": ["Lisinopril 10mg"]}}
+    skipped = fresh.restore(saved)
+    assert fresh.state.items == [] and fresh.state.helper_notes == [] and not fresh.state.card_path
+    assert "a plan item" in skipped and "a note" in skipped and "the card" in skipped
+
+
+def test_restore_ignores_junk(fresh):
+    assert isinstance(fresh.restore({"needs": "not a list", "items": [42], "comfort": "yes"}), list)
+    assert fresh.state.items == []
+
+
+# ---- Planning for someone else ------------------------------------------------
+
+def test_no_planning_until_the_person_agrees(fresh):
+    fresh.state.user_said.append("I'm helping my mom, Ana, make a plan.")
+    out = fresh.confirm_helping_someone("Ana", agreed=False)
+    assert out["agreed"] is False and "talk with Ana first" in out["tell_the_user"]
+    with pytest.raises(ToolError, match="has not agreed"):
+        fresh.confirm_needs(["power_outage"])
+    assert "has not agreed" in fresh.precheck("confirm_needs", {"needs": ["power_outage"]})
+    fresh.confirm_helping_someone("Ana", agreed=True)
+    assert fresh.confirm_needs(["power_outage"])["confirmed_needs"] == ["power_outage"]
+
+
+def test_add_to_plan_is_blocked_while_waiting_for_agreement(fresh):
+    fresh.confirm_needs(["power_outage"])
+    fresh.confirm_helping_someone("", agreed=False)
+    with pytest.raises(ToolError, match="has not agreed"):
+        fresh.add_to_plan("power_outage", "blank")
+
+
+def test_agreement_is_the_users_tap_not_the_agents_input():
+    import asyncio
+    from just_in_case.agent import make_gate
+
+    async def says_not_yet(short, data):
+        return False
+    gate = make_gate(says_not_yet, trace=lambda *_: None)
+    decision = asyncio.run(gate("mcp__jic__confirm_helping_someone", {"person_name": "", "agreed": True}, None))
+    assert decision.updated_input["agreed"] is False
+
+
+def test_names_the_user_never_said_are_dropped(fresh):
+    fresh.state.user_said.append("I'm helping my mom.")
+    fresh.confirm_helping_someone("Margaret", agreed=True)
+    assert fresh.state.planning_for == ""
+
+
+# ---- Progress counts only what the user said yes to ---------------------------
+
+def test_items_start_unconfirmed_and_no_thanks_removes_them(box):
+    box.confirm_needs(["spare_key_access", "power_outage"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    box.add_to_plan("power_outage", "blank")
+    assert [i.user_ok for i in box.state.items] == [False, False]
+    box.user_confirm_item("spare_key_access", True)
+    assert box.state.items[0].user_ok is True
+    with pytest.raises(ToolError):
+        box.user_confirm_item("power_outage", True)  # "Not covered yet" is not something to accept
+    box.user_confirm_item("spare_key_access", False)
+    assert [i.need for i in box.state.items] == ["power_outage"]
+
+
+def test_replacing_an_item_asks_again(box):
+    box.confirm_needs(["spare_key_access"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    box.user_confirm_item("spare_key_access", True)
+    box.add_to_plan("spare_key_access", "blank")
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    assert box.state.items[0].user_ok is False
+
+
+def test_saved_yes_answers_come_back(box, tmp_path):
+    box.confirm_needs(["spare_key_access"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    box.user_confirm_item("spare_key_access", True)
+    again = _new_box(tmp_path / "again")
+    again.restore(box.export())
+    assert again.state.items[0].user_ok is True
+
+
+# ---- Getting ready timeline -----------------------------------------------------
+
+def test_timeline_uses_the_users_date_and_only_confirmed_parts(box):
+    from just_in_case import timeline
+    box.confirm_needs(["ride_home_after_procedure", "spare_key_access"])
+    ride = box.find_services("ride_home_after_procedure")["services"][0]["id"]
+    box.add_to_plan("ride_home_after_procedure", "service", ride)
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    assert timeline.build(box.state, TODAY)["steps"] == []  # nothing said yes to yet
+    box.user_confirm_item("spare_key_access", True)
+    tl = timeline.build(box.state, TODAY)
+    assert tl["date"] == "" and all(s["date"] == "" for s in tl["steps"])  # no date until the user picks one
+    assert any("lockbox" in s["text"] for s in tl["steps"]) and not any("ride" in s["text"] for s in tl["steps"])
+    box.user_set_event_date("2026-11-02")
+    tl = timeline.build(box.state, TODAY)
+    assert tl["countdown"] == "14 days to go." and tl["label"] == "procedure"
+    key = next(s for s in tl["steps"] if s["text"] == "Put a key in the lockbox.")
+    assert key["date"] == "2026-11-01" and key["when"] == "The day before"
+    assert tl["steps"][-1]["when"] == "The morning of"  # in order, ending on the day
+
+
+def test_timeline_date_must_be_a_real_date_in_the_next_year(box):
+    with pytest.raises(ToolError):
+        box.user_set_event_date("next month")
+    with pytest.raises(ToolError):
+        box.user_set_event_date("2030-01-01")
+    box.user_set_event_date("")  # clearing is fine
+
+
+def test_ticking_a_step_and_countdown_words(box):
+    from datetime import date
+    from just_in_case import timeline
+    box.confirm_needs(["mail_while_away"])
+    box.add_to_plan("mail_while_away", "preparation", "prep_usps_hold_mail")
+    box.user_confirm_item("mail_while_away", True)
+    box.user_set_event_date("2026-10-20")
+    step = timeline.build(box.state, TODAY)["steps"][0]
+    box.user_tick_step(step["id"], True)
+    assert timeline.build(box.state, TODAY)["steps"][0]["done"] is True
+    with pytest.raises(ToolError):
+        box.user_tick_step("made:up", True)
+    assert timeline.countdown(date(2026, 10, 19), TODAY) == "Today is the day."
+    assert timeline.countdown(date(2026, 10, 20), TODAY) == "Tomorrow."
+    assert "passed" in timeline.countdown(date(2026, 10, 1), TODAY)
+
+
+def test_timeline_wording_is_plain(box):
+    from just_in_case import timeline
+    from just_in_case.safeguards import reading_grade
+    texts = [t for steps in timeline.STEPS.values() for _, t in steps] + [t for _, t in timeline.ALWAYS]
+    assert all(reading_grade(t) <= 8 for t in texts), [t for t in texts if reading_grade(t) > 8]
+
+
+# ---- Helper task status ----------------------------------------------------------
+
+def test_task_status_open_helping_confirmed(box):
+    from just_in_case.tools import task_status
+    box.user_edit_task("add", {"task": "Feed the cat"})
+    t = box.state.helper_tasks[0]
+    assert task_status(t) == "open"
+    with pytest.raises(ToolError, match="Add who is helping"):
+        box.user_edit_task("confirm", {"id": t["id"], "confirmed": True})
+    box.user_edit_task("update", {"id": t["id"], "task": "Feed the cat", "person": "Doris"})
+    assert task_status(t) == "helping"
+    box.user_edit_task("confirm", {"id": t["id"], "confirmed": True})
+    assert task_status(t) == "confirmed"
+    assert box.tasks_csv().splitlines()[1].endswith(",Doris,Confirmed")
+    box.user_edit_task("update", {"id": t["id"], "task": "Feed the cat", "person": "Marion"})
+    assert task_status(t) == "helping"  # a confirmation never moves to a new name

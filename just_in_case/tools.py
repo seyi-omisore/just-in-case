@@ -17,10 +17,12 @@ from typing import Any
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
 
+from . import timeline
 from .card import write_card
 from .config import MAX_HELPERS, OUTPUT_DIR
 from .directory import Directory
-from .safeguards import ESCORT_RULE_LINE, FALLBACK_LINE, check_helper_note, safe_cell, said_by_user
+from .safeguards import (ESCORT_RULE_LINE, FALLBACK_LINE, NO_ONE_LINE, check_helper_note, safe_cell,
+                         said_by_user)
 from .state import CARD_SECTIONS, NEEDS, ROUTES, PlanItem, PlanState
 
 SERVER_NAME = "jic"
@@ -28,13 +30,25 @@ PREFIX = f"mcp__{SERVER_NAME}__"
 
 # Tools that pause for the user's approval (the three human checkpoints).
 GATED_TOOLS = {"confirm_needs", "draft_helper_note", "add_helper_task",
-               "choose_card_sections", "make_fridge_card"}
+               "choose_card_sections", "make_fridge_card", "confirm_helping_someone"}
+NOT_AGREED = ("The person this plan is for has not agreed yet. Do not plan. Kindly suggest the user "
+              "talks with them first, and ask the agreement checkpoint again only when the user says they agree.")
 TASK_FIELDS = ("task", "date", "time", "person")
 MAX_FIELD = 120
+# A helper task is Open (no name), Someone's helping (a name), or Confirmed (the owner checked).
+TASK_STATUS = {"open": "Open", "helping": "Someone's helping", "confirmed": "Confirmed"}
+MAX_SAVED_SAID = 200   # messages kept in a saved plan
+MAX_SAVED_TASKS = 50
 
 
 class ToolError(Exception):
     """Raised for a rule violation. The message goes back to the model."""
+
+
+def task_status(t: dict) -> str:
+    if not t.get("person"):
+        return "open"
+    return "confirmed" if t.get("confirmed") else "helping"
 
 
 class Toolbox:
@@ -45,8 +59,29 @@ class Toolbox:
         self.out_dir = out_dir
         self.today = today or date.today()
 
+    # ---- planning for someone else ------------------------------------------
+    def confirm_helping_someone(self, person_name: str = "", agreed: bool = False) -> dict:
+        """CHECKPOINT. The user is planning for someone else. `agreed` is the user's
+        own answer from the page ("Yes, they agree" / "Not yet"), never the agent's."""
+        s = self.state
+        s.helping_someone, s.person_agreed = True, bool(agreed)
+        name = str(person_name or "").strip()[:60]
+        s.planning_for = name if said_by_user(name, s.heard(), name=True) else ""
+        s.log(f"checkpoint: planning for someone else, agreed={s.person_agreed}")
+        who = s.planning_for or "the person you're helping"
+        if not s.person_agreed:
+            return {"agreed": False, "next": NOT_AGREED,
+                    "tell_the_user": "That's okay. Plans work best when the person helps make them. "
+                                     f"You might talk with {who} first. I'm here when you're both ready."}
+        return {"agreed": True,
+                "tell_the_user": f"Thank you. Let's plan together. {who[0].upper() + who[1:]} decides what goes "
+                                 "in the plan and who is asked to help.",
+                "next": "Talk about the person as 'they'. Ask what is coming up for them."}
+
     # ---- checkpoint 1 -----------------------------------------------------
     def confirm_needs(self, needs: list[str]) -> dict:
+        if self.state.waiting_for_agreement():
+            raise ToolError(NOT_AGREED)
         unknown = [n for n in needs if n not in NEEDS]
         if unknown:
             raise ToolError(f"Unknown needs {unknown}. Use only: {list(NEEDS)}")
@@ -54,13 +89,20 @@ class Toolbox:
         self.state.log(f"checkpoint 1: user confirmed needs {self.state.confirmed_needs}")
         return {"confirmed_needs": self.state.confirmed_needs}
 
-    def set_comfort(self, comfortable_asking_people: bool, worried_about_burden: bool) -> dict:
+    def set_comfort(self, comfortable_asking_people: bool, worried_about_burden: bool,
+                    no_one_to_ask: bool = False) -> dict:
         s = self.state
-        s.comfortable_asking_people = comfortable_asking_people
+        s.comfortable_asking_people = comfortable_asking_people and not no_one_to_ask
         # Once she says she worries about being a burden, it sticks for the session.
         s.worried_about_burden = s.worried_about_burden or worried_about_burden
-        s.log(f"comfort: asking_people={s.comfortable_asking_people} burden={s.worried_about_burden}")
-        return {"people_allowed": s.people_allowed(), "burden_mode": s.worried_about_burden}
+        s.no_one_to_ask = s.no_one_to_ask or no_one_to_ask
+        s.log(f"comfort: asking_people={s.comfortable_asking_people} burden={s.worried_about_burden} "
+              f"no_one={s.no_one_to_ask}")
+        out = {"people_allowed": s.people_allowed(), "burden_mode": s.worried_about_burden}
+        if s.no_one_to_ask:
+            out["services_only"] = "Plan with services and preparations only. Do not ask about people again."
+            out["tell_the_user"] = NO_ONE_LINE
+        return out
 
     # ---- lookups ------------------------------------------------------------
     def find_services(self, need: str) -> dict:
@@ -80,6 +122,8 @@ class Toolbox:
     def add_to_plan(self, need: str, route: str, ref_id: str | None = None) -> dict:
         s = self.state
         self._check_need(need)
+        if s.waiting_for_agreement():
+            raise ToolError(NOT_AGREED)
         if need not in s.confirmed_needs:
             raise ToolError("Confirm this need with the user first (confirm_needs).")
         if route not in ROUTES:
@@ -150,7 +194,7 @@ class Toolbox:
         latest = s.user_said[-1] if s.user_said else ""
         if all(said_by_user(n, latest, name=True) for n in helper_names) and not s.people_allowed():
             # She asked for this herself, so she has changed her mind about asking someone.
-            s.comfortable_asking_people, s.worried_about_burden = True, False
+            s.comfortable_asking_people, s.worried_about_burden, s.no_one_to_ask = True, False, False
             s.log("comfort: user asked for a note to someone by name")
         s.helper_notes.append({"helpers": helper_names, "role": role, "text": note_text})
         s.log(f"checkpoint 2: note approved for {helper_names}")
@@ -172,13 +216,16 @@ class Toolbox:
                 else "The user picked nothing extra. Make the card with just the emergency lines."}
 
     def _card_problem(self, name: str, contacts: list[dict], medications: list[str],
-                      pet_name: str = "", pet_caregiver: str = "") -> str | None:
+                      pet_name: str = "", pet_caregiver: str = "",
+                      allergies: list[str] | None = None, papers: str = "") -> str | None:
         """Why this card cannot be made, or None. Checked BEFORE the user is asked."""
         chosen = self.state.card_sections
         if chosen is None:
             return "First ask what the user wants on the card: call choose_card_sections."
+        allergies = allergies or []
         not_chosen = [CARD_SECTIONS[key] for key, given in
-                      (("name", name), ("contacts", contacts), ("medications", medications), ("pet", pet_name))
+                      (("name", name), ("contacts", contacts), ("medications", medications),
+                       ("allergies", allergies), ("pet", pet_name), ("papers", papers))
                       if given and key not in chosen]
         if not_chosen:
             return ("The user did not pick these for the card: " + ", ".join(not_chosen)
@@ -195,6 +242,11 @@ class Toolbox:
         for m in medications:
             if not said_by_user(m, heard):
                 missing.append(f"medication '{m}'")
+        for a in allergies:
+            if not said_by_user(a, heard):
+                missing.append(f"allergy '{a}'")
+        if papers and not said_by_user(papers, heard):
+            missing.append(f"where papers are kept '{papers}'")
         if pet_name and not said_by_user(pet_name, heard):
             missing.append(f"pet '{pet_name}'")
         if pet_caregiver and not said_by_user(pet_caregiver, heard, name=True):
@@ -205,11 +257,13 @@ class Toolbox:
         return None
 
     def make_fridge_card(self, name: str, contacts: list[dict], medications: list[str],
-                         pet_name: str = "", pet_caregiver: str = "") -> dict:
-        problem = self._card_problem(name, contacts, medications, pet_name, pet_caregiver)
+                         pet_name: str = "", pet_caregiver: str = "",
+                         allergies: list[str] | None = None, papers: str = "") -> dict:
+        problem = self._card_problem(name, contacts, medications, pet_name, pet_caregiver, allergies, papers)
         if problem:
             raise ToolError(problem)
         card = {"name": name, "contacts": contacts, "medications": medications,
+                "allergies": allergies or [], "papers": papers,
                 "pet": {"name": pet_name, "caregiver": pet_caregiver} if pet_name else None,
                 "sections": list(self.state.card_sections)}
         self.card = card  # kept so the card can refresh when the plan or table changes
@@ -267,11 +321,40 @@ class Toolbox:
         if short == "make_fridge_card":
             return self._card_problem(data.get("name", ""), data.get("contacts", []),
                                       data.get("medications", []), data.get("pet_name", ""),
-                                      data.get("pet_caregiver", ""))
+                                      data.get("pet_caregiver", ""), data.get("allergies", []),
+                                      data.get("papers", ""))
         if short == "confirm_needs":
+            if self.state.waiting_for_agreement():
+                return NOT_AGREED
             unknown = [n for n in data.get("needs", []) if n not in NEEDS]
             return f"Unknown needs {unknown}. Use only: {list(NEEDS)}" if unknown else None
         return None
+
+    def user_confirm_item(self, need: str, ok: bool) -> None:
+        """The user answers a plan item on the page: "Yes, add this" or "No thanks"."""
+        s = self.state
+        item = next((i for i in s.items if i.need == need), None)
+        if item is None or item.route == "blank":
+            raise ToolError("That part of the plan is not there anymore.")
+        if ok:
+            item.user_ok = True
+        else:
+            s.items = [i for i in s.items if i.need != need]  # back to "still to plan"
+        s.log(f"user {'confirmed' if ok else 'said no thanks to'} {need}")
+        self.refresh_card()
+
+    # ---- "Getting ready" timeline (the user's own date and ticks) -------------
+    def user_set_event_date(self, value: str) -> None:
+        if value and timeline.parse_day(value, self.today) is None:
+            raise ToolError("Please pick a date within the next year.")
+        self.state.event_date = str(value or "")
+        self.state.log("user set the date for their timeline" if value else "user cleared the timeline date")
+
+    def user_tick_step(self, step_id: str, done: bool) -> None:
+        ids = {s["id"] for s in timeline.build(self.state, self.today)["steps"]}
+        if step_id not in ids:
+            raise ToolError("That step is not on the timeline anymore.")
+        (self.state.steps_done.add if done else self.state.steps_done.discard)(step_id)
 
     def user_edit_task(self, action: str, row: dict) -> list[dict]:
         """The user edits the table on the page. Their table, their choice."""
@@ -285,7 +368,16 @@ class Toolbox:
             clean = self._clean_task(row)
             for t in s.helper_tasks:
                 if t["id"] == row.get("id"):
+                    if clean["person"].lower() != t["person"].lower():
+                        t["confirmed"] = False  # a confirmation never moves to a new name
                     t.update(clean)
+        elif action == "confirm":
+            t = next((t for t in s.helper_tasks if t["id"] == row.get("id")), None)
+            if t is None:
+                raise ToolError("That row is not in your table anymore.")
+            if not t["person"]:
+                raise ToolError("Add who is helping before marking it confirmed.")
+            t["confirmed"] = row.get("confirmed") is True
         elif action == "delete":
             s.helper_tasks = [t for t in s.helper_tasks if t["id"] != row.get("id")]
         else:
@@ -293,6 +385,74 @@ class Toolbox:
         s.log(f"user edited helper table ({action})")
         self.refresh_card()
         return s.helper_tasks
+
+    # ---- save and continue later ------------------------------------------
+    def export(self) -> dict:
+        """Everything needed to pick up later. The user keeps it on their own device."""
+        s = self.state
+        return {"v": 1, "user_said": s.user_said[-MAX_SAVED_SAID:], "needs": s.confirmed_needs,
+                "helping": [s.helping_someone, s.person_agreed, s.planning_for],
+                "comfort": [s.comfortable_asking_people, s.worried_about_burden, s.no_one_to_ask],
+                "items": [{"need": i.need, "route": i.route, "ref_id": i.ref_id, "user_ok": i.user_ok}
+                          for i in s.items],
+                "notes": s.helper_notes, "tasks": s.helper_tasks, "sections": s.card_sections,
+                "event_date": s.event_date, "steps_done": sorted(s.steps_done),
+                "card": getattr(self, "card", None)}
+
+    def restore(self, saved: dict) -> list[str]:
+        """Rebuild a saved plan by running every step through the same checks again.
+
+        The saved copy comes from the user's browser, so it is never trusted: a
+        step that does not pass (an unknown service, a person without consent, a
+        card detail the user never typed) is left out. Returns what was left out.
+        """
+        s = self.state
+        skipped: list[str] = []
+
+        def attempt(label, step):
+            # Each step reads the saved values itself, so junk is skipped, not a crash.
+            try:
+                step()
+            except (ToolError, KeyError, TypeError, ValueError, AttributeError, IndexError):
+                skipped.append(label)
+
+        def as_list(value, limit):
+            return list(value)[:limit] if isinstance(value, list) else []
+
+        s.user_said = [str(x)[:2000] for x in as_list(saved.get("user_said"), MAX_SAVED_SAID)] + s.user_said
+        helping = as_list(saved.get("helping"), 3) + [False, False, ""]
+        if helping[0] is True:
+            attempt("who the plan is for", lambda: self.confirm_helping_someone(str(helping[2]), helping[1] is True))
+        attempt("needs", lambda: self.confirm_needs([str(n) for n in as_list(saved.get("needs"), len(NEEDS))]))
+        comfort = [bool(c) for c in as_list(saved.get("comfort"), 3)] + [False] * 3
+        attempt("comfort", lambda: self.set_comfort(*comfort[:3]))
+        for it in as_list(saved.get("items"), len(NEEDS)):
+            def add_item(it=it):
+                self.add_to_plan(str(it["need"]), str(it["route"]), str(it["ref_id"]) if it.get("ref_id") else None)
+                if it.get("user_ok") is True and it["route"] != "blank":
+                    self.user_confirm_item(str(it["need"]), True)  # the user's own earlier "yes"
+            attempt("a plan item", add_item)
+        for n in as_list(saved.get("notes"), MAX_HELPERS):
+            attempt("a note", lambda n=n: self.draft_helper_note(
+                [str(h) for h in n["helpers"]], str(n.get("role", "")), str(n["text"])))
+        for t in as_list(saved.get("tasks"), MAX_SAVED_TASKS):
+            attempt("a helper row", lambda t=t: self.user_edit_task("add", {k: t.get(k, "") for k in TASK_FIELDS}))
+        if saved.get("sections") is not None:
+            attempt("card choices", lambda: self.choose_card_sections([str(x) for x in saved["sections"]]))
+        card = saved.get("card")
+        if card and s.card_sections is not None:
+            def remake():
+                pet = card.get("pet") or {}
+                self.make_fridge_card(
+                    str(card.get("name", "")), as_list(card.get("contacts"), 10),
+                    [str(m) for m in as_list(card.get("medications"), 20)],
+                    str(pet.get("name", "")), str(pet.get("caregiver", "")),
+                    [str(a) for a in as_list(card.get("allergies"), 20)], str(card.get("papers", "")))
+            attempt("the card", remake)
+        attempt("the timeline date", lambda: self.user_set_event_date(str(saved.get("event_date") or "")))
+        s.steps_done = {str(x)[:80] for x in as_list(saved.get("steps_done"), 100)}
+        s.log(f"restored a saved plan; left out: {skipped or 'nothing'}")
+        return skipped
 
     def refresh_card(self) -> None:
         """Rebuild an approved card from the same approved details, with the latest plan."""
@@ -304,9 +464,10 @@ class Toolbox:
         import io
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow(["Task", "Date", "Time", "Who is helping"])
+        w.writerow(["Task", "Date", "Time", "Who is helping", "Status"])
         for t in self.state.helper_tasks:
-            w.writerow([safe_cell(t["task"]), safe_cell(t["date"]), safe_cell(t["time"]), safe_cell(t["person"])])
+            w.writerow([safe_cell(t["task"]), safe_cell(t["date"]), safe_cell(t["time"]), safe_cell(t["person"]),
+                        TASK_STATUS[task_status(t)]])
         return buf.getvalue()
 
     # ---- support (T7) --------------------------------------------------------
@@ -368,6 +529,16 @@ def build_server(box: Toolbox, trace=print):
             trace(f"  [rule]  blocked: {e}")
             return _err(str(e))
 
+    @tool("confirm_helping_someone",
+          "CHECKPOINT. Call first if the user is planning for someone else (a parent, relative, or "
+          "friend). The user is asked whether that person knows about the plan and agrees. Do not "
+          "plan until this returns agreed=true.",
+          {"type": "object", "properties": {
+              "person_name": {"type": "string", "description": "their first name, only if the user said it"}},
+           "required": []})
+    async def confirm_helping_someone(args):
+        return await run(box.confirm_helping_someone, args.get("person_name", ""), bool(args.get("agreed")))
+
     @tool("confirm_needs",
           "CHECKPOINT. Ask the user to confirm the list of needs to plan for. Call before planning.",
           {"type": "object", "properties": {"needs": {"type": "array", "items": NEED_ENUM}},
@@ -377,13 +548,16 @@ def build_server(box: Toolbox, trace=print):
 
     @tool("set_comfort",
           "Record whether the user is comfortable asking a friend for one small thing, and whether "
-          "she worries about being a burden. Call as soon as she says either.",
+          "she worries about being a burden, and whether she has no one to ask. Call as soon as she "
+          "says any of these.",
           {"type": "object", "properties": {
               "comfortable_asking_people": {"type": "boolean"},
-              "worried_about_burden": {"type": "boolean"}},
+              "worried_about_burden": {"type": "boolean"},
+              "no_one_to_ask": {"type": "boolean", "description": "true if the user says they have no one to ask"}},
            "required": ["comfortable_asking_people", "worried_about_burden"]})
     async def set_comfort(args):
-        return await run(box.set_comfort, args["comfortable_asking_people"], args["worried_about_burden"])
+        return await run(box.set_comfort, args["comfortable_asking_people"], args["worried_about_burden"],
+                         bool(args.get("no_one_to_ask", False)))
 
     @tool("find_services", "Search the verified local directory for services that meet a need.",
           {"type": "object", "properties": {"need": NEED_ENUM}, "required": ["need"]})
@@ -446,12 +620,15 @@ def build_server(box: Toolbox, trace=print):
                   "name": {"type": "string"}, "relationship": {"type": "string"},
                   "phone": {"type": "string"}}, "required": ["name", "relationship", "phone"]}},
               "medications": {"type": "array", "items": {"type": "string"}},
+              "allergies": {"type": "array", "items": {"type": "string"}},
               "pet_name": {"type": "string"},
-              "pet_caregiver": {"type": "string"}},
+              "pet_caregiver": {"type": "string"},
+              "papers": {"type": "string", "description": "only the place the user keeps important papers"}},
            "required": ["name", "contacts", "medications"]})
     async def make_fridge_card(args):
         return await run(box.make_fridge_card, args["name"], args["contacts"], args["medications"],
-                         args.get("pet_name", ""), args.get("pet_caregiver", ""))
+                         args.get("pet_name", ""), args.get("pet_caregiver", ""),
+                         args.get("allergies", []), args.get("papers", ""))
 
     @tool("get_support_lines",
           "Get verified support lines (988, Call2Talk, Mass 211, wellness check). Use when the user "
@@ -465,7 +642,7 @@ def build_server(box: Toolbox, trace=print):
     async def review_plan(args):
         return _ok(box.review_plan())
 
-    tools = [confirm_needs, set_comfort, find_services, find_preparations,
+    tools = [confirm_helping_someone, confirm_needs, set_comfort, find_services, find_preparations,
              add_to_plan, draft_helper_note, add_helper_task, choose_card_sections, make_fridge_card,
              get_support_lines, review_plan]
     server = create_sdk_mcp_server(name=SERVER_NAME, version="0.1.0", tools=tools)

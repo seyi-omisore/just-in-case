@@ -137,3 +137,74 @@ def test_shared_list_stays_after_the_visit_ends_as_agreed():
 def test_family_page_loads():
     assert client.get("/share/anything").status_code == 200
     assert client.get("/static/share.js").status_code == 200
+
+
+def _shared_list(ws):
+    until(ws, "hello")
+    ws.send_json({"type": "table", "action": "add", "row": {"task": "Feed the cat"}})
+    until(ws, "plan")
+    ws.send_json({"type": "share_create", "consent": True, "label": ""})
+    share = until(ws, "plan")["plan"]["share"]
+    return share["url"].split("/")[-1], share["owner_url"].split("owner=")[1]
+
+
+def test_owner_is_told_calmly_when_a_helper_steps_back():
+    with client.websocket_connect("/ws") as ws:
+        sid, _ = _shared_list(ws)
+        tid = client.get(f"/api/share/{sid}").json()["tasks"][0]["id"]
+        token = client.post(f"/api/share/{sid}/claim", json={"task_id": tid, "name": "Doris"}).json()["claim_token"]
+        until(ws, "plan")
+        client.post(f"/api/share/{sid}/unclaim", json={"task_id": tid, "token": token})
+        assert until(ws, "plan")["plan"]["tasks"][0]["person"] == ""  # the table updates first
+        notice = until(ws, "notice")["text"]
+        ws.send_json({"type": "share_delete"})
+    assert 'Doris can no longer help with "Feed the cat"' in notice and "open again" in notice
+    assert "911" not in notice and "urgent" not in notice.lower()
+
+
+def test_owner_removing_a_name_is_described_as_their_own_change():
+    with client.websocket_connect("/ws") as ws:
+        sid, owner = _shared_list(ws)
+        tid = client.get(f"/api/share/{sid}").json()["tasks"][0]["id"]
+        client.post(f"/api/share/{sid}/claim", json={"task_id": tid, "name": "Doris"})
+        until(ws, "plan")
+        client.post(f"/api/share/{sid}/unclaim", json={"task_id": tid, "token": owner})
+        assert until(ws, "notice")["text"].startswith("You removed Doris")
+        ws.send_json({"type": "share_delete"})
+
+
+def test_shared_page_shows_first_names_only(store):
+    rec, _ = store.create("Gloria Mendes", [dict(ROWS[1], person="Andre Silva")])
+    page = ShareStore.public(store.get(rec["id"]))
+    assert page["label"] == "Gloria" and page["tasks"][0]["person"] == "Andre"
+    assert "Mendes" not in str(page) and "Silva" not in str(page)
+
+
+def test_helper_full_name_is_not_shown_to_other_family():
+    with client.websocket_connect("/ws") as ws:
+        sid, _ = _shared_list(ws)
+        tid = client.get(f"/api/share/{sid}").json()["tasks"][0]["id"]
+        out = client.post(f"/api/share/{sid}/claim", json={"task_id": tid, "name": "Doris Chen"}).json()
+        page = client.get(f"/api/share/{sid}").json()
+        owner_view = until(ws, "plan")["plan"]["tasks"][0]["person"]
+        ws.send_json({"type": "share_delete"})
+    assert out["tasks"][0]["person"] == "Doris" and page["tasks"][0]["person"] == "Doris"
+    assert "Chen" not in str(page)
+    assert owner_view == "Doris Chen"  # the owner's own table keeps what was typed
+
+
+def test_family_page_shows_status_and_stepping_back_clears_confirmed():
+    with client.websocket_connect("/ws") as ws:
+        sid, _ = _shared_list(ws)
+        tid = client.get(f"/api/share/{sid}").json()["tasks"][0]["id"]
+        assert client.get(f"/api/share/{sid}").json()["tasks"][0]["status"] == "open"
+        token = client.post(f"/api/share/{sid}/claim", json={"task_id": tid, "name": "Doris"}).json()["claim_token"]
+        until(ws, "plan")
+        ws.send_json({"type": "table", "action": "confirm", "row": {"id": tid, "confirmed": True}})
+        assert until(ws, "plan")["plan"]["tasks"][0]["confirmed"] is True
+        assert client.get(f"/api/share/{sid}").json()["tasks"][0]["status"] == "confirmed"
+        client.post(f"/api/share/{sid}/unclaim", json={"task_id": tid, "token": token})
+        after = until(ws, "plan")["plan"]["tasks"][0]
+        page = client.get(f"/api/share/{sid}").json()["tasks"][0]
+        ws.send_json({"type": "share_delete"})
+    assert after["confirmed"] is False and page["status"] == "open"

@@ -38,6 +38,12 @@ def _clean(v) -> str:
     return str(v or "").replace("\r", " ").replace("\n", " ").strip()[:MAX_FIELD]
 
 
+def first_name(v) -> str:
+    """The shared page shows first names only: "Doris Chen" -> "Doris"."""
+    parts = _clean(v).split()
+    return parts[0].rstrip(",.") if parts else ""
+
+
 class ShareStore:
     def __init__(self, folder: Path, keep_days: int = KEEP_DAYS):
         self.folder = Path(folder)
@@ -95,6 +101,7 @@ class ShareStore:
         for t in tasks[:MAX_ROWS]:
             row = {k: _clean(t.get(k)) for k in ("task", "date", "time", "person")}
             row["id"] = int(t["id"])
+            row["confirmed"] = bool(t.get("confirmed")) and bool(row["person"])
             row["claim_hash"] = claims.get(row["id"]) if row["person"] else None
             out.append(row)
         return out
@@ -139,7 +146,7 @@ class ShareStore:
             mine = row.get("claim_hash") and secrets.compare_digest(row["claim_hash"], _hash(token or ""))
             if not (mine or self.is_owner(rec, token)):
                 raise ShareError("You can only remove your own name.")
-            row["person"], row["claim_hash"] = "", None
+            row["person"], row["claim_hash"], row["confirmed"] = "", None, False
             self._save(rec)
             return rec
 
@@ -149,11 +156,13 @@ class ShareStore:
 
     @staticmethod
     def public(rec: dict) -> dict:
-        """What the share page may see. No tokens, no hashes."""
+        """What the share page may see. No tokens, no hashes, and first names only."""
         return {
-            "label": rec["label"],
+            "label": first_name(rec["label"]),
             "expires": rec["expires"],
-            "tasks": [{k: t[k] for k in ("id", "task", "date", "time", "person")} for t in rec["tasks"]],
+            "tasks": [{**{k: t[k] for k in ("id", "task", "date", "time")}, "person": first_name(t["person"]),
+                       "status": "open" if not t["person"] else ("confirmed" if t.get("confirmed") else "helping")}
+                      for t in rec["tasks"]],
         }
 
     def purge_expired(self) -> int:

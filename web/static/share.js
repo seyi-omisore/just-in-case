@@ -21,7 +21,19 @@
     u.setAttribute("href", "#i-" + name); s.appendChild(u);
     return s;
   };
-  const myClaims = () => { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (_) { return {}; } };
+  // A round badge with a helper's initials, same as the main page. The name is always written next to it.
+  const TINTS = ["sky", "green", "orange", "purple", "yellow"];
+  const initials = (name) => {
+    const w = name.trim().split(/\s+/).filter((x) => /\p{L}/u.test(x));
+    return w.length ? (Array.from(w[0])[0] + (w.length > 1 ? Array.from(w[w.length - 1])[0] : "")).toUpperCase() : "";
+  };
+  const avatar = (name) => {
+    let h = 0; for (const c of name.toLowerCase()) h = (h * 31 + c.codePointAt(0)) >>> 0;
+    const a = el("span", "initials tint-" + TINTS[h % TINTS.length], initials(name));
+    a.setAttribute("aria-hidden", "true");
+    return a;
+  };
+  const myClaims =() => { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (_) { return {}; } };
   const saveClaims = (c) => { try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (_) {} };
   const status = (t) => { $("share-status").textContent = t || ""; };
 
@@ -54,8 +66,12 @@
       const when = [t.date, t.time].filter(Boolean).join(", ");
       if (when) li.appendChild(el("p", "share-when", when));
 
+      const STATUS = { open: ["Open", "plus"], helping: ["Someone's helping", "person"], confirmed: ["Confirmed", "check"] };
+      const [sWord, sIcon] = STATUS[t.status || (t.person ? "helping" : "open")];
+      const badge = el("span", "status status-" + (t.status || "open")); badge.append(icon(sIcon), document.createTextNode(sWord));
+      li.appendChild(badge);
       if (t.person) {
-        const p = el("p", "share-who"); p.append(icon("check"), document.createTextNode(`${t.person} is helping`));
+        const p = el("p", "share-who"); p.append(avatar(t.person), document.createTextNode(`${t.person} is helping`));
         li.appendChild(p);
         const token = mine[t.id] || (data.owner ? ownerToken : "");
         if (token) {
@@ -93,8 +109,6 @@
         li.appendChild(f);
         setTimeout(() => inp.focus(), 0);
       } else {
-        const chip = el("span", "open-chip"); chip.append(icon("plus"), document.createTextNode("Open"));
-        li.appendChild(chip);
         const b = el("button", "btn btn-primary share-small"); b.type = "button";
         b.append(icon("heart"), document.createTextNode("I can help"));
         b.onclick = () => { openForm = t.id; render(data); };
@@ -115,7 +129,7 @@
   }
 
   $("delete-list").onclick = async () => {
-    if (!confirm("Delete this list for everyone? This cannot be undone.")) return;
+    if (!confirm("Stop sharing? This list will be deleted for everyone, and the link will stop working. This cannot be undone.")) return;
     try { await api("/delete", { owner: ownerToken }); location.replace(location.pathname); }
     catch (e) { status(e.message); }
   };
@@ -123,13 +137,13 @@
   // theme and text size, same as the main page
   const setTheme = (t, save = true) => {
     document.documentElement.dataset.theme = t;
-    $("theme-light").setAttribute("aria-pressed", String(t === "light"));
-    $("theme-dark").setAttribute("aria-pressed", String(t === "dark"));
+    for (const k of ["light", "dark", "contrast"]) $("theme-" + k).setAttribute("aria-pressed", String(t === k));
     if (save) { try { localStorage.setItem("jic-theme", t); } catch (_) {} }
   };
-  setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light", false);
+  setTheme(["dark", "contrast"].includes(document.documentElement.dataset.theme) ? document.documentElement.dataset.theme : "light", false);
   $("theme-light").onclick = () => setTheme("light");
   $("theme-dark").onclick = () => setTheme("dark");
+  $("theme-contrast").onclick = () => setTheme("contrast");
   const SIZES = [18, 20, 22, 24, 27]; let idx = 1;
   try { const s = Number(localStorage.getItem("jic-size")); if (SIZES.includes(s)) idx = SIZES.indexOf(s); } catch (_) {}
   const size = () => { document.documentElement.style.setProperty("--fs", SIZES[idx] + "px"); try { localStorage.setItem("jic-size", SIZES[idx]); } catch (_) {} };
