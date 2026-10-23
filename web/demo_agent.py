@@ -14,13 +14,17 @@ import re
 
 from just_in_case.agent import make_gate
 from just_in_case.directory import Directory
+from just_in_case.safeguards import NO_ONE_LINE
 from just_in_case.state import PlanState
 from just_in_case.tools import PREFIX, Toolbox, ToolError
 
 PAUSE = 0.5  # seconds between steps, so the activity feed is readable
 
 CRISIS = re.compile(r"notice|who would (even )?know|no one would|nobody would|point anymore", re.I)
-BURDEN = re.compile(r"bother|impose|burden|rather not|don'?t want to ask|no one to ask", re.I)
+BURDEN = re.compile(r"bother|impose|burden|rather not|don'?t want to ask", re.I)
+HELPING = re.compile(r"helping (someone|my|a )|for (my )?(mom|mother|dad|father|parent|aunt|uncle|"
+                     r"grand\w+|friend|neighbou?r|sister|brother)|someone else", re.I)
+NO_ONE = re.compile(r"no one|nobody|don'?t have anyone|do not have anyone|not anyone|no family|no friends", re.I)
 NO = re.compile(r"^\s*(no|nope|none|not really|nothing)\b", re.I)
 
 # Keywords -> needs. The demo only plans for what the user brings up.
@@ -59,7 +63,9 @@ class DemoAgent:
         self.task = ""
         self.contacts: list[dict] = []
         self.meds: list[str] = []
+        self.allergies: list[str] = []
         self.pet = ""
+        self.papers = ""
         self.name = ""
         self.queue: list[str] = []
         self.cost_usd = 0.0
@@ -81,7 +87,7 @@ class DemoAgent:
             data = {"helper_names": args[0], "role": args[1], "note_text": args[2]}
         elif short == "make_fridge_card":
             data = {"name": args[0], "contacts": args[1], "medications": args[2],
-                    "pet_name": args[3], "pet_caregiver": args[4]}
+                    "pet_name": args[3], "pet_caregiver": args[4], "allergies": args[5], "papers": args[6]}
         elif short in ("find_services", "find_preparations"):
             data = {"need": args[0]}
         elif short == "add_to_plan":
@@ -90,6 +96,8 @@ class DemoAgent:
             data = {"sections": []}
         elif short == "add_helper_task":
             data = {"task": args[0], "person": args[1], "date": args[2], "time": args[3]}
+        elif short == "confirm_helping_someone":
+            data = {"person_name": args[0]}
         self.on_tool(short, data)
         await asyncio.sleep(PAUSE)
         decision = await self.gate(PREFIX + short, data, None)
@@ -97,6 +105,8 @@ class DemoAgent:
             return None
         if short == "choose_card_sections":  # use the user's own ticks
             args = (decision.updated_input.get("sections", []),)
+        if short == "confirm_helping_someone":  # the user's own answer
+            args = (args[0], decision.updated_input.get("agreed", False))
         try:
             result = fn(*args)
             if self.state.trace:
@@ -111,7 +121,9 @@ class DemoAgent:
         questions = {"name": "What name would you like at the top of your card?",
                      "contacts": "Who would you like on your card, and what are their phone numbers?",
                      "medications": "Which medications would you like listed? Please use your own words.",
-                     "pet": "Tell me about your pet: their name, and who looks after them."}
+                     "allergies": "What allergies would you like listed? Please use your own words.",
+                     "pet": "Tell me about your pet: their name, and who looks after them.",
+                     "papers": "Where do you keep your important papers? Just the place, not account numbers."}
         if self.queue:
             return questions[self.queue[0]]
         self.turn = 9
@@ -119,13 +131,13 @@ class DemoAgent:
         me = re.search(r"\b(?:I'm|I am|my name is)\s+([A-Z][a-z]+)", st.heard())
         name = (self.name or (me.group(1) if me else "")) if "name" in (st.card_sections or []) else ""
         card = await self._call("make_fridge_card", self.box.make_fridge_card, name,
-                                self.contacts, self.meds, self.pet, "")
+                                self.contacts, self.meds, self.pet, "", self.allergies, self.papers)
         if card is None:
             return "Of course. What would you like to change on the card?"
         return ("Your fridge card is ready. Press **See your fridge card** to look at it and print it.\n\n"
                 "Let's look at this plan again in a few months.")
 
-    async def send(self, user_text: str, on_text=print) -> str:
+    async def send(self, user_text: str, on_text=print, context: str = "") -> str:  # context: live agent only
         self.transcript.append(("user", user_text))
         self.state.user_said.append(user_text)
         reply = await self._script(user_text)
@@ -147,6 +159,15 @@ class DemoAgent:
                     "In Boston, call 617-343-4200. We can set the plan aside. I'm here when you "
                     "want to come back to it.")
 
+        if self.turn == 0 and (st.waiting_for_agreement() or (HELPING.search(text) and not st.helping_someone)):
+            out = await self._call("confirm_helping_someone", b.confirm_helping_someone,
+                                   next(iter(names_in(text)), ""))
+            if not out or not out["agreed"]:
+                return out["tell_the_user"] if out else "Of course. Tell me a little more."
+            if not any(re.search(pat, text, re.I) for _, pat in NEED_WORDS):
+                return (out["tell_the_user"] + "\n\nWhat's coming up for them? For example, a procedure, "
+                        "a hospital stay, or getting ready for winter.")
+
         if self.turn == 0:
             needs = [n for n, pat in NEED_WORDS if re.search(pat, text, re.I)]
             if not needs:
@@ -159,15 +180,24 @@ class DemoAgent:
             if ok is None:
                 self.turn = 0
                 return "Of course. Which parts would you like to plan for?"
-            self.task = ("look after my pet while I'm away" if "pet_care_during_stay" in needs
+            # Two voices: the note and table are in the user's words ("me"); the question is ours ("you").
+            pet = "pet_care_during_stay" in needs
+            self.task = ("look after my pet while I'm away" if pet
                          else "check in on me the evening after my procedure")
-            return f"Thank you. Is there someone you'd feel comfortable asking to {self.task}? What's their name?"
+            if st.helping_someone:  # planning for someone else: talk about them as "they"
+                task_you = ("look after their pet while they're away" if pet
+                            else "check in on them the evening after their procedure")
+                return f"Thank you. Is there someone they'd feel comfortable asking to {task_you}? What's their name?"
+            task_you = ("look after your pet while you're away" if pet
+                        else "check in on you the evening after your procedure")
+            return f"Thank you. Is there someone you'd feel comfortable asking to {task_you}? What's their name?"
 
         if self.turn == 1:
             self.turn = 2
-            burden = bool(BURDEN.search(text)) or bool(NO.search(text))
+            no_one = bool(NO_ONE.search(text))
+            burden = bool(BURDEN.search(text)) or bool(NO.search(text)) or no_one
             names = [] if burden else names_in(text)
-            await self._call("set_comfort", b.set_comfort, bool(names), bool(BURDEN.search(text)))
+            await self._call("set_comfort", b.set_comfort, bool(names), bool(BURDEN.search(text)), no_one)
             lines = []
             for need in st.confirmed_needs:
                 if need == "ride_home_after_procedure":
@@ -205,12 +235,14 @@ class DemoAgent:
                     for n in names:
                         await self._call("add_helper_task", b.add_helper_task, self.task[0].upper() + self.task[1:], n, "", "")
                     lines.append(f"- **Note:** I wrote a short note to {who}. You can send it yourself.")
+            if no_one:
+                lines.append("- " + NO_ONE_LINE)
             await self._call("choose_card_sections", b.choose_card_sections, [])
             picked = st.card_sections or []
-            self.queue = [k for k in ("contacts", "medications", "pet") if k in picked]
+            self.queue = [k for k in ("contacts", "medications", "allergies", "pet", "papers") if k in picked]
             if "name" in picked and not re.search(r"\b(?:I'm|I am|my name is)\s+[A-Z]", st.heard()):
                 self.queue.insert(0, "name")
-            return "Here's your plan so far.\n\n" + "\n".join(lines) + "\n\n" + await self._next_card_step()
+            return "Here's what I found.\n\n" + "\n".join(lines) + "\n\n" + await self._next_card_step()
 
         if self.turn == 2:
             current = self.queue.pop(0) if self.queue else None
@@ -222,8 +254,12 @@ class DemoAgent:
                                  for n, ph in re.findall(r"([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\D{0,20}?(" + PHONE + ")", text)]
             elif current == "medications" and not NO.search(text):
                 self.meds = [m.strip(" .") for m in re.split(r"[;,\n]|\band\b", text) if m.strip(" .")]
+            elif current == "allergies" and not NO.search(text):
+                self.allergies = [a.strip(" .") for a in re.split(r"[;,\n]|\band\b", text) if a.strip(" .")]
             elif current == "pet" and not NO.search(text):
                 self.pet = text.strip(" .")[:60]
+            elif current == "papers" and not NO.search(text):
+                self.papers = text.strip(" .")[:120]
             return await self._next_card_step()
 
         return ("This is the demo version, so it follows a set path. Turn on the real agent "

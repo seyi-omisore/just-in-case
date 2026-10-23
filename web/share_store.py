@@ -38,6 +38,12 @@ def _clean(v) -> str:
     return str(v or "").replace("\r", " ").replace("\n", " ").strip()[:MAX_FIELD]
 
 
+def first_name(v) -> str:
+    """The shared page shows first names only: "Doris Chen" -> "Doris"."""
+    parts = _clean(v).split()
+    return parts[0].rstrip(",.") if parts else ""
+
+
 class ShareStore:
     def __init__(self, folder: Path, keep_days: int = KEEP_DAYS):
         self.folder = Path(folder)
@@ -149,11 +155,12 @@ class ShareStore:
 
     @staticmethod
     def public(rec: dict) -> dict:
-        """What the share page may see. No tokens, no hashes."""
+        """What the share page may see. No tokens, no hashes, and first names only."""
         return {
-            "label": rec["label"],
+            "label": first_name(rec["label"]),
             "expires": rec["expires"],
-            "tasks": [{k: t[k] for k in ("id", "task", "date", "time", "person")} for t in rec["tasks"]],
+            "tasks": [{**{k: t[k] for k in ("id", "task", "date", "time")}, "person": first_name(t["person"])}
+                      for t in rec["tasks"]],
         }
 
     def purge_expired(self) -> int:

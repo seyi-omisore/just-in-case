@@ -21,7 +21,19 @@
     u.setAttribute("href", "#i-" + name); s.appendChild(u);
     return s;
   };
-  const myClaims = () => { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (_) { return {}; } };
+  // A round badge with a helper's initials, same as the main page. The name is always written next to it.
+  const TINTS = ["sky", "green", "orange", "purple", "yellow"];
+  const initials = (name) => {
+    const w = name.trim().split(/\s+/).filter((x) => /\p{L}/u.test(x));
+    return w.length ? (Array.from(w[0])[0] + (w.length > 1 ? Array.from(w[w.length - 1])[0] : "")).toUpperCase() : "";
+  };
+  const avatar = (name) => {
+    let h = 0; for (const c of name.toLowerCase()) h = (h * 31 + c.codePointAt(0)) >>> 0;
+    const a = el("span", "initials tint-" + TINTS[h % TINTS.length], initials(name));
+    a.setAttribute("aria-hidden", "true");
+    return a;
+  };
+  const myClaims =() => { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (_) { return {}; } };
   const saveClaims = (c) => { try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (_) {} };
   const status = (t) => { $("share-status").textContent = t || ""; };
 
@@ -55,7 +67,7 @@
       if (when) li.appendChild(el("p", "share-when", when));
 
       if (t.person) {
-        const p = el("p", "share-who"); p.append(icon("check"), document.createTextNode(`${t.person} is helping`));
+        const p = el("p", "share-who"); p.append(avatar(t.person), document.createTextNode(`${t.person} is helping`));
         li.appendChild(p);
         const token = mine[t.id] || (data.owner ? ownerToken : "");
         if (token) {
@@ -115,7 +127,7 @@
   }
 
   $("delete-list").onclick = async () => {
-    if (!confirm("Delete this list for everyone? This cannot be undone.")) return;
+    if (!confirm("Stop sharing? This list will be deleted for everyone, and the link will stop working. This cannot be undone.")) return;
     try { await api("/delete", { owner: ownerToken }); location.replace(location.pathname); }
     catch (e) { status(e.message); }
   };

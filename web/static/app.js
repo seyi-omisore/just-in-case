@@ -6,6 +6,7 @@
   const messages = $("messages"), feed = $("feed"), planEl = $("plan");
   const input = $("message"), sendBtn = $("send"), typing = $("typing");
   let ws, sessionId, busy = false, seenItems = new Set(), cardUrl = null;
+  const openWhy = new Set();  // "Why this matters" tips stay open when the plan redraws
   const USPS_HOLD = "https://holdmail.usps.com/holdmail/";
 
   // ---- small helpers -----------------------------------------------------
@@ -21,6 +22,18 @@
     const u = document.createElementNS("http://www.w3.org/2000/svg", "use");
     u.setAttribute("href", "#i-" + name); s.appendChild(u);
     return s;
+  };
+  // A round badge with a helper's initials. Decoration only: the name is always written next to it.
+  const TINTS = ["sky", "green", "orange", "purple", "yellow"];
+  const initials = (name) => {
+    const w = name.trim().split(/\s+/).filter((x) => /\p{L}/u.test(x));
+    return w.length ? (Array.from(w[0])[0] + (w.length > 1 ? Array.from(w[w.length - 1])[0] : "")).toUpperCase() : "";
+  };
+  const avatar = (name) => {
+    let h = 0; for (const c of name.toLowerCase()) h = (h * 31 + c.codePointAt(0)) >>> 0;
+    const a = el("span", "initials tint-" + TINTS[h % TINTS.length], initials(name));
+    a.setAttribute("aria-hidden", "true");
+    return a;
   };
   const NEED_ICON = {
     ride_home_after_procedure: "car", transportation: "car", spare_key_access: "key",
@@ -84,9 +97,164 @@
     const label = el("span", "sr-only", who === "agent" ? "Just in Case said: " : "You said: ");
     body.appendChild(label);
     body.appendChild(renderText(text));
+    if (extraClass === "msg-recap") body.querySelector("p").prepend(icon("check"), " ");
+    if (extraClass === "msg-ready") body.querySelector("p").prepend(icon("heart"), " ");
+    if (extraClass === "msg-error") body.querySelector("p").prepend(icon("alert"), " ", el("strong", null, "Problem: "));
+    if (who === "agent" && "speechSynthesis" in window) body.appendChild(readAloudButton(text));
     li.appendChild(body);
     messages.appendChild(li);
     scrollChat();
+    if (who === "agent" && !extraClass) lastAgent = text;
+    if (extraClass !== "msg-error") chatHistory.push({ who, text, cls: extraClass || "" });
+  }
+
+  // ---- save my progress: only in this browser, only after the user says so --
+  const SAVE_KEY = "jic-saved-plan";
+  const chatHistory = [];  // the words on screen, so a saved plan reopens with them
+  let saving = false, saveTimer = null;
+  const readSaved = () => { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); } catch (_) { return null; } };
+  const timeText = (ms) => new Date(ms).toLocaleString(undefined, { month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
+  function setSaving(on) {
+    saving = on;
+    $("save-start").hidden = on; $("save-on").hidden = !on;
+    if (on) requestSave();
+  }
+  function requestSave() {
+    if (!saving || EXAMPLE) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "save" })); }, 800);
+  }
+  function storeSave(state) {
+    if (!saving) return;
+    const at = Date.now();
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ at, state, history: chatHistory.slice(-100) }));
+      $("save-status").textContent = "Saved on this device, " + timeText(at) + ".";
+    } catch (_) {
+      $("save-status").textContent = "This browser would not save. Your plan is still here while this page is open.";
+    }
+  }
+  $("save-start").addEventListener("click", () => setSaving(true));
+  $("save-stop").addEventListener("click", () => {
+    if (!confirm("Stop saving? Your saved plan will be deleted from this device. This page stays as it is.")) return;
+    try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+    setSaving(false);
+  });
+  // Shown once, at the start of a visit, if this device has a saved plan.
+  function offerSavedPlan() {
+    const saved = readSaved();
+    if (!saved || !saved.state || EXAMPLE) return;
+    const li = el("li", "slip welcome-back");
+    const head = el("div", "slip-head"); head.append(icon("bookmark"), document.createTextNode("Welcome back"));
+    const body = el("div", "slip-body");
+    body.appendChild(el("p", null, "You saved a plan on this device on " + timeText(saved.at) + ". Would you like to pick up where you left off?"));
+    const actions = el("div", "slip-actions");
+    const go = el("button", "btn btn-primary"); go.type = "button"; go.append(icon("check"), document.createTextNode("Continue my plan"));
+    const fresh = el("button", "btn btn-quiet"); fresh.type = "button"; fresh.append(icon("plus"), document.createTextNode("Start fresh"));
+    go.onclick = () => {
+      messages.replaceChildren();
+      for (const m of saved.history || []) addMessage(m.who, m.text, m.cls || undefined);
+      $("starters").hidden = true; $("example-open").hidden = true;
+      ws.send(JSON.stringify({ type: "restore", state: saved.state }));
+      setSaving(true);
+    };
+    fresh.onclick = () => {
+      if (!confirm("Start fresh? Your saved plan will be deleted from this device.")) return;
+      try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+      li.remove(); input.focus();
+    };
+    actions.append(go, fresh);
+    li.append(head, body, actions);
+    messages.appendChild(li);
+    go.focus({ preventScroll: true });
+  }
+
+  // ---- read aloud (the browser's own voice; nothing is sent to our server) ---
+  let speakingBtn = null;
+  const setSpeaking = (btn, on) => {
+    btn.replaceChildren(icon(on ? "stop" : "speaker"), document.createTextNode(on ? "Stop" : "Read aloud"));
+    btn.setAttribute("aria-pressed", String(on));
+  };
+  // A warm voice: the most natural one this device has, a little slower and a little higher.
+  const NOVELTY = /albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|fred|junior|ralph|kathy/i;
+  const voiceScore = (v) => {
+    if (NOVELTY.test(v.name)) return -1;
+    let s = 0;
+    if (/^en[-_]US/i.test(v.lang)) s += 100; else if (/^en/i.test(v.lang)) s += 60;
+    if (/enhanced|premium|natural|neural/i.test(v.name)) s += 50;
+    if (/online|google|microsoft/i.test(v.name)) s += 25;
+    if (v.default) s += 5;
+    return s;
+  };
+  let voices = [], chosenVoice = null;
+  const voicePick = $("voice");
+  function loadVoices() {
+    const all = speechSynthesis.getVoices();
+    const english = all.filter((v) => /^en/i.test(v.lang) && voiceScore(v) >= 0);
+    voices = (english.length ? english : all).slice().sort((a, b) => voiceScore(b) - voiceScore(a));
+    if (!voices.length) return;
+    let saved = null; try { saved = sessionStorage.getItem("jic-voice"); } catch (_) {}
+    chosenVoice = voices.find((v) => v.voiceURI === saved) || voices[0];
+    voicePick.replaceChildren(...voices.map((v, i) => {
+      const o = el("option", null, v.name.replace(/\s*\(.*?\)\s*$/, "") + (i === 0 ? " (recommended)" : ""));
+      o.value = v.voiceURI; o.selected = v === chosenVoice; return o;
+    }));
+    $("voice-row").hidden = false;
+  }
+  function warmUtterance(text) {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = chosenVoice ? chosenVoice.lang : (document.documentElement.lang || "en");
+    if (chosenVoice) u.voice = chosenVoice;
+    u.rate = 0.9; u.pitch = 1.1;
+    return u;
+  }
+  if ("speechSynthesis" in window) {
+    loadVoices();
+    speechSynthesis.addEventListener("voiceschanged", loadVoices);  // most browsers load voices late
+    voicePick.addEventListener("change", () => {
+      chosenVoice = voices.find((v) => v.voiceURI === voicePick.value) || chosenVoice;
+      try { sessionStorage.setItem("jic-voice", chosenVoice.voiceURI); } catch (_) {}
+      speechSynthesis.cancel();
+      if (speakingBtn) { setSpeaking(speakingBtn, false); speakingBtn = null; }
+      speechSynthesis.speak(warmUtterance("Hi. This is how I will sound."));
+    });
+  }
+  function readAloudButton(text) {
+    const btn = el("button", "read-aloud"); btn.type = "button";
+    setSpeaking(btn, false);
+    btn.onclick = () => {
+      const wasMe = speakingBtn === btn;
+      speechSynthesis.cancel();
+      if (speakingBtn) { setSpeaking(speakingBtn, false); speakingBtn = null; }
+      if (wasMe) return;  // second tap stops
+      const u = warmUtterance(text.replace(/\*\*/g, "").replace(/^\s*[-*]\s+/gm, ""));
+      u.onend = u.onerror = () => { if (speakingBtn === btn) { setSpeaking(btn, false); speakingBtn = null; } };
+      speakingBtn = btn; setSpeaking(btn, true);
+      speechSynthesis.speak(u);
+    };
+    return btn;
+  }
+
+  // ---- "See an example": plays Ruth's side of the scripted demo ----------
+  // The page only types Ruth's lines. Every checkpoint still waits for a real tap.
+  const EXAMPLE = new URLSearchParams(location.search).get("example") === "1";
+  let lastAgent = "", exampleTimer = null;
+  const RUTH = [  // [what Just in Case asked, what Ruth says]. Fictional details only.
+    [/what's coming up/i, "I'm Ruth. I have a procedure next month and may stay two nights in the hospital. My cat Fifi needs feeding."],
+    [/comfortable asking/i, "Yes, I could ask Doris."],
+    [/phone numbers/i, "Marion Kelly, 617-555-0142, and Doris Chen, 617-555-0177"],
+    [/medications/i, "Blood pressure pill in the morning; eye drops at night"],
+    [/allergies/i, "Penicillin and shellfish"],
+    [/your pet/i, "Fifi, my cat. Doris looks after her."],
+    [/important papers/i, "In the blue folder in my desk drawer"],
+    [/top of your card/i, "Ruth"],
+  ];
+  function exampleNext() {
+    if (!EXAMPLE || busy || exampleTimer || messages.querySelector(".slip-actions")) return;
+    const question = lastAgent.trim().split(/\n\s*\n/).pop();  // the last paragraph holds the question
+    const hit = RUTH.find(([asked]) => asked.test(question));
+    if (!hit) return;  // off the script (for example, "Change something"): the viewer takes over
+    exampleTimer = setTimeout(() => { exampleTimer = null; send(hit[1]); }, 1500);
   }
 
   // ---- checkpoints -------------------------------------------------------
@@ -96,8 +264,10 @@
     make_fridge_card: "Here is what goes on your fridge card",
     add_helper_task: "Add this to your helper table?",
     choose_card_sections: "What would you like on your fridge card?",
+    confirm_helping_someone: "Does this person agree?",
   };
-  const SECTION_ICON = { contacts: "phone", medications: "note", pet: "paw", helpers: "person", plan: "home" };
+  const SECTION_ICON = { name: "card", contacts: "phone", medications: "pill", allergies: "alert", pet: "paw",
+                         papers: "folder", helpers: "person", plan: "home" };
   function addApproval(msg) {
     const { id, kind, data } = msg;
     const li = el("li", "slip");
@@ -123,6 +293,10 @@
         li2.appendChild(lab); ul.appendChild(li2);
       }
       body.appendChild(ul);
+    } else if (kind === "confirm_helping_someone") {
+      const who = data.name || "the person you're helping";
+      body.appendChild(el("p", null, `Plans work best when the person helps make them. Does ${who} know about this plan and agree to it?`));
+      body.appendChild(el("p", "helper-small", "They decide what goes in it, and who is asked to help."));
     } else if (kind === "add_helper_task") {
       const dl = el("dl");
       const row = (t, d) => { if (d) dl.append(el("dt", null, t), el("dd", null, d)); };
@@ -137,7 +311,9 @@
       if (data.name) row("Name", data.name);
       if (data.contacts.length) row("People to contact", data.contacts.map((c) => `${c.name}${c.relationship ? " (" + c.relationship + ")" : ""}, ${c.phone}`).join("; "));
       if (data.medications.length) row("Medications, in your words", data.medications.join("; "));
+      if ((data.allergies || []).length) row("Allergies, in your words", data.allergies.join("; "));
       if (data.pet) row("Pet", data.pet + (data.pet_caregiver ? `, looked after by ${data.pet_caregiver}` : ""));
+      if (data.papers) row("Where your important papers are", data.papers);
       if (!dl.children.length) dl.appendChild(el("dd", null, "Just the emergency lines and your plan."));
       body.appendChild(dl);
     }
@@ -149,6 +325,7 @@
     const answer = (ok) => {
       const msg = { type: "answer", id, ok };
       let doneText = ok ? "You said yes" : "You asked for a change";
+      if (kind === "confirm_helping_someone") doneText = ok ? "You said they agree" : "Not yet";
       if (isChoice) {
         const picked = [...body.querySelectorAll("input[type=checkbox]")];
         msg.choice = picked.filter((c) => c.checked).map((c) => c.value);
@@ -170,6 +347,10 @@
       yes.replaceChildren(icon("check"), document.createTextNode("Continue"));
       actions.append(yes);
     } else actions.append(yes, no);
+    if (kind === "confirm_helping_someone") {
+      yes.replaceChildren(icon("check"), document.createTextNode("Yes, they agree"));
+      no.replaceChildren(icon("wait"), document.createTextNode("Not yet"));
+    }
     li.append(head, body, actions);
     messages.appendChild(li);
     scrollChat();
@@ -193,6 +374,11 @@
   // ---- the fridge (plan) -------------------------------------------------
   function renderPlan(plan) {
     $("fridge-empty").hidden = plan.items.length > 0 || plan.notes.length > 0;
+    const prog = plan.progress || { covered: 0, total: 0 };
+    $("plan-progress").textContent = prog.total ? `: ${prog.covered} of ${prog.total} covered` : "";
+    $("progress-bar").hidden = !prog.total;
+    $("progress-bar").firstElementChild.style.width = prog.total ? (100 * prog.covered / prog.total) + "%" : "0";
+    $("plan-ready").hidden = !plan.ready;
     planEl.replaceChildren();
     for (const item of plan.items) {
       const key = item.need + ":" + item.route + ":" + item.name;
@@ -216,6 +402,8 @@
         a.append(icon("info"), document.createTextNode("Website")); links.appendChild(a);
       }
       if (links.childNodes.length) li.appendChild(links);
+      const checked = checkedLabel(item.checked);
+      if (checked) { const c = el("p", "tag-checked"); c.append(icon("check"), document.createTextNode(checked)); li.appendChild(c); }
       if (item.need === "mail_while_away") {
         const a = el("a", "btn btn-primary tag-action"); a.href = USPS_HOLD; a.target = "_blank"; a.rel = "noopener";
         a.append(icon("mail"), document.createTextNode("Hold my mail on USPS.com"));
@@ -230,6 +418,13 @@
         }
         li.appendChild(ul);
       }
+      if (item.why) {
+        const tip = el("details", "tag-why"); tip.open = openWhy.has(item.need);
+        tip.ontoggle = () => (tip.open ? openWhy.add(item.need) : openWhy.delete(item.need));
+        const sum = el("summary"); sum.append(icon("info"), document.createTextNode("Why this matters"));
+        tip.append(sum, el("p", null, item.why));
+        li.appendChild(tip);
+      }
       planEl.appendChild(li);
     }
 
@@ -242,9 +437,40 @@
 
     renderTasks(plan);
     renderShare(plan);
+    renderServicesOnly(plan);
     const card = $("card-link");
     cardUrl = plan.card;
     card.hidden = !plan.card;
+    planPrintUrl = plan.plan_print;
+    $("plan-print").hidden = !plan.plan_print;
+  }
+  // No one to ask: a calm services-only box instead of an empty helper table.
+  // The table stays one tap away, and any rows the user added keep it showing.
+  let showTableAnyway = false;
+  function renderServicesOnly(plan) {
+    const on = !!plan.services_only && !showTableAnyway && !(plan.tasks || []).length;
+    $("services-only").hidden = !on;
+    $("helper-body").hidden = on;
+    const ul = $("help-lines");
+    if (on && !ul.children.length) {
+      for (const l of plan.help_lines || []) {
+        const li = el("li"); li.appendChild(el("p", "s-name", l.name));
+        const how = el("p", "s-how"); inline(how, l.how_to_reach); li.appendChild(how);
+        ul.appendChild(li);
+      }
+    }
+  }
+  $("show-table").addEventListener("click", () => {
+    showTableAnyway = true; $("services-only").hidden = true; $("helper-body").hidden = false;
+    form.elements.task.focus();
+  });
+
+  // "2026-10-21" -> "Info checked October 2026". Read as text, so time zones cannot shift the month.
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+                  "August", "September", "October", "November", "December"];
+  function checkedLabel(iso) {
+    const m = /^(\d{4})-(\d{2})/.exec(iso || "");
+    return m && MONTHS[+m[2] - 1] ? `Info checked ${MONTHS[+m[2] - 1]} ${m[1]}` : "";
   }
   // Flags come from the rules in code; show them in friendlier words.
   function plainFlag(f) {
@@ -263,7 +489,7 @@
 
   function connect() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(`${proto}://${location.host}/ws`);
+    ws = new WebSocket(`${proto}://${location.host}/ws${EXAMPLE ? "?example=1" : ""}`);
     setBusy(true);
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data);
@@ -274,13 +500,24 @@
           setBusy(false);
           if (!messages.children.length) addMessage("agent", m.greeting);
           if (!feed.children.length) feed.appendChild(el("li", "feed-empty", "Each step shows up here while Just in Case works."));
+          $("save-zone").hidden = EXAMPLE;
+          offerSavedPlan();
+          exampleNext();
+          break;
+        case "saved": storeSave(m.state); break;
+        case "restored":
+          addMessage("agent", "Welcome back. Here's where we left off. What would you like to do next?");
+          if (m.skipped.length) addMessage("agent", "A few parts could not be reopened, so they were left out: " + m.skipped.join(", ") + ". We can add them again.");
           break;
         case "agent": addMessage("agent", m.text); break;
+        case "recap": addMessage("agent", m.text, "msg-recap"); break;
+        case "ready": addMessage("agent", m.text, "msg-ready"); break;
         case "activity": addActivity(m.kind, m.text); break;
         case "approval": addApproval(m); break;
-        case "plan": renderPlan(m.plan); break;
-        case "busy": setBusy(m.on); break;
+        case "plan": renderPlan(m.plan); requestSave(); break;
+        case "busy": setBusy(m.on); if (!m.on) exampleNext(); break;
         case "table_error": $("task-error").textContent = m.text; break;
+        case "notice": addNotice(m.text); break;
         case "error": addMessage("agent", m.text, "msg-error"); setBusy(false); break;
       }
     };
@@ -290,11 +527,60 @@
     };
   }
 
+  // ---- speak instead of type (the browser's own speech recognition) ------
+  // Words go into the message box only. Nothing is sent until the user taps Send.
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let stopListening = () => {};
+  if (Recognition) {
+    const mic = $("mic"), micStatus = $("mic-status");
+    let rec = null;
+    mic.hidden = false; $("mic-note").hidden = false;
+    const say = (text, withIcon) => {
+      micStatus.replaceChildren();
+      if (text) micStatus.append(...(withIcon ? [icon("mic")] : []), document.createTextNode(text));
+    };
+    const setListening = (on) => {
+      mic.replaceChildren(icon(on ? "stop" : "mic"), document.createTextNode(on ? "Stop" : "Speak"));
+      mic.setAttribute("aria-pressed", String(on));
+      if (on) say("Listening… Tap Stop when you're done.", true);
+    };
+    const MIC_ERRORS = {
+      "not-allowed": "The microphone is turned off for this page. You can type instead.",
+      "service-not-allowed": "Speaking isn't available in this browser right now. You can type instead.",
+      "no-speech": "I didn't hear anything. Tap Speak to try again, or type instead.",
+      "audio-capture": "No microphone was found. You can type instead.",
+      "network": "Speaking needs an internet connection in this browser. You can type instead.",
+    };
+    stopListening = () => { if (rec) rec.stop(); };
+    mic.onclick = () => {
+      if (rec) { rec.stop(); return; }
+      rec = new Recognition();
+      rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true;
+      const before = input.value.trim() ? input.value.trim() + " " : "";
+      let failed = false;
+      rec.onresult = (e) => {
+        let heard = ""; for (const r of e.results) heard += r[0].transcript;
+        input.value = before + heard.trim();
+      };
+      rec.onerror = (e) => { failed = true; say(MIC_ERRORS[e.error] || "Speaking stopped. You can try again, or type instead."); };
+      rec.onend = () => {
+        rec = null; setListening(false);
+        if (!failed) say(input.value.trim() ? "Check your message, then tap Send." : "");
+        input.focus();
+      };
+      setListening(true);
+      try { rec.start(); } catch (_) { rec = null; setListening(false); say(MIC_ERRORS["service-not-allowed"]); }
+    };
+  }
+
   function send(text) {
     text = text.trim();
     if (!text || busy || !ws || ws.readyState !== 1) return;
+    stopListening();
+    $("mic-status").textContent = "";
     addMessage("user", text);
     $("starters").hidden = true;
+    $("example-open").hidden = true;
     ws.send(JSON.stringify({ type: "say", text }));
     input.value = "";
   }
@@ -304,6 +590,7 @@
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input.value); }
   });
   for (const b of document.querySelectorAll(".starter")) b.addEventListener("click", () => send(b.dataset.text));
+  if (EXAMPLE) { $("starters").hidden = true; $("example-open").hidden = true; $("example-exit").hidden = false; }
 
   // ---- text size (remembered on this device only) ------------------------
   const SIZES = [18, 20, 22, 24, 27];
@@ -332,6 +619,7 @@
       const td = (v, label, cls) => { const c = el("td", cls || "", v || ""); if (label) c.dataset.label = label; return c; };
       const whoCell = td(t.person, "Who", "who");
       if (!t.person) { whoCell.replaceChildren(); const chip = el("span", "open-chip"); chip.append(icon("plus"), document.createTextNode("Open")); whoCell.appendChild(chip); }
+      else { const who = el("span", "who-name"); who.append(avatar(t.person), document.createTextNode(t.person)); whoCell.replaceChildren(who); }
       tr.append(td(t.task, "Task"), td(t.date, "Date"), td(t.time, "Time"), whoCell);
       const act = el("td"); const box = el("div", "row-actions");
       const edit = el("button"); edit.type = "button"; edit.setAttribute("aria-label", "Change " + t.task); edit.title = "Change";
@@ -378,6 +666,24 @@
     dialog.showModal();
   });
 
+  // ---- helper updates: calm, non-urgent notices -------------------------
+  // For example, a helper stepped back from a task. Never styled as an emergency.
+  function addNotice(text) {
+    const box = el("div", "notice");
+    const p = el("p"); p.append(icon("info"), el("strong", null, "Update: "), document.createTextNode(text));
+    const ok = el("button", "btn btn-quiet"); ok.type = "button"; ok.append(icon("check"), document.createTextNode("OK"));
+    ok.onclick = () => { box.remove(); updateTabCount(); };
+    box.append(p, ok);
+    $("notices").appendChild(box);
+    updateTabCount();
+  }
+  function updateTabCount() {
+    const n = $("notices").children.length, badge = $("tab-updates");
+    badge.hidden = !n;
+    $("notices-wrap").hidden = !n;  // the 911 line always sits above any update
+    badge.textContent = n === 1 ? "1 update" : `${n} updates`;
+  }
+
   // ---- sharing (only after the consent box) -----------------------------
   const consent = $("consent-dialog");
   let shareState = null;
@@ -386,7 +692,7 @@
     const has = (plan.tasks || []).length > 0;
     $("share-open").hidden = !!plan.share;
     $("share-open").disabled = !has;
-    $("share-open").title = has ? "" : "Add a task first";
+    $("share-why-off").hidden = has || !!plan.share;  // say why, not just fade the button
     $("share-box").hidden = !plan.share;
     if (plan.share) {
       const url = location.origin + plan.share.url;
@@ -422,7 +728,14 @@
     frame.src = cardUrl + "?t=" + Date.now();
     dialog.showModal();
   });
-  $("card-print").addEventListener("click", () => { try { frame.contentWindow.print(); } catch (_) { window.open(cardUrl); } });
+  let planPrintUrl = null;
+  $("plan-print").addEventListener("click", () => {
+    if (!planPrintUrl) return;
+    $("card-dialog-title").textContent = "Your plan";
+    frame.src = planPrintUrl + "?t=" + Date.now();
+    dialog.showModal();
+  });
+  $("card-print").addEventListener("click", () => { try { frame.contentWindow.print(); } catch (_) { window.open(frame.src); } });
   $("card-close").addEventListener("click", () => dialog.close());
   dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
 
@@ -454,5 +767,20 @@
     .then((c) => { $("restart-banner").hidden = c.needs_restart === false; })  // missing = older server.catch(() => {});
   checkRestart(); setInterval(checkRestart, 60000);
 
-  connect();
+  // ---- tabs: About / Features / Make my plan ------------------------------
+  // The 911 and 988 strip sits above the tabs, so it shows on every tab.
+  // The chat connects the first time "Make my plan" opens, not before.
+  const TABS = ["about", "features", "plan"];
+  let connected = false;
+  function showTab(name, focus) {
+    if (!TABS.includes(name)) name = EXAMPLE ? "plan" : "about";
+    for (const t of TABS) $("panel-" + t).hidden = t !== name;
+    for (const a of document.querySelectorAll(".tabs a")) {
+      if (a.dataset.tab === name) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    }
+    if (name === "plan" && !connected) { connected = true; connect(); }
+    if (focus) { window.scrollTo(0, 0); $("panel-" + name).focus({ preventScroll: true }); }
+  }
+  window.addEventListener("hashchange", () => showTab(location.hash.slice(1), true));
+  showTab(location.hash.slice(1), false);
 })();

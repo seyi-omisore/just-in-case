@@ -21,7 +21,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 15 16 4l12 11v13H4z' fill='%230072B2'/%3E%3Cpath d='M16 25s-6-3.6-6-7.6a3.3 3.3 0 0 1 6-1.9 3.3 3.3 0 0 1 6 1.9c0 4-6 7.6-6 7.6z' fill='%23E69F00'/%3E%3C/svg%3E">
 </head>
 <body>
-  <a class="skip" href="#message">Skip to the message box</a>
+  <a class="skip" href="#main">Skip to the main content</a>
 
   <div class="safety-strip" role="note">
     <p class="safety-911">
@@ -41,11 +41,11 @@
     </a>
     <p class="tagline">A little planning now means less worry later.</p>
     <div class="theme-switch" role="group" aria-label="Light or dark mode">
-      <button type="button" id="theme-light" aria-label="Light mode" title="Light mode">
-        <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg>
+      <button type="button" id="theme-light" aria-label="Light mode">
+        <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg> <span aria-hidden="true">Light</span>
       </button>
-      <button type="button" id="theme-dark" aria-label="Dark mode" title="Dark mode">
-        <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg>
+      <button type="button" id="theme-dark" aria-label="Dark mode">
+        <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> <span aria-hidden="true">Dark</span>
       </button>
     </div>
     <div class="text-size" role="group" aria-label="Text size">
@@ -61,44 +61,147 @@
 
   <div id="demo-banner" class="demo-banner" hidden>
     <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
-    Demo mode: this follows a set story about Ruth, so no AI is used.
+    <p>Demo mode: this follows a set story about Ruth, so no AI is used.</p>
+    <a id="example-exit" class="btn btn-quiet" href="/" hidden>
+      <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Start my own plan
+    </a>
   </div>
 
-  <main class="layout">
+  <nav class="tabs" aria-label="Sections of Just in Case">
+    <a href="#about" data-tab="about"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> About</a>
+    <a href="#features" data-tab="features"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg> Features</a>
+    <a href="#plan" data-tab="plan"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg> Make my plan <span id="tab-updates" class="tab-updates" hidden></span></a>
+  </nav>
+
+  <main id="main">
+  <section id="panel-about" class="panel intro" data-panel="about" tabindex="-1" aria-label="About Just in Case">
+    <h1 class="purpose">Make a small backup plan, and a card for your fridge, in case you need a hand while living alone.</h1>
+    <div class="about-pair">
+      <div class="about-box">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Our goal</h2>
+        <p>Help people who live alone stay independent, with a simple plan made before anything happens.</p>
+      </div>
+      <div class="about-box">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> Our mission</h2>
+        <p>Free local services and simple steps come first. Friends come in only if you choose. No pressure, nothing to buy, and nothing is ever sent for you.</p>
+      </div>
+    </div>
+    <div class="how" aria-labelledby="how-title">
+      <h2 id="how-title" class="how-title">How it works</h2>
+      <ol class="how-steps">
+        <li>
+          <span class="how-icon" aria-hidden="true"><svg class="icon"><use href="#i-chat"/></svg></span>
+          <span><strong>Tell us what's coming up.</strong> A procedure, a trip, or getting ready for winter.</span>
+        </li>
+        <li>
+          <span class="how-icon" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
+          <span><strong>Choose what helps.</strong> Free services and simple steps first. You say yes to each one.</span>
+        </li>
+        <li>
+          <span class="how-icon" aria-hidden="true"><svg class="icon"><use href="#i-card"/></svg></span>
+          <span><strong>Print your fridge card.</strong> One page with who to call and what's planned.</span>
+        </li>
+      </ol>
+      <div class="how-actions">
+        <a class="btn btn-primary" href="#plan">
+          <svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg> Make my plan
+        </a>
+        <a id="example-open" class="btn btn-quiet" href="/?example=1#plan">
+          <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See an example
+        </a>
+      </div>
+    </div>
+    <p class="trust-line">
+      <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span>Just in Case will never ask for money, bank details, or your Social Security number.</span>
+    </p>
+  </section>
+
+  <section id="panel-features" class="panel intro" data-panel="features" tabindex="-1" aria-labelledby="features-title" hidden>
+    <h1 id="features-title" class="purpose">What Just in Case can do</h1>
+    <ul class="feature-list">
+      <li><svg class="icon" aria-hidden="true"><use href="#i-chat"/></svg><div><strong>Plain-language chat</strong><p>Tell it what's coming up, in your own words.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><div><strong>Speak or type</strong><p>Tap Speak to talk instead of typing. You check the words before you send.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg><div><strong>Read aloud</strong><p>Any answer can be read to you, in the voice you pick.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><div><strong>Free services first</strong><p>Boston services, free ones first, each with the month it was checked.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><div><strong>You approve every step</strong><p>Nothing goes into your plan until you say yes.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-card"/></svg><div><strong>Fridge card</strong><p>One page with 911 at the top, and only the details you choose.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-note"/></svg><div><strong>Print my plan</strong><p>Your whole plan on one clean page, to keep or hand to someone.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><div><strong>Recaps as you go</strong><p>A short "So far, we've planned" after each part, so nothing gets lost.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg><div><strong>Save and come back</strong><p>Only if you choose. Saved in this browser on this device, and you can delete it any time.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-hand"/></svg><div><strong>Planning for someone else</strong><p>For a parent, relative, or friend, once they agree. They decide what goes in it.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg><div><strong>No one to ask? That's okay.</strong><p>A plan with services only, plus Boston's Council on Aging and Mass 211.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg><div><strong>Helper table</strong><p>List things you'd like help with. Family can sign up for open tasks.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg><div><strong>Share with family</strong><p>Only if you agree. First names only, and you can stop sharing any time.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg><div><strong>Helper updates</strong><p>In an emergency, call 911 first. These are calm, non-urgent updates, like when a helper signs up or steps back.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg><div><strong>Hold your mail</strong><p>Step-by-step help with free USPS Hold Mail.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg><div><strong>People you can talk to</strong><p>988 and other free support lines, any time of day.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg><div><strong>Easy to see</strong><p>Bigger text, and light or dark mode.</p></div></li>
+      <li><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><div><strong>Never asks for money</strong><p>No money, bank details, or Social Security number. Ever.</p></div></li>
+    </ul>
+    <a class="btn btn-primary how-example" href="#plan">
+      <svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg> Make my plan
+    </a>
+  </section>
+
+  <div id="panel-plan" class="panel layout" data-panel="plan" tabindex="-1" hidden>
     <section class="chat" aria-label="Conversation with Just in Case">
       <ol id="messages" class="messages" aria-live="polite"></ol>
 
       <div id="typing" class="typing" hidden>
-        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-        <span class="sr-only">Just in Case is thinking</span>
+        <span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span>
+        <span class="typing-text">Thinking…</span>
       </div>
 
-      <div id="starters" class="starters" aria-label="Ways to start">
+      <div id="starters" class="starters" role="group" aria-label="Ways to start">
         <button type="button" class="starter" data-text="I have a procedure next month and the clinic says someone has to take me home.">
-          <svg class="icon" aria-hidden="true"><use href="#i-car"/></svg> I have a procedure coming up
+          <span class="starter-icon" aria-hidden="true"><svg class="icon"><use href="#i-car"/></svg></span>
+          <span class="starter-text"><strong>I have a procedure coming up</strong><span>Getting home safely afterward</span></span>
         </button>
         <button type="button" class="starter" data-text="I'd like a plan for my pet in case I have to go to the hospital.">
-          <svg class="icon" aria-hidden="true"><use href="#i-paw"/></svg> A plan for my pet
+          <span class="starter-icon" aria-hidden="true"><svg class="icon"><use href="#i-paw"/></svg></span>
+          <span class="starter-text"><strong>A plan for my pet</strong><span>If I have to go to the hospital</span></span>
         </button>
         <button type="button" class="starter" data-text="I'd like to be ready for a winter power outage.">
-          <svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg> Ready for a power outage
+          <span class="starter-icon" aria-hidden="true"><svg class="icon"><use href="#i-bolt"/></svg></span>
+          <span class="starter-text"><strong>Ready for a power outage</strong><span>Staying warm and safe in winter</span></span>
+        </button>
+        <button type="button" class="starter" data-text="I'm helping someone else make a plan.">
+          <span class="starter-icon" aria-hidden="true"><svg class="icon"><use href="#i-hand"/></svg></span>
+          <span class="starter-text"><strong>I'm helping someone else plan</strong><span>For a parent, relative, or friend</span></span>
         </button>
       </div>
 
       <form id="composer" class="composer">
         <label for="message" class="sr-only">Your message</label>
         <textarea id="message" rows="2" placeholder="Type your message here" autocomplete="off"></textarea>
-        <button type="submit" id="send" class="btn btn-primary">
-          Send
-          <svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>
-        </button>
+        <div class="composer-actions">
+          <button type="button" id="mic" class="btn btn-quiet" aria-pressed="false" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg> Speak
+          </button>
+          <button type="submit" id="send" class="btn btn-primary">
+            Send
+            <svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>
+          </button>
+        </div>
       </form>
+      <p id="mic-status" class="mic-status" role="status"></p>
+      <p id="mic-note" class="helper-small mic-note" hidden>In some browsers, your voice may be sent to the browser's maker to turn it into text.</p>
+      <label id="voice-row" class="voice-row" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg>
+        <span>Reading voice</span>
+        <select id="voice"></select>
+      </label>
     </section>
 
     <aside class="side" aria-label="Your plan">
       <section class="fridge" aria-labelledby="fridge-title">
         <div class="fridge-handle" aria-hidden="true"></div>
-        <h2 id="fridge-title">Your plan</h2>
+        <h2 id="fridge-title">Your plan<span id="plan-progress"></span></h2>
+        <div id="progress-bar" class="progress-bar" aria-hidden="true" hidden><span></span></div>
+        <p id="plan-ready" class="plan-ready" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Ready. Nothing you need to do right now.
+        </p>
         <p id="fridge-empty" class="fridge-empty">Your plan will show up here as we talk.</p>
         <ul id="plan" class="plan"></ul>
         <div id="notes"></div>
@@ -106,6 +209,21 @@
           <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg>
           See your fridge card
         </button>
+        <button type="button" id="plan-print" class="btn btn-quiet btn-block plan-print" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg> Print my plan
+        </button>
+        <div id="save-zone" class="save-zone" hidden>
+          <button type="button" id="save-start" class="btn btn-quiet btn-block">
+            <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg> Save my progress
+          </button>
+          <div id="save-on" class="save-on" hidden>
+            <p class="save-status"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> <span id="save-status">Saving on this device is on.</span></p>
+            <button type="button" id="save-stop" class="btn btn-quiet btn-block">
+              <svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> Stop saving and delete
+            </button>
+          </div>
+          <p class="helper-small">Saved only in this browser, on this device. Anyone who uses this device could open it.</p>
+        </div>
       </section>
 
       <section class="helpers" aria-labelledby="helpers-title">
@@ -113,6 +231,25 @@
           <svg class="icon" aria-hidden="true"><use href="#i-person"/></svg>
           Who's helping
         </h2>
+        <div id="notices-wrap" class="notices-wrap" hidden>
+          <p class="notice-911">
+            <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg>
+            <span><strong>In an emergency, call 911.</strong> These updates are not urgent.</span>
+          </p>
+          <div id="notices" class="notices" role="status"></div>
+        </div>
+        <div id="services-only" class="services-only" hidden>
+          <p class="services-only-title">
+            <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+            Your plan uses services and simple steps. That's a good plan.
+          </p>
+          <p>If you'd like more help finding services, these places can help, for free:</p>
+          <ul id="help-lines" class="support-lines"></ul>
+          <button type="button" id="show-table" class="btn btn-quiet btn-block">
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> Show the helper table anyway
+          </button>
+        </div>
+        <div id="helper-body">
         <p class="helper-intro">Things you'd like help with. Leave the name blank and family can sign up.</p>
         <p id="table-empty" class="table-empty">No one is in your table yet.</p>
         <table id="helper-table" class="helper-table" hidden>
@@ -128,7 +265,7 @@
             <label>Date <input name="date" maxlength="120" placeholder="Like Nov 14"></label>
             <label>Time <input name="time" maxlength="120" placeholder="Like morning"></label>
           </div>
-          <p id="task-error" class="task-error" role="alert"></p>
+          <p class="task-error-row"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span id="task-error" class="task-error" role="alert"></span></p>
           <div class="task-form-actions">
             <button type="submit" id="task-save" class="btn btn-primary">
               <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> <span>Add row</span>
@@ -151,12 +288,16 @@
           <button type="button" id="share-open" class="btn btn-primary btn-block">
             <svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> Share with family
           </button>
+          <p id="share-why-off" class="helper-small" hidden>Add a task first, then you can share.</p>
           <div id="share-box" class="share-box" hidden>
             <p class="share-box-title">
               <svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg>
               Your list is shared
             </p>
-            <p>Send this link to the people you choose. They can add their name to open tasks.</p>
+            <button type="button" id="share-stop" class="btn btn-quiet btn-block btn-stop">
+              <svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Stop sharing and delete
+            </button>
+            <p>Send this link to the people you choose. They can add their name to open tasks. The shared page shows first names only.</p>
             <div class="share-link-row">
               <input id="share-link" readonly aria-label="Link to your helper list">
               <button type="button" id="share-copy" class="btn btn-quiet">Copy link</button>
@@ -173,8 +314,8 @@
                 <button type="button" id="share-owner-copy" class="btn btn-quiet">Copy</button>
               </div>
             </details>
-            <button type="button" id="share-stop" class="btn btn-quiet btn-block">Stop sharing and delete</button>
           </div>
+        </div>
         </div>
       </section>
 
@@ -210,6 +351,7 @@
         <ol id="feed" class="feed" aria-live="polite"></ol>
       </section>
     </aside>
+  </div>
   </main>
 
   <dialog id="consent-dialog" class="consent-dialog" aria-labelledby="consent-title">
@@ -217,10 +359,11 @@
       <h2 id="consent-title">Before we share your list</h2>
       <p>Just in Case does not save anything unless you say yes. To share, we need to save your helper list.</p>
       <ul class="consent-facts">
+        <li><strong>In an emergency, always call 911.</strong> Updates on this list, like who signed up, are not urgent.</li>
         <li><strong>What we save:</strong> only your helper list (tasks, dates, times, and names). Not your chat, card, contacts, or medications.</li>
         <li><strong>Who can see it:</strong> anyone you give the link to.</li>
         <li><strong>How long:</strong> it is deleted after 30 days, or right away when you stop sharing.</li>
-        <li><strong>What helpers can do:</strong> add their own name to an open task, or remove it.</li>
+        <li><strong>What helpers can do:</strong> add their own name to an open task, or remove it. The list shows first names only.</li>
       </ul>
       <label class="consent-label">Name to show on the list <span class="optional">(optional)</span>
         <input id="consent-name" maxlength="60" placeholder="For example: Gloria">
@@ -273,6 +416,15 @@
       <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4" fill="currentColor"/><path d="M4 21a8 8 0 0 1 16 0z" fill="currentColor"/></symbol>
       <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
       <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.8A8.5 8.5 0 0 1 9.2 3.5a8.5 8.5 0 1 0 11.3 11.3z" fill="currentColor"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-5 4v-4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm3 5v2h10V9zm0 4v2h7v-2z" fill="currentColor"/></symbol>
+      <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3zm12.5-1.5a6 6 0 0 1 0 9l-1.4-1.4a4 4 0 0 0 0-6.2zm2.8-2.8a10 10 0 0 1 0 14.6l-1.4-1.4a8 8 0 0 0 0-11.8z" fill="currentColor"/></symbol>
+      <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 2h12a1 1 0 0 1 1 1v19l-7-4.5L5 22V3a1 1 0 0 1 1-1z" fill="currentColor"/></symbol>
+      <symbol id="i-star"viewBox="0 0 24 24"><path d="m12 2 3 6.5 7 .8-5.2 4.8 1.4 7L12 17.6 5.8 21.1l1.4-7L2 9.3l7-.8z" fill="currentColor"/></symbol>
+      <symbol id="i-mic"viewBox="0 0 24 24"><path d="M12 2a3.5 3.5 0 0 1 3.5 3.5v6a3.5 3.5 0 0 1-7 0v-6A3.5 3.5 0 0 1 12 2zm-7 9h2a5 5 0 0 0 10 0h2a7 7 0 0 1-6 6.9V21h3v2H8v-2h3v-3.1A7 7 0 0 1 5 11z" fill="currentColor"/></symbol>
+      <symbol id="i-stop"viewBox="0 0 24 24"><path d="M6 6h12v12H6z" fill="currentColor"/></symbol>
+      <symbol id="i-pill"viewBox="0 0 24 24"><path d="M8.5 3a5.5 5.5 0 0 1 3.9 1.6l7 7a5.5 5.5 0 0 1-7.8 7.8l-7-7A5.5 5.5 0 0 1 8.5 3zm0 2a3.5 3.5 0 0 0-2.5 6l3.1 3.1 5-5L11 6a3.5 3.5 0 0 0-2.5-1z" fill="currentColor"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 2 1 21h22zm-1 7h2v6h-2zm0 8h2v2h-2z" fill="currentColor"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M2 5a1 1 0 0 1 1-1h6l2 2h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" fill="currentColor"/></symbol>
       <symbol id="i-dash" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zM7 11v2h10v-2z" fill="currentColor"/></symbol>
     </defs>
   </svg>
