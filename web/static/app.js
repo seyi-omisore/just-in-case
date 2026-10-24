@@ -572,6 +572,7 @@
     // A calm line at each milestone. The words come from the server, never from the model.
     $("plan-ready").hidden = !plan.encouragement;
     $("ready-ill").toggleAttribute("hidden", !plan.ready);  // the calm "you're prepared" picture, once every part is covered
+    if (plan.ready) playOnce($("ready-ill"), 1600);          // its check mark draws itself, once
     $("plan-ready-text").textContent = plan.encouragement || "";
     renderNextStep(plan.next_step);
     renderReview(plan.review);
@@ -698,6 +699,9 @@
     box.hidden = !tl || !tl.steps.length;
     if (box.hidden) return;
     $("event-label").textContent = tl.label;
+    const ride = $("ride-scene"), procedure = /procedure/i.test(tl.label);
+    ride.toggleAttribute("hidden", !procedure);
+    if (procedure) playOnce(ride, 3500);                     // the car drives to the house, once
     const pick = $("event-date");
     if (document.activeElement !== pick) pick.value = tl.date;
     $("countdown").replaceChildren();
@@ -1131,6 +1135,40 @@
   $("card-close").addEventListener("click", () => dialog.close());
   dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
 
+  // ---- Gentle motion: the home scene plays about nine seconds, then settles into a still picture ----
+  // Nothing moves when the device asks for less motion. "Pause" is there the whole time it plays.
+  const stillOnly = matchMedia("(prefers-reduced-motion: reduce)");
+  const hero = $("hero-scene"), sceneBtn = $("scene-btn");
+  const SCENE_MS = 9500;
+  let sceneState = "still", sceneLeft = 0, sceneStart = 0, sceneTimer = null;
+  function sceneButton(word, ic) { sceneBtn.replaceChildren(icon(ic), document.createTextNode(" "), el("span", null, word)); }
+  function sceneRun() { sceneStart = Date.now(); sceneTimer = setTimeout(sceneEnd, sceneLeft); }
+  function sceneEnd() {
+    clearTimeout(sceneTimer); hero.classList.remove("playing", "paused");
+    sceneState = "still"; sceneButton("Play scene", "play");
+  }
+  function scenePlay() {
+    if (stillOnly.matches) return;
+    sceneEnd(); void hero.getBoundingClientRect();   // start again from the beginning
+    hero.classList.add("playing"); sceneLeft = SCENE_MS; sceneRun();
+    sceneState = "playing"; sceneButton("Pause", "pause");
+  }
+  sceneBtn.addEventListener("click", () => {
+    if (sceneState === "still") scenePlay();
+    else if (sceneState === "playing") {
+      clearTimeout(sceneTimer); sceneLeft -= Date.now() - sceneStart;
+      hero.classList.add("paused"); sceneState = "paused"; sceneButton("Play", "play");
+    } else { hero.classList.remove("paused"); sceneRun(); sceneState = "playing"; sceneButton("Pause", "pause"); }
+  });
+  const motionSetting = () => { sceneBtn.hidden = stillOnly.matches; if (stillOnly.matches) sceneEnd(); };
+  stillOnly.addEventListener("change", motionSetting); motionSetting();
+  // Short pictures play once when they first appear: the car on the ride home, the check when the plan is ready.
+  function playOnce(svg, ms) {
+    if (stillOnly.matches || svg.dataset.played) return;
+    svg.dataset.played = "1"; svg.classList.add("playing");
+    setTimeout(() => svg.classList.remove("playing"), ms);
+  }
+
   // ---- Features: tap a bubble to read one sentence about it. One bubble is open at a time. ----
   const bubbles = [...document.querySelectorAll(".bubble")];
   for (const b of bubbles) b.addEventListener("click", () => {
@@ -1402,6 +1440,7 @@
   $("more-menu").addEventListener("click", (e) => { if (e.target.closest("a")) $("more-menu").open = false; });
   window.addEventListener("hashchange", () => { endTour(); showTab(location.hash.slice(1), true); });
   showTab(location.hash.slice(1), false);
+  if (!$("panel-home").hidden) scenePlay();                 // the home scene plays once when Home first opens
   let toured = "1"; try { toured = localStorage.getItem(TOUR_KEY); } catch (_) {}   // no storage: never nag
   if (!toured && !EXAMPLE && !$("panel-home").hidden) startTour(false);
 })();

@@ -115,7 +115,44 @@
 
   <main id="main">
   <section id="panel-home" class="panel home" data-panel="home" tabindex="-1" aria-labelledby="home-title">
-    <svg class="ill ill-hero scene" viewBox="0 0 320 130" role="img" aria-label="Illustration: an older woman with gray hair and a cane waves outside her teal house on a sunny day. A cat sits by the door, and a heart is on the roof."><use href="#ill-home"/></svg>
+    <div class="hero-wrap">
+      <svg id="hero-scene" class="ill ill-hero scene" viewBox="0 0 320 130" role="img" aria-label="Illustration: an older woman with gray hair and a cane waves outside her teal house on a sunny day. Her cat sits beside her, and a heart is on the roof.">
+        <g id="ill-home">
+          <rect width="320" height="130" rx="20" style="fill:var(--ill-sky)"/>
+          <path d="M0 100 Q160 84 320 100 V110 A20 20 0 0 1 300 130 H20 A20 20 0 0 1 0 110Z" style="fill:var(--ill-ground)"/>
+          <g class="a-sun"><circle cx="284" cy="30" r="18" style="fill:var(--ill-sun)"/></g>
+          <g class="a-cloud1"><path d="M30 26a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H32a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/></g>
+          <g class="a-cloud2"><path d="M196 20a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H198a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/></g>
+          <g class="a-birds"><path d="M214 42q4-4 8 0q4-4 8 0" style="fill:none;stroke:var(--ill-leg);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"/><path d="M236 52q3-3 6 0q3-3 6 0" style="fill:none;stroke:var(--ill-leg);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"/></g>
+          <path d="M150 100 L170 100 L186 130 L134 130Z" style="fill:var(--ill-path)"/>
+          <path d="M104 62 L160.0 25 L216 62Z" style="fill:var(--ill-house)"/>
+          <path d="M102 62 L160.0 23 L218 62" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+          <rect x="112" y="58" width="96" height="44" style="fill:var(--ill-house)"/>
+          <rect x="121.6" y="67.68" width="21.12" height="15.4" rx="3" style="fill:var(--ill-window)"/>
+          <rect x="177.28" y="67.68" width="21.12" height="15.4" rx="3" style="fill:var(--ill-window)"/>
+          <rect x="150.4" y="71.2" width="19.2" height="30.8" rx="3" style="fill:var(--ill-door)"/>
+          <path d="M160 42s-8-4.6-8-10a4.4 4.4 0 0 1 8-2.4 4.4 4.4 0 0 1 8 2.4c0 5.4-8 10-8 10z" style="fill:var(--ill-heart)"/>
+          <circle cx="166" cy="88" r="1.6" style="fill:var(--ill-house)"/>
+          <rect x="228" y="88" width="14" height="14" rx="2" style="fill:var(--ill-pot)"/>
+          <ellipse cx="235" cy="77" rx="5" ry="12" style="fill:var(--ill-plant)"/>
+          <path d="M235 87V70" style="fill:none;stroke:var(--ill-pot);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"/>
+          <g class="tree"><rect x="289" y="78" width="6" height="26" rx="2" style="fill:var(--ill-cane)"/><circle cx="292" cy="68" r="13" style="fill:var(--ill-plant)"/><circle cx="282" cy="78" r="9" style="fill:var(--ill-plant)"/><circle cx="302" cy="78" r="9" style="fill:var(--ill-plant)"/></g>
+          <g class="a-leaf a-leaf1"><ellipse cx="276" cy="110" rx="3.4" ry="1.8" style="fill:var(--ill-pot)"/></g>
+          <g class="a-leaf a-leaf2"><ellipse cx="300" cy="114" rx="3.4" ry="1.8" style="fill:var(--ill-sun)"/></g>
+          <g class="a-leaf a-leaf3"><ellipse cx="311" cy="107" rx="3.4" ry="1.8" style="fill:var(--ill-pot)"/></g>
+          <path d="M62 74 56 92" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
+          <path d="M54 90 51 113" style="fill:none;stroke:var(--ill-cane);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/>
+          <rect x="63" y="98" width="5" height="15" rx="2" style="fill:var(--ill-leg)"/>
+          <rect x="72" y="98" width="5" height="15" rx="2" style="fill:var(--ill-leg)"/>
+          <g class="a-dress"><path d="M62 70h16l6 31H56z" style="fill:var(--ill-dress)"/></g>
+          <path d="M78 72 90 56" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
+          <circle cx="69" cy="57" r="9.5" style="fill:var(--ill-hair)"/>
+          <circle cx="71" cy="61" r="8" style="fill:var(--ill-skin)"/>
+          <g transform="translate(-38 9)"><g class="a-cat"><g class="a-cat-step"><path d="M146 99q9-2 7-11" style="fill:none;stroke:var(--ill-cat);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/><ellipse cx="138" cy="96" rx="9" ry="7" style="fill:var(--ill-cat)"/><circle cx="131" cy="88" r="5.5" style="fill:var(--ill-cat)"/><path d="M126.5 86l1-6.5 4 4zM131.5 83.5l4-4.5 .5 6.5z" style="fill:var(--ill-cat)"/></g></g></g>
+        </g>
+      </svg>
+      <button type="button" id="scene-btn" class="scene-btn"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> <span>Play scene</span></button>
+    </div>
     <div class="home-greeting">
       <h1 id="home-title" class="home-title">Hi, I'm {{AGENT_NAME}}.</h1>
       <p class="tagline">A little planning now means less worry later.</p>
@@ -624,7 +661,34 @@
             <p>"Remind me later" moves this step to the end of your list. Just in Case never sends alerts, so open this page to see it again.</p>
           </details>
         </section>
-        <svg id="ready-ill" class="ill scene ready-ill" viewBox="0 0 240 120" role="img" aria-label="Illustration: an older woman rests on a bench outside her teal house with a cup of tea, beside a green check mark, because her plan is ready." hidden><use href="#ill-ready"/></svg>
+        <svg id="ready-ill" class="ill scene ready-ill" viewBox="0 0 240 120" role="img" aria-label="Illustration: an older woman rests on a bench outside her teal house with a cup of tea, beside a green check mark, because her plan is ready." hidden>
+          <g id="ill-ready">
+            <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+            <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+            <circle cx="28" cy="26" r="12" style="fill:var(--ill-sun)"/>
+            <path d="M120 18a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H122a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
+            <path d="M34 60 L75.0 29 L116 60Z" style="fill:var(--ill-house)"/>
+            <path d="M32 60 L75.0 27 L118 60" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+            <rect x="42" y="56" width="66" height="36" style="fill:var(--ill-house)"/>
+            <rect x="48.6" y="63.92" width="14.52" height="12.6" rx="3" style="fill:var(--ill-window)"/>
+            <rect x="86.88" y="63.92" width="14.52" height="12.6" rx="3" style="fill:var(--ill-window)"/>
+            <rect x="68.4" y="66.8" width="13.2" height="25.2" rx="3" style="fill:var(--ill-door)"/>
+            <path d="M75 44.4s-6.4-3.68-6.4-8.0a3.52 3.52 0 0 1 6.4-1.92 3.52 3.52 0 0 1 6.4 1.92c0 4.32-6.4 8.0-6.4 8.0z" style="fill:var(--ill-heart)"/>
+            <rect x="140" y="70" width="52" height="5" rx="2" style="fill:var(--ill-cane)"/>
+            <rect x="140" y="84" width="52" height="5" rx="2" style="fill:var(--ill-cane)"/>
+            <rect x="144" y="89" width="4" height="12" style="fill:var(--ill-cane)"/>
+            <rect x="184" y="89" width="4" height="12" style="fill:var(--ill-cane)"/>
+            <rect x="150" y="80" width="26" height="7" rx="3" style="fill:var(--ill-leg)"/>
+            <rect x="170" y="84" width="6" height="16" rx="2" style="fill:var(--ill-leg)"/>
+            <path d="M153 61h17l4 24h-25z" style="fill:var(--ill-dress)"/>
+            <path d="M168 67l9 8" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
+            <rect x="176" y="71" width="8" height="9" rx="1.5" style="fill:var(--ill-door)"/>
+            <circle cx="160" cy="49" r="9.5" style="fill:var(--ill-hair)"/>
+            <circle cx="162" cy="53" r="8" style="fill:var(--ill-skin)"/>
+            <circle class="a-check-dot" cx="212" cy="30" r="15" style="fill:var(--ill-plant)"/>
+            <path class="a-check" pathLength="1" d="M205 30l5 5 9-10" style="stroke-dasharray:1;fill:none;stroke:var(--ill-door);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round"/>
+          </g>
+        </svg>
         <p id="plan-ready" class="plan-ready" hidden>
           <svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> <span id="plan-ready-text"></span>
         </p>
@@ -645,6 +709,24 @@
         </section>
         <section id="getting-ready" class="getting-ready" aria-labelledby="getting-ready-title" hidden>
           <h3 id="getting-ready-title"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Getting ready</h3>
+          <svg id="ride-scene" class="ill scene ride-scene" viewBox="0 0 240 120" role="img" aria-label="Illustration: a blue car drives along a road toward a small teal house, with a calendar marked with a check, for getting home after a procedure." hidden>
+            <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+            <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+            <g class="a-sun"><circle cx="150" cy="30" r="12" style="fill:var(--ill-sun)"/></g>
+            <path d="M0 101 Q120 84 240 96" style="fill:none;stroke:var(--ill-road);stroke-width:11;stroke-linecap:round;stroke-linejoin:round"/>
+            <path d="M6 101 Q120 84 234 96" style="fill:none;stroke:var(--ill-dash);stroke-width:2;stroke-dasharray:7 7"/>
+            <rect x="18" y="14" width="34" height="30" rx="5" style="fill:var(--ill-door)"/>
+            <path d="M18 23v-4a5 5 0 0 1 5-5h24a5 5 0 0 1 5 5v4z" style="fill:var(--ill-dress)"/>
+            <path d="M27 32l5 5 9-10" style="fill:none;stroke:var(--ill-plant);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round"/>
+            <path d="M180 64 L205.0 39 L230 64Z" style="fill:var(--ill-house)"/>
+            <path d="M178 64 L205.0 37 L232 64" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+            <rect x="188" y="60" width="34" height="28" style="fill:var(--ill-house)"/>
+            <rect x="191.4" y="66.16" width="7.48" height="9.8" rx="3" style="fill:var(--ill-window)"/>
+            <rect x="211.12" y="66.16" width="7.48" height="9.8" rx="3" style="fill:var(--ill-window)"/>
+            <path d="M205 51.6s-5.6-3.22-5.6-7.0a3.08 3.08 0 0 1 5.6-1.68 3.08 3.08 0 0 1 5.6 1.68c0 3.78-5.6 7.0-5.6 7.0z" style="fill:var(--ill-heart)"/>
+            <rect x="200" y="72" width="10" height="16" rx="1.5" style="fill:var(--ill-door)"/>
+            <g transform="translate(42 0)"><g class="a-car"><path d="M78 88v-11a4 4 0 0 1 4-4h6l7-11h22l8 11h6a4 4 0 0 1 4 4v11z" style="fill:var(--ill-car)"/><rect x="97" y="65" width="9" height="7" rx="1.5" style="fill:var(--ill-door)"/><rect x="110" y="65" width="9" height="7" rx="1.5" style="fill:var(--ill-door)"/><circle cx="94" cy="89" r="6" style="fill:var(--ill-leg)"/><circle cx="122" cy="89" r="6" style="fill:var(--ill-leg)"/><circle cx="94" cy="89" r="2" style="fill:var(--ill-door)"/><circle cx="122" cy="89" r="2" style="fill:var(--ill-door)"/></g></g>
+          </svg>
           <label class="event-date" for="event-date">When is your <span id="event-label">day</span>?</label>
           <input type="date" id="event-date" class="event-date-input">
           <p id="countdown" class="countdown" role="status"></p>
@@ -991,39 +1073,9 @@
       <symbol id="i-people" viewBox="0 0 24 24"><circle cx="8" cy="7" r="3.5" fill="currentColor"/><circle cx="17" cy="8" r="3" fill="currentColor"/><path d="M1.5 20a6.5 6.5 0 0 1 13 0zM14.5 20a6.5 6.5 0 0 0-1.6-4.3A5 5 0 0 1 22.5 20z" fill="currentColor"/></symbol>
       <symbol id="i-unlink" viewBox="0 0 24 24"><path d="M10 7H7a5 5 0 0 0 0 10h3v-2H7a3 3 0 0 1 0-6h3zm4 0v2h3a3 3 0 0 1 0 6h-3v2h3a5 5 0 0 0 0-10zM3.7 2.3 2.3 3.7l18 18 1.4-1.4z" fill="currentColor"/></symbol>
       <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z" fill="currentColor"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z" fill="currentColor"/></symbol>
       <symbol id="i-dash" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zM7 11v2h10v-2z" fill="currentColor"/></symbol>
       <!-- Illustrations: original flat drawings in the app's colors (the --ill-* tokens). Used with <use href="#ill-...">. -->
-      <symbol id="ill-home" viewBox="0 0 320 130">
-        <rect width="320" height="130" rx="20" style="fill:var(--ill-sky)"/>
-        <path d="M0 100 Q160 84 320 100 V110 A20 20 0 0 1 300 130 H20 A20 20 0 0 1 0 110Z" style="fill:var(--ill-ground)"/>
-        <circle cx="284" cy="30" r="18" style="fill:var(--ill-sun)"/>
-        <path d="M30 26a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H32a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
-        <path d="M196 20a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H198a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
-        <path d="M150 100 L170 100 L186 130 L134 130Z" style="fill:var(--ill-path)"/>
-        <path d="M104 62 L160.0 25 L216 62Z" style="fill:var(--ill-house)"/>
-        <path d="M102 62 L160.0 23 L218 62" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
-        <rect x="112" y="58" width="96" height="44" style="fill:var(--ill-house)"/>
-        <rect x="121.6" y="67.68" width="21.12" height="15.4" rx="3" style="fill:var(--ill-window)"/>
-        <rect x="177.28" y="67.68" width="21.12" height="15.4" rx="3" style="fill:var(--ill-window)"/>
-        <rect x="150.4" y="71.2" width="19.2" height="30.8" rx="3" style="fill:var(--ill-door)"/>
-        <path d="M160 42s-8-4.6-8-10a4.4 4.4 0 0 1 8-2.4 4.4 4.4 0 0 1 8 2.4c0 5.4-8 10-8 10z" style="fill:var(--ill-heart)"/>
-        <circle cx="166" cy="88" r="1.6" style="fill:var(--ill-house)"/>
-        <rect x="228" y="88" width="14" height="14" rx="2" style="fill:var(--ill-pot)"/>
-        <ellipse cx="235" cy="77" rx="5" ry="12" style="fill:var(--ill-plant)"/>
-        <path d="M235 87V70" style="fill:none;stroke:var(--ill-pot);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"/>
-        <path d="M146 99q9-2 7-11" style="fill:none;stroke:var(--ill-cat);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/>
-        <ellipse cx="138" cy="96" rx="9" ry="7" style="fill:var(--ill-cat)"/>
-        <circle cx="131" cy="88" r="5.5" style="fill:var(--ill-cat)"/>
-        <path d="M126.5 86l1-6.5 4 4zM131.5 83.5l4-4.5 .5 6.5z" style="fill:var(--ill-cat)"/>
-        <path d="M62 74 56 92" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
-        <path d="M54 90 51 113" style="fill:none;stroke:var(--ill-cane);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/>
-        <rect x="63" y="98" width="5" height="15" rx="2" style="fill:var(--ill-leg)"/>
-        <rect x="72" y="98" width="5" height="15" rx="2" style="fill:var(--ill-leg)"/>
-        <path d="M62 70h16l6 31H56z" style="fill:var(--ill-dress)"/>
-        <path d="M78 72 90 56" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
-        <circle cx="69" cy="57" r="9.5" style="fill:var(--ill-hair)"/>
-        <circle cx="71" cy="61" r="8" style="fill:var(--ill-skin)"/>
-      </symbol>
       <symbol id="ill-clinic" viewBox="0 0 240 120">
         <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
         <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
@@ -1103,32 +1155,6 @@
         <path d="M150 58l20 13 20-13" style="fill:none;stroke:var(--ill-dash);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>
         <rect x="160" y="72" width="40" height="26" rx="3" style="fill:var(--ill-door)"/>
         <path d="M160 74l20 13 20-13" style="fill:none;stroke:var(--ill-dash);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>
-      </symbol>
-      <symbol id="ill-ready" viewBox="0 0 240 120">
-        <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
-        <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
-        <circle cx="28" cy="26" r="12" style="fill:var(--ill-sun)"/>
-        <path d="M120 18a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H122a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
-        <path d="M34 60 L75.0 29 L116 60Z" style="fill:var(--ill-house)"/>
-        <path d="M32 60 L75.0 27 L118 60" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
-        <rect x="42" y="56" width="66" height="36" style="fill:var(--ill-house)"/>
-        <rect x="48.6" y="63.92" width="14.52" height="12.6" rx="3" style="fill:var(--ill-window)"/>
-        <rect x="86.88" y="63.92" width="14.52" height="12.6" rx="3" style="fill:var(--ill-window)"/>
-        <rect x="68.4" y="66.8" width="13.2" height="25.2" rx="3" style="fill:var(--ill-door)"/>
-        <path d="M75 44.4s-6.4-3.68-6.4-8.0a3.52 3.52 0 0 1 6.4-1.92 3.52 3.52 0 0 1 6.4 1.92c0 4.32-6.4 8.0-6.4 8.0z" style="fill:var(--ill-heart)"/>
-        <rect x="140" y="70" width="52" height="5" rx="2" style="fill:var(--ill-cane)"/>
-        <rect x="140" y="84" width="52" height="5" rx="2" style="fill:var(--ill-cane)"/>
-        <rect x="144" y="89" width="4" height="12" style="fill:var(--ill-cane)"/>
-        <rect x="184" y="89" width="4" height="12" style="fill:var(--ill-cane)"/>
-        <rect x="150" y="80" width="26" height="7" rx="3" style="fill:var(--ill-leg)"/>
-        <rect x="170" y="84" width="6" height="16" rx="2" style="fill:var(--ill-leg)"/>
-        <path d="M153 61h17l4 24h-25z" style="fill:var(--ill-dress)"/>
-        <path d="M168 67l9 8" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
-        <rect x="176" y="71" width="8" height="9" rx="1.5" style="fill:var(--ill-door)"/>
-        <circle cx="160" cy="49" r="9.5" style="fill:var(--ill-hair)"/>
-        <circle cx="162" cy="53" r="8" style="fill:var(--ill-skin)"/>
-        <circle cx="212" cy="30" r="15" style="fill:var(--ill-plant)"/>
-        <path d="M205 30l5 5 9-10" style="fill:none;stroke:var(--ill-door);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round"/>
       </symbol>
       <symbol id="ill-cat-plan" viewBox="0 0 120 80">
         <rect width="120" height="80" rx="18" style="fill:var(--ill-sky)"/>

@@ -569,7 +569,7 @@ def test_illustrations_exist_and_have_descriptive_alt_text():
     page = client.get("/").text
     for name in ("home", "clinic", "outage", "pet", "mail", "ready"):
         assert f'id="ill-{name}"' in page
-    hero = re.search(r'<svg class="ill ill-hero[^"]*"[^>]*aria-label="([^"]+)"', page)
+    hero = re.search(r'<svg[^>]*class="ill ill-hero[^"]*"[^>]*aria-label="([^"]+)"', page)
     assert hero and len(hero.group(1).split()) >= 8 and 'role="img"' in hero.group(0)
     js = client.get("/static/app.js").text
     alts = re.findall(r'"(Illustration: [^"]+)"', js)
@@ -921,14 +921,13 @@ def test_illustrations_are_original_flat_scenes_with_a_calm_ready_picture():
     import re
     page = client.get("/").text
     home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
-    hero = re.search(r'<svg class="ill ill-hero scene"[^>]*aria-label="([^"]+)"', home).group(1)
+    hero = re.search(r'<svg[^>]*class="ill ill-hero scene"[^>]*aria-label="([^"]+)"', home).group(1)
     assert "older" in hero and "house" in hero and "sunny" in hero                   # the person outside their house
     ready = re.search(r'<svg id="ready-ill"[^>]*aria-label="([^"]+)"[^>]*hidden', page)
     assert ready and "plan is ready" in ready.group(1)
     assert '$("ready-ill").toggleAttribute("hidden", !plan.ready)' in client.get("/static/app.js").text
     for name in ("home", "clinic", "outage", "pet", "mail", "ready"):
-        sym = page[page.index(f'<symbol id="ill-{name}"'):]
-        sym = sym[:sym.index("</symbol>")]
+        sym = page[page.index(f'id="ill-{name}"'):][:5000]   # a shared drawing, or one drawn in the page so it can move
         assert "var(--ill-sky)" in sym and "<image" not in sym and "href=\"http" not in sym   # drawn here, in our colors
 
 
@@ -953,7 +952,7 @@ def test_havens_heart_pulses_while_thinking_but_not_when_motion_is_reduced():
     typing = page[page.index('id="typing"'):page.index("</div>", page.index('id="typing"'))]
     assert 'class="thinking-heart"' in typing and "is thinking" in typing    # the words say it too
     css = client.get("/static/style.css").text
-    assert "animation: heartbeat" in css
+    assert "animation: heartbeat 1.6s ease-in-out 3;" in css and "scale(1.25)" in css   # a little more noticeable, still calm
     assert "@media (prefers-reduced-motion: reduce) { .thinking-heart { animation: none; } }" in css
 
 
@@ -1136,3 +1135,34 @@ def test_home_has_an_illustrated_how_it_works_row():
     for name in ("chat", "print", "cat-plan", "cat-safe", "cat-help", "cat-share"):
         sym = page[page.index(f'<symbol id="ill-{name}"'):]
         assert "var(--ill-sky)" in sym[:sym.index("</symbol>")]                      # drawn here, in theme colors
+
+
+# ---- Round 7, part 4: gentle motion -----------------------------------------------------
+
+def test_the_home_scene_moves_gently_then_settles_and_can_be_paused():
+    import re
+    page = client.get("/").text
+    home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
+    scene = home[home.index('<svg id="hero-scene"'):home.index("</svg>", home.index('id="ill-home"'))]
+    for part in ("a-sun", "a-cloud1", "a-cloud2", "a-birds", "a-leaf1", "a-leaf2", "a-leaf3", "a-dress", "a-cat", 'class="tree"'):
+        assert part in scene, part                                         # cat, clouds, birds, leaves, tree, dress, sun
+    assert 'id="scene-btn"' in home and "Play scene" in home
+    js = client.get("/static/app.js").text
+    assert "const SCENE_MS = 9500;" in js and 'sceneButton("Pause", "pause")' in js and 'sceneButton("Play scene", "play")' in js
+    assert 'matchMedia("(prefers-reduced-motion: reduce)")' in js and "sceneBtn.hidden = stillOnly.matches" in js
+    assert "playOnce(ride, 3500)" in js and 'playOnce($("ready-ill"), 1600)' in js   # the car drives, the check draws, once
+    assert "a-car" in page and 'class="a-check" pathLength="1"' in page
+
+def test_motion_is_slow_never_flashes_and_stops_for_reduce_motion():
+    import re
+    css = client.get("/static/style.css").text
+    assert "*, *::before, *::after { animation: none !important; transition: none !important; }" in css
+    for dur, count in re.findall(r"animation:[^;]*?\b(\d*\.?\d+)s\b[^;]*?(infinite|\b\d+\b)?;", css):
+        assert float(dur) >= .3, dur                                        # nothing flashes 3 times a second
+    assert "infinite" not in css                                            # nothing loops forever
+    # Anything longer than five seconds is the home scene, which has a Pause button the whole time.
+    for sel, body in re.findall(r"([^{}]+)\{([^}]*animation:[^}]*)\}", css):
+        m = re.search(r"animation:\s*[\w-]+\s+(\d*\.?\d+)s(?:[^;]*?\s(\d+)(?:\s|;))?", body)
+        if m:
+            total = float(m.group(1)) * int(m.group(2) or 1)
+            assert total <= 5.5 or "playing" in sel, (sel.strip(), total)
