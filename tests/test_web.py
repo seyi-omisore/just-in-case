@@ -363,8 +363,6 @@ def test_helper_updates_are_described_as_non_urgent_with_911_first():
     home = client.get("/").text
     updates = home[home.index('id="notices-wrap"'):home.index('id="notices"')]
     assert "In an emergency, call 911." in updates and "not urgent" in updates
-    features = home[home.index("<h3>Helper updates</h3>"):]
-    assert features.index("911") < features.index("non-urgent")
     consent = home[home.index('class="consent-facts"'):]
     assert consent.index("call 911") < consent.index("What we save")
     family = client.get("/share/anything").text
@@ -420,9 +418,11 @@ def test_faq_says_this_is_not_an_emergency_service():
 
 def test_comparison_is_honest_that_pendants_can_call_for_help():
     page = client.get("/").text
-    table = page[page.index('class="compare-table"'):page.index("</table>")]
+    table = page[page.index('class="compare-chart"'):page.index("</table>")]
     row = table[table.index("Calls for help in an emergency"):table.index("</tr>", table.index("Calls for help"))]
-    assert "No. Always call 911" in row and "Yes, that is what it is for" in row
+    cells = __import__("re").findall(r'<span class="mark mark-(\w+)">.*?</svg>([^<]+)</span>', row)
+    assert cells == [("no", "No"), ("no", "No"), ("no", "No"), ("yes", "Yes")]   # Just in Case cannot call; a pendant can
+    assert "Just in Case is a planning tool. In an emergency, always call 911." in page
 
 
 # ---- Simple mode: the home screen --------------------------------------------
@@ -1100,3 +1100,39 @@ def test_settings_has_three_collapsible_sections_with_the_current_choice_and_911
     assert colors.count('class="theme-choice"') == 3 and colors.count('class="theme-preview') == 3
     js = client.get("/static/app.js").text
     assert '$("now-colors").textContent' in js and '$("now-size").textContent' in js and '$("now-voice").textContent' in js
+
+
+# ---- Round 7, part 3: Features and How it works ---------------------------------------
+
+def test_features_are_four_groups_of_bubbles_that_open_one_at_a_time():
+    import re
+    page = client.get("/").text
+    feat = page[page.index('id="panel-features"'):page.index('id="panel-privacy"')]
+    groups = re.findall(r'<h2 id="fcat-\w+" class="fcat-title">([^<]+)</h2>', feat)
+    assert groups == ["Make a plan", "Stay safe", "Get help", "Share with people you trust"]
+    assert feat.count('<use href="#ill-cat-') == 4                               # one picture per group
+    bubbles = re.findall(r'<button type="button" class="bubble" aria-expanded="false" aria-controls="(fb-\d+)">.*?'
+                         r'<span class="bubble-name">([^<]+)</span>', feat, re.S)
+    assert len(bubbles) >= 12
+    for panel, name in bubbles:
+        assert 2 <= len(name.split()) <= 4, name                                   # short names
+        text = re.search(rf'<p id="{panel}" class="bubble-panel" hidden>([^<]+)</p>', feat).group(1)
+        assert len(re.findall(r"[.!?](?:\s|$)", text)) == 1, text                    # one sentence each
+        assert not re.search(r"911|988|emergency|crisis", text, re.I), text        # safety words are never behind a tap
+    js = client.get("/static/app.js").text
+    assert 'for (const o of bubbles) { o.setAttribute("aria-expanded", "false")' in js   # only one open at a time
+    assert "<table" not in feat.replace('<table class="compare-chart">', "")           # the old big table is gone
+    assert 'id="facts"' in feat and feat.count('class="fact-icon"') >= 7            # By the numbers: tiles with icons
+
+def test_home_has_an_illustrated_how_it_works_row():
+    import re
+    page = client.get("/").text
+    home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
+    row = home[home.index('class="how-row"'):home.index("</ol>", home.index('class="how-row"'))]
+    steps = re.findall(r'aria-label="(Illustration: [^"]+)"><use href="#ill-[\w-]+"/></svg><span>([^<]+)</span>', row)
+    assert [t for _, t in steps] == ["Tell Haven what's coming up", "Get a simple plan", "Print your fridge card"]
+    assert all(len(a.split()) >= 8 for a, _ in steps)
+    assert home.index('class="home-buttons"') < home.index('class="how-row"') < home.index('id="season-tip"')
+    for name in ("chat", "print", "cat-plan", "cat-safe", "cat-help", "cat-share"):
+        sym = page[page.index(f'<symbol id="ill-{name}"'):]
+        assert "var(--ill-sky)" in sym[:sym.index("</symbol>")]                      # drawn here, in theme colors

@@ -1131,6 +1131,14 @@
   $("card-close").addEventListener("click", () => dialog.close());
   dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
 
+  // ---- Features: tap a bubble to read one sentence about it. One bubble is open at a time. ----
+  const bubbles = [...document.querySelectorAll(".bubble")];
+  for (const b of bubbles) b.addEventListener("click", () => {
+    const opening = b.getAttribute("aria-expanded") !== "true";
+    for (const o of bubbles) { o.setAttribute("aria-expanded", "false"); $(o.getAttribute("aria-controls")).hidden = true; }
+    if (opening) { b.setAttribute("aria-expanded", "true"); $(b.getAttribute("aria-controls")).hidden = false; }
+  });
+
   // ---- "By the numbers": counted by the server from the app itself -------
   fetch("/api/facts").then((r) => r.json()).then((f) => {
     for (const n of document.querySelectorAll("[data-fact]")) {

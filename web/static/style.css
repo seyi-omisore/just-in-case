@@ -1430,3 +1430,60 @@ a:where(:link, :visited) { color: var(--link); }
 .preview-contrast { --pv-wall: #000000; --pv-card: #000000; --pv-btn: #FFFF00; --pv-line: #FFFFFF; }
 .preview-contrast i:not(:last-child) { border: 1px solid #FFFFFF; }
 .simple-view .settings-dialog .voice-full-only { display: none; }   /* "All voices" stays in Full view only */
+
+/* ---- Features: four groups of bubbles, each with its own picture and color ------------- */
+.features { max-width: 60rem; }
+.fcat { display: grid; gap: .9rem; padding: 1.2rem; border-radius: 24px; background: var(--paper); }
+.fcat-head { display: flex; gap: 1rem; align-items: center; }
+.fcat-ill { width: 6.5rem; flex: none; }
+.fcat-title { font-size: 1.35rem; color: var(--cat-title); }
+.bubbles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(4.6rem, 100%), 1fr)); gap: .8rem .4rem; }
+.bubble {
+  display: grid; justify-items: center; gap: .45rem; width: 100%; padding: .3rem; background: none; border: 0;
+  color: var(--ink); font: inherit; font-weight: 700; font-size: .92rem; line-height: 1.25; text-align: center; cursor: pointer;
+}
+.bubble-icon {
+  width: 4.2rem; height: 4.2rem; border-radius: 50%; display: grid; place-items: center;
+  background: var(--cat-tint); color: var(--cat-ink); transition: background .3s ease, color .3s ease, transform .3s ease;
+}
+.bubble-icon .icon { width: 1.8rem; height: 1.8rem; }
+.bubble[aria-expanded="true"] .bubble-icon { background: var(--cat-ink); color: var(--cat-on); transform: scale(1.06); }
+.bubble[aria-expanded="true"] .bubble-name { text-decoration: underline; text-underline-offset: 4px; }   /* open, not by color alone */
+.bubble-panel { margin: 0; padding: .9rem 1.1rem; border-radius: 16px; background: var(--cat-tint); color: var(--ink); font-size: 1.02rem; }
+.bubble-panel:not([hidden]) { animation: bubble-open .3s ease-out; }
+@keyframes bubble-open { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.fcat-plan { --cat-tint: var(--primary-tint); --cat-ink: var(--primary); --cat-on: var(--on-primary); --cat-title: var(--link); }
+.fcat-safe { --cat-tint: var(--success-tint); --cat-ink: var(--success); --cat-on: var(--wall); --cat-title: var(--ok); }
+.fcat-help { --cat-tint: var(--note); --cat-ink: var(--season-icon); --cat-on: var(--on-season); --cat-title: var(--ink); }
+.fcat-share { --cat-tint: var(--blue-tint); --cat-ink: var(--sit-ride); --cat-on: var(--sit-ink); --cat-title: var(--ink); }
+[data-theme="contrast"] .fcat { border: 2px solid var(--line); }
+[data-theme="contrast"] .bubble-icon { border: 2px solid var(--line); }
+
+/* The comparison chart: four columns, a check or cross with a word, at every width. */
+.compare-chart { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .92rem; }
+.compare-chart th, .compare-chart td { padding: .7rem .3rem; text-align: center; vertical-align: middle; border-bottom: 1px solid var(--line); }
+.compare-chart thead th { font-size: .85rem; color: var(--ink-soft); }
+.compare-chart thead th:first-of-type { color: var(--link); }
+.compare-chart tbody th { text-align: left; font-weight: 700; width: 34%; }
+.compare-chart tbody tr:last-child > * { border-bottom: 0; }
+.mark { display: grid; justify-items: center; gap: .1rem; font-size: .8rem; color: var(--ink-soft); }
+.mark .icon { width: 1.6rem; height: 1.6rem; }
+.mark-yes .icon { color: var(--success); }
+.mark-no .icon, .mark-some .icon { color: var(--edge); }
+.compare-note { display: flex; gap: .45rem; align-items: flex-start; margin-top: .9rem; font-weight: 700; }
+
+/* By the numbers: big tiles, each with an icon. */
+.fact-tiles { grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr)); }
+.fact-tiles li { justify-items: start; gap: .35rem; background: var(--paper); border-radius: 20px; padding: 1.1rem; }
+.fact-icon { width: 2.6rem; height: 2.6rem; border-radius: 12px; display: grid; place-items: center; background: var(--primary-tint); color: var(--primary); }
+.fact-tiles strong { font-size: 2rem; }
+
+/* Home: How it works, three small pictures. */
+.how-home { display: grid; gap: .7rem; }
+.how-home-title { font-size: 1.3rem; }
+.how-row { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; }
+.how-row li { display: grid; gap: .45rem; justify-items: center; text-align: center; font-size: .95rem; }
+.how-ill { width: 100%; max-width: 8rem; }
+.fact-tiles { grid-template-columns: repeat(auto-fill, minmax(min(6.5rem, 100%), 1fr)); gap: .7rem; }
+.fact-icon .icon { width: 1.4rem; height: 1.4rem; }
+.compare-chart thead td { width: 34%; }
