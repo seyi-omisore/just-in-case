@@ -143,3 +143,9 @@ def safe_cell(value: str) -> str:
     """Spreadsheet cell that cannot run as a formula (CSV injection guard)."""
     value = str(value or "").replace("\r", " ").replace("\n", " ").strip()
     return "'" + value if value[:1] in ("=", "+", "-", "@", "\t") else value
+
+
+def first_name(value) -> str:
+    """Pages other people may see show first names only: "Doris Chen" -> "Doris"."""
+    parts = str(value or "").replace("\r", " ").replace("\n", " ").split()
+    return parts[0].rstrip(",.")[:120] if parts else ""

@@ -29,8 +29,12 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from just_in_case.config import DATA_DIR, OUTPUT_DIR
+from just_in_case.config import AGENT_NAME
 from just_in_case.prompts import GREETING
 from just_in_case import timeline
+from just_in_case.encouragement import encouragement
+from just_in_case.next_step import pick_next_step
+from just_in_case.reviews import review_status
 from just_in_case.state import CARD_SECTIONS, NEED_WHY, NEEDS
 from web.share_store import ShareError, ShareStore
 
@@ -102,6 +106,8 @@ def describe_trace(line: str) -> tuple[str, str] | None:
 # ---------------------------------------------------------------------------
 
 class Session:
+    summary_ok = False  # nothing is made until the person says yes
+
     def __init__(self, ws: WebSocket, demo: bool = False):
         self.id = uuid.uuid4().hex
         self.ws = ws
@@ -118,6 +124,7 @@ class Session:
         self.recapped: tuple = ()  # the plan as of the last "So far" recap
         self.returning = False  # restored a saved plan; tell the live agent once
         self.ready_said = False  # "Your plan is ready" is said once per visit
+        self.summary_ok = False  # the person agreed to make a readiness summary this visit
         self.declined: list[str] = []  # parts the user said "No thanks" to, for the agent's next turn
 
     def emit(self, msg: dict) -> None:
@@ -204,6 +211,10 @@ class Session:
             "services_only": state.services_only(),
             "help_lines": [{"name": l["name"], "how_to_reach": l["how_to_reach"]}
                            for l in d.support_lines if l["id"] in ("line_age_strong", "line_mass211")],
+            "next_step": pick_next_step(items, state.actions_done, state.actions_later),
+            "review": review_status(state.reviews, self.agent.box.today, any(i["user_ok"] for i in items)),
+            "encouragement": encouragement(len(covered & set(state.confirmed_needs)), len(state.confirmed_needs),
+                                           bool(state.card_path)),
             "progress": {"covered": len(covered & set(state.confirmed_needs)),
                          "total": len(state.confirmed_needs)},
             "ready": self.is_ready(),
@@ -212,6 +223,8 @@ class Session:
             "tasks": state.helper_tasks,
             "card": f"/card/{self.id}" if state.card_path else None,
             "plan_print": f"/plan/{self.id}" if state.items else None,
+            "summary_available": any(i["user_ok"] for i in items),          # the button may show
+            "summary_print": f"/summary/{self.id}" if self.summary_ok and any(i["user_ok"] for i in items) else None,
             "table_csv": f"/table/{self.id}.csv",
             "table_print": f"/table/{self.id}",
             "share": {"url": f"/share/{self.share_id}",
@@ -249,8 +262,7 @@ class Session:
             st = self.agent.state
             next_step = ("You can print your plan or your fridge card any time." if st.card_path else
                          "You can print your plan any time. When you'd like, we can make your fridge card too.")
-            self.emit({"type": "ready", "text": "Your plan is ready. Everything you asked to plan for is covered. "
-                       f"{next_step} There's nothing you need to do right now."})
+            self.emit({"type": "ready", "text": f"Your plan is ready. {next_step}"})
 
     def is_ready(self) -> bool:
         st = self.agent.state
@@ -258,6 +270,22 @@ class Session:
         return bool(st.confirmed_needs) and set(st.confirmed_needs) <= covered
 
     # -- "Yes, add this" / "No thanks" on each plan item ------------------------
+    def review_edit(self, action: str) -> None:
+        from just_in_case.tools import ToolError
+        try:
+            self.agent.box.user_review(action)
+        except ToolError as e:
+            self.emit({"type": "table_error", "text": str(e)})
+        self.emit({"type": "plan", "plan": self.plan()})
+
+    def next_step_edit(self, need: str, action: str) -> None:
+        from just_in_case.tools import ToolError
+        try:
+            self.agent.box.user_next_step(need, action)
+        except ToolError as e:
+            self.emit({"type": "table_error", "text": str(e)})
+        self.emit({"type": "plan", "plan": self.plan()})
+
     def answer_item(self, need: str, ok: bool) -> None:
         from just_in_case.tools import ToolError
         try:
@@ -307,6 +335,13 @@ class Session:
         self.emit({"type": "plan", "plan": self.plan()})
 
     # -- sharing (only with consent) -----------------------------------------
+    def summary_consent(self, agree) -> None:
+        """Making the summary is opt in. Without a yes, the page address answers 403."""
+        self.summary_ok = agree is True
+        if self.summary_ok:
+            self.emit({"type": "activity", "kind": "human", "text": "You chose to make your readiness summary. It is not saved or sent."})
+        self.emit({"type": "plan", "plan": self.plan()})
+
     def share_create(self, consent: bool, label: str) -> None:
         if consent is not True:
             self.emit({"type": "table_error", "text": "Nothing was shared. Sharing needs your OK first."})
@@ -397,7 +432,7 @@ class Session:
             self.emit({"type": "busy", "on": True})
             def on_text(t: str) -> None:
                 self.maybe_recap()
-                self.emit({"type": "agent", "text": t.removeprefix("\nJust in Case: ")})
+                self.emit({"type": "agent", "text": t.removeprefix(f"\n{AGENT_NAME}: ")})
             notes = []
             if self.returning:
                 self.returning = False
@@ -423,14 +458,19 @@ class Session:
 # Routes
 # ---------------------------------------------------------------------------
 
+def render_page(name: str, agent_name: str = AGENT_NAME) -> str:
+    """A page with the agent's name filled in. The name lives in config.py, nowhere else."""
+    return (STATIC / name).read_text().replace("{{AGENT_NAME}}", htmlmod.escape(agent_name))
+
+
 @app.get("/")
 async def index():
-    return FileResponse(STATIC / "index.html")
+    return HTMLResponse(render_page("index.html"))
 
 
 @app.get("/api/config")
 async def config():
-    return JSONResponse({"demo": DEMO, "greeting": GREETING,
+    return JSONResponse({"demo": DEMO, "greeting": GREETING, "agent_name": AGENT_NAME,
                          "needs_restart": code_fingerprint() != STARTED_WITH})
 
 
@@ -603,6 +643,18 @@ async def plan_print(sid: str):
                                          s.plan()["help_lines"] if st.services_only() else None))
 
 
+@app.get("/summary/{sid}")
+async def summary_print(sid: str):
+    """"My readiness summary": made only when the person asks, fresh each time, never stored."""
+    from just_in_case.summary import render_summary_html
+    s = _session_or_404(sid)
+    if not s:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    if not s.summary_ok:  # opt in only: no yes, no summary
+        return JSONResponse({"error": "The summary is only made after you say yes."}, status_code=403)
+    return HTMLResponse(render_summary_html(s.agent.state, s.agent.box.dir, s.agent.box.today))
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
@@ -618,7 +670,7 @@ async def ws_endpoint(ws: WebSocket):
     tasks: set[asyncio.Task] = set()
     try:
         await s.start()
-        s.emit({"type": "hello", "session": s.id, "demo": s.demo, "greeting": GREETING})
+        s.emit({"type": "hello", "session": s.id, "demo": s.demo, "greeting": GREETING, "agent_name": AGENT_NAME})
         while True:
             msg = await ws.receive_json()
             if msg.get("type") == "say" and str(msg.get("text", "")).strip():
@@ -637,6 +689,12 @@ async def ws_endpoint(ws: WebSocket):
                 s.save()
             elif msg.get("type") in ("event_date", "step"):
                 s.timeline_edit(msg)
+            elif msg.get("type") == "summary_consent":
+                s.summary_consent(msg.get("agree"))
+            elif msg.get("type") == "review":
+                s.review_edit(str(msg.get("action", "")))
+            elif msg.get("type") == "next_step":
+                s.next_step_edit(str(msg.get("need", ""))[:60], str(msg.get("action", "")))
             elif msg.get("type") == "item":
                 s.answer_item(str(msg.get("need", "")), msg.get("ok") is True)
             elif msg.get("type") == "restore":

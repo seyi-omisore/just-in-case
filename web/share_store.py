@@ -21,6 +21,8 @@ import threading
 import time
 from pathlib import Path
 
+from just_in_case.safeguards import first_name as _first_name
+
 KEEP_DAYS = 30
 MAX_FIELD = 120
 MAX_ROWS = 40
@@ -40,8 +42,7 @@ def _clean(v) -> str:
 
 def first_name(v) -> str:
     """The shared page shows first names only: "Doris Chen" -> "Doris"."""
-    parts = _clean(v).split()
-    return parts[0].rstrip(",.") if parts else ""
+    return _first_name(_clean(v))
 
 
 class ShareStore:

@@ -9,6 +9,8 @@ Flow of one turn:
 
 import asyncio
 import json
+import shutil
+import tempfile
 from typing import Awaitable, Callable
 
 from claude_agent_sdk import (
@@ -22,7 +24,7 @@ from claude_agent_sdk import (
     ToolUseBlock,
 )
 
-from .config import MAX_BUDGET_USD, MODEL, runtime_env
+from .config import AGENT_NAME, MAX_BUDGET_USD, MODEL, runtime_env
 from .directory import Directory
 from .prompts import SYSTEM_PROMPT
 from .safeguards import check_helper_note
@@ -108,6 +110,10 @@ class JustInCaseAgent:
         self.on_tool = on_tool
         server, tool_names = build_server(self.box, trace=trace)
         gated = {PREFIX + t for t in GATED_TOOLS}
+        # The AI toolkit keeps its own log of every conversation in a settings folder.
+        # We give it a private, temporary folder instead, and delete that folder when
+        # the visit ends, so no copy of the chat is left on this computer.
+        self._private_dir = tempfile.mkdtemp(prefix="jic-private-")
         self.options = ClaudeAgentOptions(
             system_prompt=SYSTEM_PROMPT,          # replaces Claude Code's coding prompt
             model=model or MODEL,
@@ -116,7 +122,7 @@ class JustInCaseAgent:
             allowed_tools=[n for n in tool_names if n not in gated],  # auto-approved
             can_use_tool=make_gate(approver, trace, precheck=self.box.precheck),  # everything else comes here
             setting_sources=[],                    # ignore CLAUDE.md, plugins, user settings
-            env=runtime_env(),                     # route to OpenRouter
+            env={**runtime_env(), "CLAUDE_CONFIG_DIR": self._private_dir},  # route to OpenRouter; private log folder
             max_turns=40,
             max_budget_usd=MAX_BUDGET_USD,
         )
@@ -129,7 +135,10 @@ class JustInCaseAgent:
         return self
 
     async def __aexit__(self, *exc):
-        await self.client.disconnect()
+        try:
+            await self.client.disconnect()
+        finally:
+            shutil.rmtree(self._private_dir, ignore_errors=True)  # the toolkit's copy of the chat goes with the visit
 
     async def send(self, user_text: str, on_text=print, context: str = "") -> str:
         """Send one user message and return the agent's full text reply.
@@ -147,7 +156,7 @@ class JustInCaseAgent:
                 for block in msg.content:
                     if isinstance(block, TextBlock) and block.text.strip():
                         reply_parts.append(block.text)
-                        on_text(f"\nJust in Case: {block.text}")
+                        on_text(f"\n{AGENT_NAME}: {block.text}")
                     elif isinstance(block, ToolUseBlock):
                         short = block.name.removeprefix(PREFIX)
                         self.trace(f"  [tool]  {short}")

@@ -3,10 +3,24 @@
 
 (() => {
   const $ = (id) => document.getElementById(id);
+  const AGENT = window.JIC_AGENT_NAME || "your helper";   // set by the server from AGENT_NAME in config.py
   const messages = $("messages"), feed = $("feed"), planEl = $("plan");
   const input = $("message"), sendBtn = $("send"), typing = $("typing");
+
+  // ---- simple view: one question per screen ------------------------------
+  // Every message and checkpoint is tagged with the page (question) it belongs to.
+  // Simple view shows one page at a time. "Show details" shows the whole chat as before.
+  let pages = [];   // [{answered: bool}]
+  let view = 0;     // the page on screen
+  function pageFor(who) {
+    let last = pages[pages.length - 1];
+    if (who === "agent") {
+      if (!last || last.answered) { last = { answered: false }; pages.push(last); view = pages.length - 1; }
+    } else if (last) last.answered = true;
+    return pages.length - 1;
+  }
   let ws, sessionId, busy = false, seenItems = new Set(), cardUrl = null;
-  const openWhy = new Set();  // "Why this matters" tips stay open when the plan redraws
+  const openItems = new Set();  // plan items you opened stay open when the plan redraws
   const USPS_HOLD = "https://holdmail.usps.com/holdmail/";
 
   // ---- small helpers -----------------------------------------------------
@@ -45,6 +59,26 @@
     b.setAttribute("aria-hidden", "true"); b.appendChild(icon(NEED_ICON[need] || "check"));
     return b;
   };
+  // Line illustrations for the situations. Each has words that describe it for screen readers.
+  const ILLUSTRATION = (() => {
+    const clinic = ["clinic", "Line drawing of a clinic with a plus sign above its door, and a small car waiting outside to take someone home."];
+    return {
+      ride_home_after_procedure: clinic, check_in_after_procedure: clinic, transportation: clinic,
+      power_outage: ["outage", "Line drawing of an unlit light bulb next to a lit candle, for a winter power outage."],
+      pet_care_during_stay: ["pet", "Line drawing of a cat sitting next to its food bowl."],
+      mail_while_away: ["mail", "Line drawing of a mailbox on a post, with a letter beside it."],
+    };
+  })();
+  function illustration(need, cls) {
+    const art = ILLUSTRATION[need];
+    if (!art) return null;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "ill " + (cls || "")); svg.setAttribute("viewBox", "0 0 120 96");
+    svg.setAttribute("role", "img"); svg.setAttribute("aria-label", art[1]);
+    const use = document.createElementNS("http://www.w3.org/2000/svg", "use"); use.setAttribute("href", "#ill-" + art[0]);
+    svg.appendChild(use);
+    return svg;
+  }
   const NEED_ICON = {
     ride_home_after_procedure: "car", transportation: "car", spare_key_access: "key",
     pet_care_during_stay: "paw", mail_while_away: "mail", power_outage: "bolt",
@@ -97,14 +131,17 @@
   // ---- messages ----------------------------------------------------------
   function addMessage(who, text, extraClass) {
     const li = el("li", `msg msg-${who}${extraClass ? " " + extraClass : ""}`);
+    li.dataset.page = pageFor(who);
     if (who === "agent") {
       const av = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      av.setAttribute("viewBox", "0 0 48 48"); av.setAttribute("class", "msg-avatar"); av.setAttribute("aria-hidden", "true");
+      av.setAttribute("viewBox", "0 0 48 48"); av.setAttribute("class", "msg-avatar");
+      av.setAttribute("role", "img"); av.setAttribute("aria-label", `${AGENT}, your digital planning helper`);
       av.innerHTML = '<circle cx="24" cy="24" r="24" style="fill:var(--primary-tint)"/><path d="M11 24 24 12l13 12v14H11z" style="fill:var(--primary)"/><path d="M24 34s-6-3.6-6-7.6a3.3 3.3 0 0 1 6-1.9 3.3 3.3 0 0 1 6 1.9c0 4-6 7.6-6 7.6z" style="fill:var(--accent)"/>';
       li.appendChild(av);
     }
     const body = el("div", "msg-body");
-    const label = el("span", "sr-only", who === "agent" ? "Just in Case said: " : "You said: ");
+    const label = el("span", "sr-only", who === "agent" ? "said: " : "You said: ");
+    if (who === "agent") { const nm = el("span", "msg-name", AGENT); nm.setAttribute("aria-hidden", "true"); body.appendChild(nm); }  // the avatar already names it for screen readers
     body.appendChild(label);
     body.appendChild(renderText(text));
     if (extraClass === "msg-recap") body.querySelector("p").prepend(icon("check"), " ");
@@ -155,6 +192,7 @@
     const saved = readSaved();
     if (!saved || !saved.state || EXAMPLE) return;
     const li = el("li", "slip welcome-back");
+    li.dataset.page = pageFor("agent");
     const head = el("div", "slip-head"); head.append(icon("bookmark"), document.createTextNode("Welcome back"));
     const body = el("div", "slip-body");
     body.appendChild(el("p", null, "You saved a plan on this device on " + timeText(saved.at) + ". Would you like to pick up where you left off?"));
@@ -162,7 +200,7 @@
     const go = el("button", "btn btn-primary"); go.type = "button"; go.append(icon("check"), document.createTextNode("Continue my plan"));
     const fresh = el("button", "btn btn-quiet"); fresh.type = "button"; fresh.append(icon("plus"), document.createTextNode("Start fresh"));
     go.onclick = () => {
-      messages.replaceChildren();
+      messages.replaceChildren(); pages = []; view = 0;
       for (const m of saved.history || []) addMessage(m.who, m.text, m.cls || undefined);
       $("starters").hidden = true; $("example-open").hidden = true;
       ws.send(JSON.stringify({ type: "restore", state: saved.state }));
@@ -183,6 +221,7 @@
   let speakingBtn = null;
   const setSpeaking = (btn, on) => {
     btn.replaceChildren(icon(on ? "stop" : "speaker"), document.createTextNode(on ? "Stop" : "Read aloud"));
+    btn.setAttribute("aria-label", on ? `Stop reading ${AGENT}'s message` : `Read ${AGENT}'s message aloud`);
     btn.setAttribute("aria-pressed", String(on));
   };
   // A warm voice: the most natural one this device has, a little slower and a little higher.
@@ -196,38 +235,116 @@
     if (v.default) s += 5;
     return s;
   };
-  let voices = [], chosenVoice = null;
-  const voicePick = $("voice");
-  function loadVoices() {
-    const all = speechSynthesis.getVoices();
-    const english = all.filter((v) => /^en/i.test(v.lang) && voiceScore(v) >= 0);
-    voices = (english.length ? english : all).slice().sort((a, b) => voiceScore(b) - voiceScore(a));
-    if (!voices.length) return;
-    let saved = null; try { saved = sessionStorage.getItem("jic-voice"); } catch (_) {}
-    chosenVoice = voices.find((v) => v.voiceURI === saved) || voices[0];
-    voicePick.replaceChildren(...voices.map((v, i) => {
-      const o = el("option", null, v.name.replace(/\s*\(.*?\)\s*$/, "") + (i === 0 ? " (recommended)" : ""));
-      o.value = v.voiceURI; o.selected = v === chosenVoice; return o;
+  // ---- Reading voice: accent, female or male voice, a sample, and speed ---------
+  // Accent names come from the voice's language tag. Only accents this device has are shown.
+  const ACCENTS = { "en-US": "American", "en-GB": "British", "en-AU": "Australian", "en-IN": "Indian",
+                    "en-IE": "Irish", "en-ZA": "South African", "en-CA": "Canadian", "en-NZ": "New Zealand" };
+  // Female or male only when the voice says so, or its name is on these lists (Apple, Google, Microsoft).
+  // A name that is not here is never guessed. It is just "Voice 1", "Voice 2".
+  const FEMALE_NAMES = /\b(samantha|karen|moira|tessa|fiona|veena|victoria|allison|ava|susan|serena|kate|nicky|zira|aria|jenny|michelle|sonia|libby|maisie|natasha|annette|clara|neerja|emily|hazel|linda|catherine|heera|heather|leah|molly|mia)\b/i;
+  const MALE_NAMES = /\b(daniel|rishi|alex|tom|aaron|oliver|lee|arthur|gordon|evan|nathan|david|mark|guy|ryan|thomas|christopher|eric|roger|steffan|brian|davis|jason|tony|liam|william|connor|james|george|richard|prabhat|ravi|mitchell|luke)\b/i;
+  const genderOf = (v) => {
+    const f = /\bfemale\b/i.test(v.name) || FEMALE_NAMES.test(v.name);
+    const m = /\bmale\b/i.test(v.name) || MALE_NAMES.test(v.name);
+    return f && !m ? "female" : m && !f ? "male" : null;   // both, or neither: we do not guess
+  };
+  const accentOf = (v) => {
+    const tag = String(v.lang || "").replace("_", "-");
+    const k = tag.slice(0, 2).toLowerCase() + "-" + tag.slice(3, 5).toUpperCase();
+    return ACCENTS[k] ? k : /^en/i.test(tag) ? "en-other" : "other";
+  };
+  // The menu shows the accent and its language tag, like "American (en-US)".
+  const accentName = (k) => ACCENTS[k] ? `${ACCENTS[k]} (${k})` : (k === "en-other" ? "Other English" : "Other voices");
+  const SAMPLE = "Hi, I'm here to help you make your plan.";
+  const SPEEDS = [0.7, 0.8, 0.9, 1.0, 1.1];                 // 0.9 is the warm default
+  const SPEED_WORDS = ["Slowest", "Slower", "Warm (usual)", "Faster", "Fastest"];
+  const voiceStore = {
+    get: (k) => { try { return localStorage.getItem("jic-voice-" + k); } catch (_) { return null; } },
+    set: (k, v) => { try { localStorage.setItem("jic-voice-" + k, String(v)); } catch (_) {} },
+  };
+  let voices = [], chosenVoice = null, speedIdx = 2;
+  { const raw = voiceStore.get("speed"), n = Number(raw); if (raw !== null && Number.isInteger(n) && n >= 0 && n < SPEEDS.length) speedIdx = n; }
+  const voicePick = $("voice"), accentPick = $("voice-accent");
+  const byScore = (a, b) => voiceScore(b) - voiceScore(a);
+
+  // The voices in one accent, each with its label: "Female voice", "Male voice", or "Voice 1".
+  function labelled(accent) {
+    const list = voices.filter((v) => accentOf(v) === accent).sort(byScore);
+    const counts = { female: 0, male: 0 }; list.forEach((v) => { const g = genderOf(v); if (g) counts[g] += 1; });
+    const seen = { female: 0, male: 0, none: 0 };
+    return list.map((v) => {
+      const g = genderOf(v), n = (seen[g || "none"] += 1);
+      const label = g ? `${g === "female" ? "Female" : "Male"} voice` + (counts[g] > 1 ? ` ${n}` : "") : `Voice ${n}`;
+      return { v, g, label };
+    });
+  }
+  function renderVoiceControls() {
+    if (!chosenVoice) return;
+    const accent = accentOf(chosenVoice), list = labelled(accent);
+    accentPick.replaceChildren(...[...new Set(voices.map(accentOf))]
+      .sort((a, b) => (Object.keys(ACCENTS).indexOf(a) + 1 || 99) - (Object.keys(ACCENTS).indexOf(b) + 1 || 99))
+      .map((k) => { const o = el("option", null, accentName(k)); o.value = k; o.selected = k === accent; return o; }));
+    // Simple view: Female voice / Male voice (only the ones this accent really has), else the first two unlabeled voices.
+    const kinds = [];
+    for (const g of ["female", "male"]) { const hit = list.find((x) => x.g === g); if (hit) kinds.push({ ...hit, label: `${g === "female" ? "Female" : "Male"} voice` }); }
+    if (!kinds.length) kinds.push(...list.filter((x) => !x.g).slice(0, 2));
+    $("voice-kind").replaceChildren(...kinds.map((k) => {
+      const b = el("button", null, k.label); b.type = "button";
+      b.setAttribute("aria-pressed", String(k.v === chosenVoice || (k.g && genderOf(chosenVoice) === k.g)));
+      b.onclick = () => chooseVoice(k.v);
+      return b;
     }));
+    // Full view: every voice in this accent. Real names are shown only for voices we could identify.
+    voicePick.replaceChildren(...list.map((x) => {
+      const o = el("option", null, x.g ? `${x.label} (${x.v.name.replace(/^Microsoft\s+|\s*\(.*?\)\s*$|\s*-\s*English.*$/gi, "")})` : x.label);
+      o.value = x.v.voiceURI; o.selected = x.v === chosenVoice; return o;
+    }));
+    $("voice-speed").textContent = "Speed: " + SPEED_WORDS[speedIdx];
+    $("voice-slower").disabled = speedIdx === 0; $("voice-faster").disabled = speedIdx === SPEEDS.length - 1;
+  }
+  function chooseVoice(v) {
+    chosenVoice = v;
+    voiceStore.set("uri", v.voiceURI);
+    stopSpeaking();
+    renderVoiceControls();   // silent: the person taps Play sample to hear it
+  }
+  function loadVoices() {
+    const all = speechSynthesis.getVoices().filter((v) => !NOVELTY.test(v.name));
+    const english = all.filter((v) => /^en/i.test(v.lang));
+    voices = english.length ? english : all;
+    if (!voices.length) return;
+    const saved = voiceStore.get("uri");
+    chosenVoice = voices.find((v) => v.voiceURI === saved) || voices.slice().sort(byScore)[0];
+    renderVoiceControls();
     $("voice-row").hidden = false;
+  }
+  function stopSpeaking() {
+    speechSynthesis.cancel();
+    if (speakingBtn) { setSpeaking(speakingBtn, false); speakingBtn = null; }
   }
   function warmUtterance(text) {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = chosenVoice ? chosenVoice.lang : (document.documentElement.lang || "en");
     if (chosenVoice) u.voice = chosenVoice;
-    u.rate = 0.9; u.pitch = 1.1;
+    u.rate = SPEEDS[speedIdx]; u.pitch = 1.1;   // a little slower and a little higher: warmer
     return u;
   }
   if ("speechSynthesis" in window) {
     loadVoices();
     speechSynthesis.addEventListener("voiceschanged", loadVoices);  // most browsers load voices late
-    voicePick.addEventListener("change", () => {
-      chosenVoice = voices.find((v) => v.voiceURI === voicePick.value) || chosenVoice;
-      try { sessionStorage.setItem("jic-voice", chosenVoice.voiceURI); } catch (_) {}
-      speechSynthesis.cancel();
-      if (speakingBtn) { setSpeaking(speakingBtn, false); speakingBtn = null; }
-      speechSynthesis.speak(warmUtterance("Hi. This is how I will sound."));
+    accentPick.addEventListener("change", () => {
+      const pool = labelled(accentPick.value), g = chosenVoice && genderOf(chosenVoice);
+      const next = (g && pool.find((x) => x.g === g)) || pool[0];   // keep female or male when the new accent has it
+      if (next) chooseVoice(next.v);
     });
+    voicePick.addEventListener("change", () => {
+      const v = voices.find((x) => x.voiceURI === voicePick.value);
+      if (v) chooseVoice(v);
+    });
+    $("voice-sample").addEventListener("click", () => { stopSpeaking(); speechSynthesis.speak(warmUtterance(SAMPLE)); });
+    const setSpeed = (i) => { speedIdx = Math.max(0, Math.min(SPEEDS.length - 1, i)); voiceStore.set("speed", speedIdx); renderVoiceControls(); };
+    $("voice-slower").addEventListener("click", () => setSpeed(speedIdx - 1));
+    $("voice-faster").addEventListener("click", () => setSpeed(speedIdx + 1));
   }
   function readAloudButton(text) {
     const btn = el("button", "read-aloud"); btn.type = "button";
@@ -278,9 +395,15 @@
   };
   const SECTION_ICON = { name: "card", contacts: "phone", medications: "pill", allergies: "alert", pet: "paw",
                          papers: "folder", helpers: "person", plan: "home" };
+  // A short line stays on the card; the longer words wait behind a "Show details" link.
+  function moreDetails(text) {
+    const d = el("details", "more"); d.append(el("summary", null, "Show details"), el("p", null, text));
+    return d;
+  }
   function addApproval(msg) {
     const { id, kind, data } = msg;
     const li = el("li", "slip");
+    li.dataset.page = pageFor("agent");
     const head = el("div", "slip-head"); head.append(icon("check"), document.createTextNode(SLIP_TITLE[kind] || "Please check this"));
     const body = el("div", "slip-body");
 
@@ -290,7 +413,8 @@
       for (const n of data.needs) { const i = el("li"); i.append(sitBadge(n.key), document.createTextNode(n.label)); ul.appendChild(i); }
       body.appendChild(ul);
     } else if (kind === "draft_helper_note") {
-      body.appendChild(el("p", null, "For " + data.to.join(" and ") + ". We never send it. You send it yourself if you like."));
+      body.appendChild(el("p", null, "This is for " + data.to.join(" and ") + ". You send it yourself."));
+      body.appendChild(moreDetails("We never send it. You can change it, or skip it."));
       const note = el("div", "sticky"); const nh = el("span", "sticky-head"); nh.append(icon("note"), document.createTextNode("Your note"));
       note.append(nh, el("p", null, data.text)); body.appendChild(note);
     } else if (kind === "choose_card_sections") {
@@ -306,7 +430,7 @@
     } else if (kind === "confirm_helping_someone") {
       const who = data.name || "the person you're helping";
       body.appendChild(el("p", null, `Plans work best when the person helps make them. Does ${who} know about this plan and agree to it?`));
-      body.appendChild(el("p", "helper-small", "They decide what goes in it, and who is asked to help."));
+      body.appendChild(moreDetails("They decide what goes in it, and who is asked to help."));
     } else if (kind === "add_helper_task") {
       const dl = el("dl");
       const row = (t, d) => { if (d) dl.append(el("dt", null, t), el("dd", null, d)); };
@@ -344,6 +468,7 @@
         doneText = names.length ? "You picked: " + names.join(", ") : "You picked just the emergency lines";
       }
       ws.send(JSON.stringify(msg));
+      if (pages[+li.dataset.page]) pages[+li.dataset.page].answered = true;
       actions.remove();
       if (busy) typing.hidden = false;
       const done = el("p", "slip-done " + (ok ? "yes" : "no"));
@@ -382,6 +507,55 @@
   }
 
   // ---- the fridge (plan) -------------------------------------------------
+  // The one thing to do now. Done or Remind me later shows the next step.
+  let nextNeed = null;
+  function renderNextStep(step) {
+    const box = $("next-step");
+    box.hidden = !step;
+    if (!step) return;
+    nextNeed = step.need || null;
+    const finished = !!step.all_done;
+    $("next-step-title").lastChild.textContent = finished ? " All done for now" : " Your next step";
+    const nextArt = ILLUSTRATION[step.need];   // a picture for the step, when we have one
+    const ill = $("next-ill");
+    ill.hidden = finished || !nextArt;
+    if (nextArt) { ill.setAttribute("aria-label", nextArt[1]); ill.firstElementChild.setAttribute("href", "#ill-" + nextArt[0]); }
+    $("next-step-text").textContent = finished ? "You finished every step. You can look over your plan below." : step.text;
+    const call = $("next-call");
+    // A phone number gets "Call now". With no number, a website gets "Open website". With neither, no button.
+    const dest = step.phone ? "tel:" + step.phone.replace(/[^0-9+]/g, "") : step.url || "";
+    call.hidden = finished || !dest;
+    if (dest) {
+      call.href = dest; call.target = step.phone ? "" : "_blank"; call.rel = "noopener";
+      $("next-call-label").textContent = step.phone ? "Call now" : "Open website";
+    }
+    $("next-done").hidden = $("next-later").hidden = finished;
+    $("next-left").textContent = finished ? "" : step.left ? `${step.left} more after this one.` : "This is your last step.";
+  }
+  const sendNext = (action) => {
+    if (!nextNeed || !ws || ws.readyState !== 1) return;
+    ws.send(JSON.stringify({ type: "next_step", need: nextNeed, action }));
+  };
+  $("next-done").addEventListener("click", () => sendNext("done"));
+  $("next-later").addEventListener("click", () => sendNext("later"));
+
+  // "Mark my plan as reviewed": a dated record, and a gentle nudge a few months later. Never an alarm.
+  function renderReview(rev) {
+    const box = $("review-box");
+    box.hidden = !rev;
+    if (!rev) return;
+    $("review-text").textContent = rev.text;
+    $("review-mark").hidden = rev.reviewed_today;
+    $("review-undo").hidden = !rev.reviewed_today;
+    $("review-status").textContent = rev.reviewed_today ? "Marked as reviewed today. Thank you for keeping it current." : "";
+    const list = $("review-history"); list.replaceChildren();
+    for (const d of rev.history) list.appendChild(el("li", null, "Reviewed " + d));
+    list.hidden = !rev.history.length;
+  }
+  const sendReview = (action) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "review", action })); };
+  $("review-mark").addEventListener("click", () => sendReview("mark"));
+  $("review-undo").addEventListener("click", () => sendReview("undo"));
+
   function renderPlan(plan) {
     $("fridge-empty").hidden = plan.items.length > 0 || plan.notes.length > 0;
     const prog = plan.progress || { covered: 0, total: 0 };
@@ -390,7 +564,11 @@
     const ring = $("progress-ring"), C = 2 * Math.PI * 20;
     ring.toggleAttribute("hidden", !prog.total);  // an SVG has no .hidden property
     ring.querySelector(".ring-fill").style.strokeDashoffset = String(prog.total ? C * (1 - prog.covered / prog.total) : C);
-    $("plan-ready").hidden = !plan.ready;
+    // A calm line at each milestone. The words come from the server, never from the model.
+    $("plan-ready").hidden = !plan.encouragement;
+    $("plan-ready-text").textContent = plan.encouragement || "";
+    renderNextStep(plan.next_step);
+    renderReview(plan.review);
     planEl.replaceChildren();
     for (const item of plan.items) {
       const key = item.need + ":" + item.route + ":" + item.name;
@@ -399,12 +577,34 @@
       li.dataset.need = item.need; li.dataset.sit = SITUATION[item.need] || "other";
       const mag = el("span", "magnet"); mag.appendChild(icon(NEED_ICON[item.need] || "check"));
       li.appendChild(mag);
-      li.appendChild(el("p", "tag-need", item.need_label));
-      li.appendChild(el("p", "tag-name", item.route === "blank" ? "Not covered yet" : item.name));
+
+      // Short list: one line per situation with a status icon and label. Tap to open the details.
+      const [sIcon, sText, sKind] = item.user_ok ? ["check", "Added to your plan", "ok"]
+        : item.route === "blank" ? ["dash", "Not covered yet", "blank"] : ["wait", "Waiting for your OK", "wait"];
+      const pop = item.user_ok && justAdded.has(item.need); justAdded.delete(item.need);
+      const panelId = "tag-details-" + item.need;
+      const open = openItems.has(item.need);
+      const head = el("button", "tag-head"); head.type = "button";
+      head.setAttribute("aria-expanded", String(open)); head.setAttribute("aria-controls", panelId);
+      const status = el("span", "tag-status status-" + sKind + (pop ? " pop" : "")); status.append(icon(sIcon), document.createTextNode(sText));
+      const chev = el("span", "tag-chevron"); chev.setAttribute("aria-hidden", "true");
+      head.append(el("span", "tag-title", item.need_label), status, chev);
+      li.appendChild(head);
+
+      const panel = el("div", "tag-details"); panel.id = panelId; panel.hidden = !open;
+      head.onclick = () => {
+        const now = panel.hidden;  // hidden now means it is about to open
+        panel.hidden = !now; head.setAttribute("aria-expanded", String(now));
+        if (now) openItems.add(item.need); else openItems.delete(item.need);
+      };
+      li.appendChild(panel);
+
+      const art = illustration(item.need, "tag-ill"); if (art) panel.appendChild(art);
+      panel.appendChild(el("p", "tag-name", item.route === "blank" ? "Not covered yet" : item.name));
       const [rWord, rIcon] = ROUTE[item.route] || ["", "check"];
       const r = el("span", "tag-route route-" + item.route); r.append(icon(rIcon), document.createTextNode(rWord));
-      li.appendChild(r);
-      if (item.route !== "blank") li.appendChild(itemAnswer(item));
+      panel.appendChild(r);
+      if (item.route !== "blank" && !item.user_ok) panel.appendChild(itemAnswer(item));
 
       const links = el("p", "tag-links");
       if (item.phone && item.phone !== "see website") {
@@ -414,13 +614,13 @@
         const a = el("a"); a.href = item.url; a.target = "_blank"; a.rel = "noopener";
         a.append(icon("info"), document.createTextNode("Website")); links.appendChild(a);
       }
-      if (links.childNodes.length) li.appendChild(links);
+      if (links.childNodes.length) panel.appendChild(links);
       const checked = checkedLabel(item.checked);
-      if (checked) { const c = el("p", "tag-checked"); c.append(icon("check"), document.createTextNode(checked)); li.appendChild(c); }
+      if (checked) { const c = el("p", "tag-checked"); c.append(icon("check"), document.createTextNode(checked)); panel.appendChild(c); }
       if (item.need === "mail_while_away") {
         const a = el("a", "btn btn-primary tag-action"); a.href = USPS_HOLD; a.target = "_blank"; a.rel = "noopener";
         a.append(icon("mail"), document.createTextNode("Hold my mail on USPS.com"));
-        li.appendChild(a);
+        panel.appendChild(a);
       }
 
       if (item.flags && item.flags.length) {
@@ -429,15 +629,9 @@
           const fi = el("li"); fi.append(icon(/WAITLIST/.test(f) ? "wait" : "info"), document.createTextNode(plainFlag(f)));
           ul.appendChild(fi);
         }
-        li.appendChild(ul);
+        li.insertBefore(ul, panel);   // warnings (waitlist, escort rule, no phone) stay visible, never behind a tap
       }
-      if (item.why) {
-        const tip = el("details", "tag-why"); tip.open = openWhy.has(item.need);
-        tip.ontoggle = () => (tip.open ? openWhy.add(item.need) : openWhy.delete(item.need));
-        const sum = el("summary"); sum.append(icon("info"), document.createTextNode("Why this matters"));
-        tip.append(sum, el("p", null, item.why));
-        li.appendChild(tip);
-      }
+      if (item.why) { const w = el("p", "tag-why"); w.append(icon("info"), document.createTextNode(item.why)); panel.appendChild(w); }
       planEl.appendChild(li);
     }
 
@@ -457,6 +651,9 @@
     card.hidden = !plan.card;
     planPrintUrl = plan.plan_print;
     $("plan-print").hidden = !plan.plan_print;
+    summaryUrl = plan.summary_print;
+    $("summary-print").hidden = !plan.summary_available;   // only after something is in the plan, and only if you ask
+    if (openSummaryWhenReady && summaryUrl) { openSummaryWhenReady = false; openSummary(); }
   }
   // No one to ask: a calm services-only box instead of an empty helper table.
   // The table stays one tap away, and any rows the user added keep it showing.
@@ -628,6 +825,7 @@
   // ---- connection --------------------------------------------------------
   function setBusy(on) {
     busy = on; typing.hidden = !on; sendBtn.disabled = on;
+    renderView();
     if (on) scrollChat();
   }
 
@@ -643,7 +841,7 @@
           $("table-download").href = `/table/${sessionId}.csv`;
           setBusy(false);
           if (!messages.children.length) addMessage("agent", m.greeting);
-          if (!feed.children.length) feed.appendChild(el("li", "feed-empty", "Each step shows up here while Just in Case works."));
+          if (!feed.children.length) feed.appendChild(el("li", "feed-empty", `Each step shows up here while ${AGENT} works.`));
           $("save-zone").hidden = EXAMPLE;
           offerSavedPlan();
           exampleNext();
@@ -895,9 +1093,23 @@
     dialog.showModal();
   });
   let planPrintUrl = null;
+  // Opt in only: the button asks first. Nothing is made until the person says yes.
+  let summaryUrl = null, openSummaryWhenReady = false;
+  function openSummary() {
+    $("card-dialog-title").textContent = "My readiness summary"; frame.title = "My readiness summary";
+    frame.src = summaryUrl + "?t=" + Date.now();
+    dialog.showModal();
+  }
+  $("summary-print").addEventListener("click", () => $("summary-dialog").showModal());
+  $("summary-yes").addEventListener("click", () => {
+    if (!ws || ws.readyState !== 1) return;
+    openSummaryWhenReady = true;
+    ws.send(JSON.stringify({ type: "summary_consent", agree: true }));
+    $("summary-dialog").close();
+  });
   $("plan-print").addEventListener("click", () => {
     if (!planPrintUrl) return;
-    $("card-dialog-title").textContent = "Your plan";
+    $("card-dialog-title").textContent = "Your plan"; frame.title = "Your plan";
     frame.src = planPrintUrl + "?t=" + Date.now();
     dialog.showModal();
   });
@@ -942,20 +1154,74 @@
     .then((c) => { $("restart-banner").hidden = c.needs_restart === false; })  // missing = older server.catch(() => {});
   checkRestart(); setInterval(checkRestart, 60000);
 
-  // ---- tabs: About / Features / Make my plan ------------------------------
-  // The 911 and 988 strip sits above the tabs, so it shows on every tab.
+  // ---- simple view controls: Back, Next, progress dots, Show details ---------
+  const chat = document.querySelector(".chat");
+  function renderView() {
+    const last = pages.length - 1;
+    view = Math.max(0, Math.min(view, last));
+    const reviewing = view < last;
+    const pending = !!messages.querySelector(".slip-actions");
+    for (const li of messages.children) li.toggleAttribute("data-active", +li.dataset.page === view);
+    chat.classList.toggle("reviewing", reviewing);
+    chat.classList.toggle("has-slip", pending && !reviewing);
+    const dots = $("step-dots");
+    dots.replaceChildren();
+    const shown = Math.min(pages.length, 10);  // the last ten, so a long visit never overflows
+    for (let i = pages.length - shown; i < pages.length; i++) dots.appendChild(el("span", "step-dot" + (i === view ? " on" : "")));
+    $("step-count").textContent = pages.length ? "Step " + (view + 1) : "";
+    $("step-back").disabled = view <= 0;
+    $("step-next").disabled = !reviewing && (pending || busy || !pages.length);
+    $("step-hint").textContent = "";
+  }
+  new MutationObserver(renderView).observe(messages, { childList: true, subtree: true });
+  // When Back or Next changes the screen, say what is on it (screen readers do not hear a hidden list swap).
+  function announceStep() {
+    const words = [...messages.querySelectorAll("[data-active]")].map((li) => li.innerText.trim()).join(" ");
+    $("step-announce").textContent = `Step ${view + 1}. ${words}`.slice(0, 400);
+  }
+  $("step-back").onclick = () => { view -= 1; renderView(); announceStep(); };
+  $("step-next").onclick = () => {
+    if (view < pages.length - 1) { view += 1; renderView(); announceStep(); return; }
+    if (!input.value.trim()) { $("step-hint").textContent = "Type your answer above, then tap Next."; input.focus(); return; }
+    send(input.value);
+  };
+  // Simple view or Full view. The choice is remembered on this device only,
+  // like the color theme. It is a display setting, not part of anyone's plan.
+  function setView(mode, save = true) {
+    const simple = mode !== "full";
+    chat.classList.toggle("simple", simple);
+    $("view-simple").setAttribute("aria-pressed", String(simple));
+    $("view-full").setAttribute("aria-pressed", String(!simple));
+    if (save) { try { localStorage.setItem("jic-view", simple ? "simple" : "full"); } catch (_) {} }
+    if (!simple) scrollChat();
+  }
+  $("view-simple").onclick = () => setView("simple");
+  $("view-full").onclick = () => setView("full");
+  let savedView = null; try { savedView = localStorage.getItem("jic-view"); } catch (_) {}
+  setView(savedView === "full" ? "full" : "simple", false);  // Simple is the default
+
+
+  // ---- screens: Home (the default), Make my plan, Get help, and the Menu ----
+  // Home shows three big buttons. About and Features live in the small Menu.
+  // The 911 and 988 strip sits above everything, so it shows on every screen.
   // The chat connects the first time "Make my plan" opens, not before.
-  const TABS = ["about", "features", "plan"];
+  const TABS = ["home", "about", "features", "privacy", "plan", "help"];
   let connected = false;
-  function showTab(name, focus) {
-    if (!TABS.includes(name)) name = EXAMPLE ? "plan" : "about";
+  function showTab(raw, focus) {
+    const seePlan = raw === "my-plan";           // "See my plan": the plan screen, scrolled to your plan
+    let name = seePlan ? "plan" : raw;
+    if (!TABS.includes(name)) name = EXAMPLE ? "plan" : "home";
     for (const t of TABS) $("panel-" + t).hidden = t !== name;
-    for (const a of document.querySelectorAll(".tabs a")) {
+    for (const a of document.querySelectorAll(".more-menu a")) {
       if (a.dataset.tab === name) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     }
+    $("menu-home").hidden = name === "home";
+    $("more-menu").open = false;
     if (name === "plan" && !connected) { connected = true; connect(); }
-    if (focus) { window.scrollTo(0, 0); $("panel-" + name).focus({ preventScroll: true }); }
+    if (seePlan) { $("plan-section").scrollIntoView(); $("plan-section").focus({ preventScroll: true }); }
+    else if (focus) { window.scrollTo(0, 0); $("panel-" + name).focus({ preventScroll: true }); }
   }
+  $("more-menu").addEventListener("click", (e) => { if (e.target.closest("a")) $("more-menu").open = false; });
   window.addEventListener("hashchange", () => showTab(location.hash.slice(1), true));
   showTab(location.hash.slice(1), false);
 })();

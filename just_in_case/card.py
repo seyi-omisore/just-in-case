@@ -10,7 +10,8 @@ import re
 from datetime import date, timedelta
 from pathlib import Path
 
-from .config import OUTPUT_DIR, REVIEW_AFTER_MONTHS
+from . import reviews
+from .config import OUTPUT_DIR
 from .directory import Directory
 from .safeguards import CRISIS_LINE, EMERGENCY_LINE
 from .state import NEEDS, PlanState
@@ -21,7 +22,7 @@ def _slug(name: str) -> str:
 
 
 def build_card_lines(card: dict, state: PlanState, directory: Directory, today: date) -> list[str]:
-    review_by = today + timedelta(days=30 * REVIEW_AFTER_MONTHS)
+    review_by = reviews.review_by(state.reviews, today)
     lines = [
         f"IF SOMETHING HAPPENS: {card['name']}" if card.get("name") else "IF SOMETHING HAPPENS",
         EMERGENCY_LINE.upper(),
@@ -82,7 +83,9 @@ def build_card_lines(card: dict, state: PlanState, directory: Directory, today: 
                 name += f", {phone}" if phone else ", see website and call to confirm"
             lines.append(f"  {need}: {name}")
 
-    lines += ["", f"Review this plan by: {review_by:%B %Y}", EMERGENCY_LINE]
+    last = reviews.parse(state.reviews[-1]) if state.reviews else None
+    lines += [""] + ([f"Plan last reviewed: {reviews.words(last)}"] if last else [])
+    lines += [f"Review this plan by: {review_by:%B %Y}", EMERGENCY_LINE]
     return lines
 
 
@@ -140,7 +143,8 @@ def render_plan_html(state: PlanState, directory: Directory, today: date | None 
     passed the tool checks. Card-only details (medications, allergies) are left off."""
     e = html.escape
     today = today or date.today()
-    review_by = today + timedelta(days=30 * REVIEW_AFTER_MONTHS)
+    review_by = reviews.review_by(state.reviews, today)
+    last = reviews.parse(state.reviews[-1]) if state.reviews else None
     helpers = [h for n in state.helper_notes for h in n["helpers"]]
     rows = []
     for item in state.items:
@@ -207,6 +211,7 @@ def render_plan_html(state: PlanState, directory: Directory, today: date | None 
  {section("Still to plan", "".join(f"<li>{e(x)}</li>" for x in left))}
  {section("Who is helping", tasks)}
  {section("Places that can help", places)}
+ {f'<p class="foot">Plan last reviewed: {reviews.words(last)}</p>' if last else ""}
  <p class="foot">Review this plan by: {review_by:%B %Y}</p>
  <p class="foot">{e(EMERGENCY_LINE)}</p>
  <button class="print" onclick="window.print()">Print my plan</button>

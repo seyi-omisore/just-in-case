@@ -20,6 +20,10 @@ OUTPUT_DIR = ROOT / "output"
 
 load_dotenv(ROOT / ".env")
 
+# The agent's name. Change it here and it changes everywhere: the greeting, the agent's
+# instructions, the chat, and the pages. The app itself stays "Just in Case".
+AGENT_NAME = "Haven"
+
 MODEL = os.getenv("JIC_MODEL", "anthropic/claude-haiku-5.5")
 MAX_BUDGET_USD = float(os.getenv("JIC_MAX_BUDGET_USD", "0.50"))
 

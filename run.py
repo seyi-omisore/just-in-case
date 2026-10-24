@@ -10,6 +10,7 @@ import asyncio
 
 from just_in_case.config import MODEL, MAX_BUDGET_USD, runtime_env
 from just_in_case.directory import Directory
+from just_in_case.config import AGENT_NAME
 from just_in_case.prompts import GREETING
 from just_in_case.state import PlanState
 from just_in_case.tools import Toolbox, build_server
@@ -32,7 +33,7 @@ async def chat(quiet: bool) -> None:
 
     trace = (lambda *_: None) if quiet else (lambda s: print(f"\033[2m{s}\033[0m") if s else None)
     async with JustInCaseAgent(trace=trace) as agent:
-        print(f"\nJust in Case: {GREETING}")
+        print(f"\n{AGENT_NAME}: {GREETING}")
         while True:
             try:
                 text = await asyncio.to_thread(input, "\nYou: ")

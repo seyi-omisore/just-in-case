@@ -21,5 +21,10 @@ helps older adults who live alone make a small backup plan and a fridge card.
 - Never give the agent a tool that sends messages, browses, or touches files
   other than writing the card into output/.
 - Never add real-looking phone numbers or services. Only Leya adds verified data.
-- Keep the user-facing language plain (grade 8 or lower), warm, and pressure-free.
+- Keep the user-facing language plain (about grade 6), warm, and pressure-free.
+- Each card shows at most two short sentences. Longer text goes behind a
+  `<details class="more">` "Show details" link. `tests/test_web.py` checks this.
+- The agent's name is `AGENT_NAME` in `just_in_case/config.py`. Never type it anywhere else. Pages use `{{AGENT_NAME}}`.
+- Keep the agent's private log folder (`CLAUDE_CONFIG_DIR` in agent.py). Without it the AI toolkit
+  saves a copy of every chat in `~/.claude`. If a privacy claim changes, update the Your privacy page too.
 - Run `pytest -q` before every commit. Commit small, with clear messages.

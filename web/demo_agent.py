@@ -31,7 +31,8 @@ NO = re.compile(r"^\s*(no|nope|none|not really|nothing)\b", re.I)
 NEED_WORDS = [
     ("ride_home_after_procedure", r"procedure|surgery|sedation|operation|take me home|ride home"),
     ("pet_care_during_stay", r"\bpets?\b|\bcats?\b|\bdogs?\b|\bbird\b|kitten|puppy"),
-    ("mail_while_away", r"hospital|away|stay|nights?\b|trip|travel"),
+    ("mail_while_away", r"hospital|away|stay|nights?\b|trip|travel|leav(e|ing)\b|vacation|holiday|out of town|"
+                        r"\bgone\b|weeks?\b|flight|cruise|visit(ing)?\b"),
     ("power_outage", r"power|outage|storm|electric"),
 ]
 NOT_NAMES = {"I", "I'm", "Im", "Yes", "No", "Okay", "Ok", "Sure", "Hi", "Hello", "Thanks", "Thank",
@@ -171,8 +172,14 @@ class DemoAgent:
         if self.turn == 0:
             needs = [n for n, pat in NEED_WORDS if re.search(pat, text, re.I)]
             if not needs:
-                return ("Thanks for telling me. What's coming up? For example, a procedure, a "
-                        "hospital stay, or getting ready for winter.")
+                # Never ask the exact same thing twice: the second time, say what this demo understands.
+                self.misses = getattr(self, "misses", 0) + 1
+                if self.misses == 1:
+                    return ("Thanks for telling me. What's coming up? For example, a procedure, a "
+                            "hospital stay, or getting ready for winter.")
+                return ("This demo only knows a few topics. Try something like \"I have a procedure next "
+                        "month\", \"I'm going away for two weeks\", or \"a winter power outage\". "
+                        "The full version understands any wording.")
             if "ride_home_after_procedure" in needs:
                 needs.insert(1, "spare_key_access")
             self.turn = 1
