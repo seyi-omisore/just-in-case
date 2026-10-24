@@ -8,7 +8,7 @@ a hospital stay with a pet at home) *before* they happen. It leans on services a
 simple preparation first, and on people only when the user chooses. It ends with a
 printed one-page "If something happens" card for the refrigerator.
 
-> Team: Seyi (technical), Leya (services and safeguards), Joan (evaluation and documentation), Satoshi (story and presentation)
+> Team: Leya Jacob Kurzhiparambil (services and safeguards), Oluwaseyi Omisore (technical), Joan Arches (evaluation and documentation), Satoshi Nagae (story, design, and presentation)
 
 ## How it works
 

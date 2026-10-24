@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- "only light": browsers may not darken Light by themselves. The Dark and High contrast themes set their own colors. -->
+  <meta name="color-scheme" content="only light">
   <title>Just in Case</title>
   <meta name="description" content="A friendly helper that makes a small backup plan for people who live alone.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,8 +16,10 @@
     // Pick the theme before the page draws: the saved choice, or Light.
     (function () {
       var t = null;
-      try { t = localStorage.getItem("jic-theme"); } catch (e) {}
-      if (t !== "light" && t !== "dark" && t !== "contrast") t = "light";  // Light is the default
+      try { t = localStorage.getItem("jic-theme-v2"); } catch (e) {}
+      // Light is the default. "-v2": choices saved by older versions (which could follow the
+      // computer's dark setting) are ignored, so everyone starts in Light once.
+      if (t !== "light" && t !== "dark" && t !== "contrast") t = "light";
       document.documentElement.dataset.theme = t;
     })();
   </script>
@@ -35,24 +39,48 @@
   <header class="site-header">
     <a class="brand" href="#home" aria-label="Just in Case, home">
       <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M6 22 24 6l18 16v20H6z" fill="#1F6F78"/>
-        <path d="M24 37s-9-5.4-9-11.4a5 5 0 0 1 9-2.9 5 5 0 0 1 9 2.9c0 6-9 11.4-9 11.4z" fill="#E07A5F"/>
+        <path d="M6 22 24 6l18 16v20H6z" style="fill:var(--primary)"/>
+        <path d="M24 37s-9-5.4-9-11.4a5 5 0 0 1 9-2.9 5 5 0 0 1 9 2.9c0 6-9 11.4-9 11.4z" style="fill:var(--brand-heart)"/>
       </svg>
       <span class="brand-name">Just in Case</span>
     </a>
-    <p class="tagline">A little planning now means less worry later.</p>
-    <div class="theme-switch" role="group" aria-label="Color theme">
-      <button type="button" id="theme-light" aria-label="Light mode">
-        <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg> <span aria-hidden="true">Light</span>
+    <div class="header-actions">
+      <details id="display-menu" class="display-menu">
+        <summary><span class="aa" aria-hidden="true">Aa</span> Display</summary>
+        <div class="display-panel">
+          <div class="settings-group" role="group" aria-labelledby="display-size-label">
+            <p id="display-size-label" class="settings-label">Text size</p>
+            <div class="text-size">
+              <button type="button" data-size="smaller" aria-label="Make text smaller">A<span aria-hidden="true">−</span></button>
+              <button type="button" data-size="bigger" aria-label="Make text bigger">A<span aria-hidden="true">+</span></button>
+            </div>
+          </div>
+          <div class="settings-group" role="group" aria-labelledby="display-theme-label">
+            <p id="display-theme-label" class="settings-label">Colors</p>
+            <div class="theme-switch">
+              <button type="button" data-theme-pick="light" aria-label="Light mode"><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg> <span aria-hidden="true">Light</span></button>
+              <button type="button" data-theme-pick="dark" aria-label="Dark mode"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> <span aria-hidden="true">Dark</span></button>
+              <button type="button" data-theme-pick="contrast" aria-label="High contrast"><svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg> <span aria-hidden="true">High contrast</span></button>
+            </div>
+          </div>
+        </div>
+      </details>
+      <button type="button" id="settings-open" class="settings-btn" aria-haspopup="dialog">
+        <svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg> <span>Settings</span>
       </button>
-      <button type="button" id="theme-dark" aria-label="Dark mode">
-        <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> <span aria-hidden="true">Dark</span>
-      </button>
-      <button type="button" id="theme-contrast" aria-label="High contrast"><svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg> <span aria-hidden="true">High contrast</span></button>
-    </div>
-    <div class="text-size" role="group" aria-label="Text size">
-      <button type="button" id="smaller" aria-label="Make text smaller">A<span aria-hidden="true">−</span></button>
-      <button type="button" id="bigger" aria-label="Make text bigger">A<span aria-hidden="true">+</span></button>
+      <nav aria-label="Menu">
+        <details id="more-menu" class="more-menu">
+          <summary>Menu <span id="tab-updates" class="tab-updates" hidden></span></summary>
+          <ul>
+            <li><a href="#home" data-tab="home">Home</a></li>
+            <li><a href="#about" data-tab="about">About</a></li>
+            <li><a href="#features" data-tab="features">Features</a></li>
+            <li><a href="#privacy" data-tab="privacy">Your privacy</a></li>
+            <li><a href="#who" data-tab="who">Who we are</a></li>
+            <li><a href="#tour">Show me how</a></li>
+          </ul>
+        </details>
+      </nav>
     </div>
   </header>
 
@@ -72,25 +100,26 @@
     </a>
   </div>
 
-  <nav class="menu-bar" aria-label="Menu">
+  <nav class="menu-bar" aria-label="Back to home">
     <a id="menu-home" class="menu-home" href="#home" hidden>
       <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Home
     </a>
-    <details id="more-menu" class="more-menu">
-      <summary>Menu <span id="tab-updates" class="tab-updates" hidden></span></summary>
-      <ul>
-        <li><a href="#home" data-tab="home">Home</a></li>
-        <li><a href="#about" data-tab="about">About</a></li>
-        <li><a href="#features" data-tab="features">Features</a></li>
-        <li><a href="#privacy" data-tab="privacy">Your privacy</a></li>
-      </ul>
-    </details>
+  </nav>
+
+  <nav id="tabs" class="tabs" aria-label="Pages" hidden>
+    <a href="#about" data-tab="about">About</a>
+    <a href="#features" data-tab="features">Features</a>
+    <a href="#who" data-tab="who">Who we are</a>
+    <a href="#plan" data-tab="plan">Make my plan</a>
   </nav>
 
   <main id="main">
   <section id="panel-home" class="panel home" data-panel="home" tabindex="-1" aria-labelledby="home-title">
-    <svg class="ill ill-hero" viewBox="0 0 120 96" role="img" aria-label="Line drawing of a small house with a heart on its front, a chimney, a door, and a tree beside it."><use href="#ill-home"/></svg>
-    <h1 id="home-title" class="home-title">What would you like to do?</h1>
+    <svg class="ill ill-hero scene" viewBox="0 0 320 130" role="img" aria-label="Illustration: an older woman with gray hair and a cane waves outside her teal house on a sunny day. A cat sits by the door, and a heart is on the roof."><use href="#ill-home"/></svg>
+    <div class="home-greeting">
+      <h1 id="home-title" class="home-title">Hi, I'm {{AGENT_NAME}}.</h1>
+      <p class="tagline">A little planning now means less worry later.</p>
+    </div>
     <div class="home-buttons">
       <a class="btn btn-primary home-btn" href="#plan">
         <svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg> <span>Make my plan</span>
@@ -99,9 +128,15 @@
         <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> <span>See my plan</span>
       </a>
       <a class="btn home-btn home-help" href="#help">
-        <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg> <span>Get help now</span>
+        <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg> <span>Get help now<small>911, 988, and Mass 211</small></span>
       </a>
     </div>
+    <p id="season-tip" class="season-tip">
+      <svg class="icon" aria-hidden="true"><use href="#i-snow"/></svg>
+      <span><strong id="season-lead">Winter is coming.</strong> <span id="season-ask">Is your power outage plan ready?</span>
+        <a id="season-link" href="#plan-power_outage">Check it</a></span>
+    </p>
+    <p class="home-links"><a href="#tour" class="tour-link">Show me how</a></p>
   </section>
 
   <section id="panel-help" class="panel help" data-panel="help" tabindex="-1" aria-labelledby="help-title" hidden>
@@ -230,7 +265,7 @@
       <p>Many people who live alone worry about needing a hand. Small things, like a ride home, are hard to plan alone.</p>
       <p>We make that planning calm and simple. You stay in charge of your plan.</p>
       <details class="more"><summary>Show details</summary><p>Many people who live alone have a quiet worry: what happens if I need a hand? A ride home after a procedure, someone to feed the cat, a way for help to get in. These are small things, but they are hard to plan for alone.</p><p>We built Just in Case to make that planning calm and simple. It leans on free local services first, asks before every step, and never pressures anyone. You stay in charge of your own plan.</p></details>
-      <p class="why-sign">Leya Jacob, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae</p>
+      <p class="why-sign">Leya Jacob Kurzhiparambil, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae</p>
     </section>
 
     <section class="faq" aria-labelledby="faq-title">
@@ -360,6 +395,54 @@
     </div>
   </section>
 
+  <section id="panel-who" class="panel intro who" data-panel="who" tabindex="-1" aria-labelledby="who-title" hidden>
+    <h1 id="who-title" class="page-title">Who we are</h1>
+    <p class="hero-lead">Just in Case was built by a team at the University of Massachusetts Boston for the Applied AI Microcredential, hosted by the Paul English Applied Artificial Intelligence Institute.</p>
+    <ul class="team-list" aria-label="Our team">
+      <li class="team-teal">
+        <span class="team-initials" aria-hidden="true">LK</span>
+        <div class="team-text">
+          <h2 class="team-name">Leya Jacob Kurzhiparambil</h2>
+          <p class="team-program">PhD Student in Gerontology</p>
+          <ul class="team-roles" aria-label="Roles">
+          <li class="team-role">Services and safeguards lead</li>
+          <li class="team-role">Technical lead</li>
+          </ul>
+        </div>
+      </li>
+      <li class="team-coral">
+        <span class="team-initials" aria-hidden="true">OO</span>
+        <div class="team-text">
+          <h2 class="team-name">Oluwaseyi Omisore</h2>
+          <p class="team-program">Undergraduate in Computer Science</p>
+          <ul class="team-roles" aria-label="Roles">
+          <li class="team-role">Technical lead</li>
+          </ul>
+        </div>
+      </li>
+      <li class="team-green">
+        <span class="team-initials" aria-hidden="true">JA</span>
+        <div class="team-text">
+          <h2 class="team-name">Joan Arches</h2>
+          <p class="team-program">Professor Emerita, College of Education and Human Development</p>
+          <ul class="team-roles" aria-label="Roles">
+          <li class="team-role">Evaluation and documentation lead</li>
+          </ul>
+        </div>
+      </li>
+      <li class="team-yellow">
+        <span class="team-initials" aria-hidden="true">SN</span>
+        <div class="team-text">
+          <h2 class="team-name">Satoshi Nagae</h2>
+          <p class="team-program">PhD Student in Exercise and Health Sciences</p>
+          <ul class="team-roles" aria-label="Roles">
+          <li class="team-role">Story, design, and presentation lead</li>
+          </ul>
+        </div>
+      </li>
+    </ul>
+  </section>
+
   <div id="panel-plan" class="panel layout" data-panel="plan" tabindex="-1" hidden>
     <p class="promise" role="note">
       <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
@@ -369,7 +452,11 @@
       <ol id="messages" class="messages" aria-live="polite"></ol>
 
       <div id="typing" class="typing" hidden>
-        <span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span>
+        <svg class="thinking-mark" viewBox="0 0 48 48" aria-hidden="true">
+          <circle cx="24" cy="24" r="24" style="fill:var(--primary-tint)"/>
+          <path d="M11 24 24 12l13 12v14H11z" style="fill:var(--primary)"/>
+          <path class="thinking-heart" d="M24 34s-6-3.6-6-7.6a3.3 3.3 0 0 1 6-1.9 3.3 3.3 0 0 1 6 1.9c0 4-6 7.6-6 7.6z" style="fill:var(--accent)"/>
+        </svg>
         <span class="typing-text">{{AGENT_NAME}} is thinking…</span>
       </div>
 
@@ -396,22 +483,6 @@
       </form>
       <p id="mic-status" class="mic-status" role="status"></p>
       <p id="mic-note" class="helper-small mic-note" hidden>In some browsers, your voice may be sent to the browser's maker to turn it into text.</p>
-      <fieldset id="voice-row" class="voice-row" hidden>
-        <legend><svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg> Reading voice</legend>
-        <label class="voice-field">Accent <select id="voice-accent"></select></label>
-        <div id="voice-kind" class="voice-kind view-switch" role="group" aria-label="Female or male voice"></div>
-        <label class="voice-field voice-full-only">All voices <select id="voice"></select></label>
-        <div class="voice-actions">
-          <button type="button" id="voice-sample" class="btn btn-quiet">
-            <svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg> Play sample
-          </button>
-          <span class="voice-speed" role="group" aria-label="Reading speed">
-            <button type="button" id="voice-slower" class="btn btn-quiet">Slower</button>
-            <span id="voice-speed" class="voice-speed-text" role="status"></span>
-            <button type="button" id="voice-faster" class="btn btn-quiet">Faster</button>
-          </span>
-        </div>
-      </fieldset>
       <div class="step-nav" role="group" aria-label="Steps">
         <button type="button" id="step-back" class="btn btn-quiet" disabled><span aria-hidden="true">&larr;</span> Back</button>
         <div class="step-progress">
@@ -433,7 +504,7 @@
       </div>
     </section>
 
-    <aside class="side" aria-label="Your plan">
+    <aside id="side" class="side plan-empty" aria-label="Your plan">
       <section id="plan-section" class="fridge" aria-labelledby="fridge-title" tabindex="-1">
         <div class="fridge-handle" aria-hidden="true"></div>
         <div class="fridge-head">
@@ -445,7 +516,7 @@
         </div>
         <section id="next-step" class="next-step" aria-labelledby="next-step-title" hidden>
           <h3 id="next-step-title" class="next-step-title"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg> Your next step</h3>
-          <svg id="next-ill" class="ill next-ill" viewBox="0 0 120 96" role="img" aria-label="" hidden><use href="#ill-clinic"/></svg>
+          <svg id="next-ill" class="ill scene next-ill" viewBox="0 0 240 120" role="img" aria-label="" hidden><use href="#ill-clinic"/></svg>
           <p id="next-step-text" class="next-step-text"></p>
           <div class="next-step-actions">
             <a id="next-call" class="btn btn-primary next-btn" href="#" hidden>
@@ -463,6 +534,7 @@
             <p>"Remind me later" moves this step to the end of your list. Just in Case never sends alerts, so open this page to see it again.</p>
           </details>
         </section>
+        <svg id="ready-ill" class="ill scene ready-ill" viewBox="0 0 240 120" role="img" aria-label="Illustration: an older woman rests on a bench outside her teal house with a cup of tea, beside a green check mark, because her plan is ready." hidden><use href="#ill-ready"/></svg>
         <p id="plan-ready" class="plan-ready" hidden>
           <svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> <span id="plan-ready-text"></span>
         </p>
@@ -540,38 +612,42 @@
         </div>
         <div id="helper-body">
         <p class="helper-intro">Things you'd like help with. Leave the name blank and family can sign up.</p>
-        <p id="table-empty" class="table-empty"><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> <span>Your helper list shows up here. It's okay to leave it empty.</span></p>
-        <table id="helper-table" class="helper-table" hidden>
-          <thead><tr><th scope="col">Task</th><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Who</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Change</span></th></tr></thead>
-          <tbody id="helper-rows"></tbody>
-        </table>
+        <details id="helper-more" class="more-options">
+          <summary>More options <span id="helper-count" class="helper-count"></span></summary>
+          <p class="helper-small">Your helper table, a spreadsheet to download, and a page to print.</p>
+          <p id="table-empty" class="table-empty"><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> <span>Your helper list shows up here. It's okay to leave it empty.</span></p>
+          <table id="helper-table" class="helper-table" hidden>
+            <thead><tr><th scope="col">Task</th><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Who</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Change</span></th></tr></thead>
+            <tbody id="helper-rows"></tbody>
+          </table>
 
-        <form id="task-form" class="task-form">
-          <p class="task-form-title" id="task-form-title">Add a row</p>
-          <label>What do you need help with? <input name="task" required maxlength="120" placeholder="For example: pick up groceries"></label>
-          <label>Who is helping <span class="optional">(optional)</span> <input name="person" maxlength="120" placeholder="Leave blank so family can sign up"></label>
-          <div class="task-form-pair">
-            <label>Date <input name="date" maxlength="120" placeholder="Like Nov 14"></label>
-            <label>Time <input name="time" maxlength="120" placeholder="Like morning"></label>
-          </div>
-          <p class="task-error-row"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span id="task-error" class="task-error" role="alert"></span></p>
-          <div class="task-form-actions">
-            <button type="submit" id="task-save" class="btn btn-primary">
-              <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> <span>Add row</span>
+          <form id="task-form" class="task-form">
+            <p class="task-form-title" id="task-form-title">Add a row</p>
+            <label>What do you need help with? <input name="task" required maxlength="120" placeholder="For example: pick up groceries"></label>
+            <label>Who is helping <span class="optional">(optional)</span> <input name="person" maxlength="120" placeholder="Leave blank so family can sign up"></label>
+            <div class="task-form-pair">
+              <label>Date <input name="date" maxlength="120" placeholder="Like Nov 14"></label>
+              <label>Time <input name="time" maxlength="120" placeholder="Like morning"></label>
+            </div>
+            <p class="task-error-row"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span id="task-error" class="task-error" role="alert"></span></p>
+            <div class="task-form-actions">
+              <button type="submit" id="task-save" class="btn btn-primary">
+                <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> <span>Add row</span>
+              </button>
+              <button type="button" id="task-cancel" class="btn btn-quiet" hidden>Cancel</button>
+            </div>
+          </form>
+
+          <div class="table-actions">
+            <a id="table-download" class="btn btn-quiet" href="#" download="who-is-helping.csv">
+              <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> Download spreadsheet
+            </a>
+            <button type="button" id="table-print" class="btn btn-quiet">
+              <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg> Print table
             </button>
-            <button type="button" id="task-cancel" class="btn btn-quiet" hidden>Cancel</button>
           </div>
-        </form>
-
-        <div class="table-actions">
-          <a id="table-download" class="btn btn-quiet" href="#" download="who-is-helping.csv">
-            <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> Download spreadsheet
-          </a>
-          <button type="button" id="table-print" class="btn btn-quiet">
-            <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg> Print table
-          </button>
-        </div>
-        <p class="helper-small">The spreadsheet opens in Excel, Numbers, or Google Sheets. You choose who gets it.</p>
+          <p class="helper-small">The spreadsheet opens in Excel, Numbers, or Google Sheets. You choose who gets it.</p>
+        </details>
 
         <div class="share-zone">
           <button type="button" id="share-open" class="btn btn-primary btn-block">
@@ -642,8 +718,63 @@
         <ol id="feed" class="feed" aria-live="polite"></ol>
       </section>
     </aside>
+    <section id="story-guide" class="story-guide" aria-labelledby="story-count" aria-live="polite" hidden>
+      <p id="story-count" class="story-count"></p>
+      <p id="story-text" class="story-text"></p>
+      <div class="story-actions">
+        <button type="button" id="story-next" class="btn tour-next" hidden>Next</button>
+        <a id="story-own" class="btn tour-next" href="/#plan" hidden>Start my own plan</a>
+      </div>
+    </section>
   </div>
   </main>
+
+  <dialog id="settings-dialog" class="consent-dialog settings-dialog" aria-labelledby="settings-title">
+    <div class="consent-form">
+      <div class="settings-head">
+        <h2 id="settings-title"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg> Settings</h2>
+        <button type="button" id="settings-close" class="btn btn-quiet">Close</button>
+      </div>
+      <p class="notice-911"><svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg><span><strong>In an emergency, call 911.</strong> Feeling alone or unsafe? Call or text <strong>988</strong>.</span></p>
+      <fieldset id="voice-row" class="voice-row" hidden>
+        <legend><svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg> Reading voice</legend>
+        <label class="voice-field">Accent <select id="voice-accent"></select></label>
+        <div id="voice-kind" class="voice-kind view-switch" role="group" aria-label="Female or male voice"></div>
+        <label class="voice-field voice-full-only">All voices <select id="voice"></select></label>
+        <div class="voice-actions">
+          <button type="button" id="voice-sample" class="btn btn-quiet">
+            <svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg> Play sample
+          </button>
+          <span class="voice-speed" role="group" aria-label="Reading speed">
+            <button type="button" id="voice-slower" class="btn btn-quiet">Slower</button>
+            <span id="voice-speed" class="voice-speed-text" role="status"></span>
+            <button type="button" id="voice-faster" class="btn btn-quiet">Faster</button>
+          </span>
+        </div>
+      </fieldset>
+      <p id="voice-none" class="helper-small">Read aloud is not available in this browser.</p>
+      <div class="settings-group" role="group" aria-labelledby="size-label">
+        <p id="size-label" class="settings-label">Text size</p>
+        <div class="text-size">
+          <button type="button" id="smaller" data-size="smaller" aria-label="Make text smaller">A<span aria-hidden="true">−</span></button>
+          <button type="button" id="bigger" data-size="bigger" aria-label="Make text bigger">A<span aria-hidden="true">+</span></button>
+        </div>
+      </div>
+      <div class="settings-group" role="group" aria-labelledby="theme-label">
+        <p id="theme-label" class="settings-label">Colors</p>
+        <div class="theme-switch" role="group" aria-label="Color theme">
+          <button type="button" id="theme-light" data-theme-pick="light" aria-label="Light mode">
+            <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg> <span aria-hidden="true">Light</span>
+          </button>
+          <button type="button" id="theme-dark" data-theme-pick="dark" aria-label="Dark mode">
+            <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> <span aria-hidden="true">Dark</span>
+          </button>
+          <button type="button" id="theme-contrast" data-theme-pick="contrast" aria-label="High contrast"><svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg> <span aria-hidden="true">High contrast</span></button>
+        </div>
+      </div>
+      <p class="helper-small">These choices are saved only in this browser.</p>
+    </div>
+  </dialog>
 
   <dialog id="consent-dialog" class="consent-dialog" aria-labelledby="consent-title">
     <form method="dialog" class="consent-form">
@@ -694,7 +825,7 @@
       <h2 id="card-dialog-title">Your fridge card</h2>
       <div class="card-dialog-actions">
         <button type="button" id="card-print" class="btn btn-primary">
-          <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> Print card
+          <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> <span id="card-print-label">Print card</span>
         </button>
         <button type="button" id="card-close" class="btn btn-quiet">Close</button>
       </div>
@@ -739,55 +870,146 @@
       <symbol id="i-pill"viewBox="0 0 24 24"><path d="M8.5 3a5.5 5.5 0 0 1 3.9 1.6l7 7a5.5 5.5 0 0 1-7.8 7.8l-7-7A5.5 5.5 0 0 1 8.5 3zm0 2a3.5 3.5 0 0 0-2.5 6l3.1 3.1 5-5L11 6a3.5 3.5 0 0 0-2.5-1z" fill="currentColor"/></symbol>
       <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 2 1 21h22zm-1 7h2v6h-2zm0 8h2v2h-2z" fill="currentColor"/></symbol>
       <symbol id="i-folder" viewBox="0 0 24 24"><path d="M2 5a1 1 0 0 1 1-1h6l2 2h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" fill="currentColor"/></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><path d="M10.3 2h3.4l.5 2.6 1.8.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.8 2.6.5v3.4l-2.6.5-.8 1.8 1.5 2.2-2.4 2.4-2.2-1.5-1.8.8-.5 2.6h-3.4l-.5-2.6-1.8-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.8L2 13.7v-3.4l2.6-.5.8-1.8-1.5-2.2 2.4-2.4 2.2 1.5 1.8-.8zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor" fill-rule="evenodd"/></symbol>
+      <symbol id="i-snow" viewBox="0 0 24 24"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 3.5l3 2.5 3-2.5M9 20.5l3-2.5 3 2.5M3 10.5l3.6-.9-1-3.6M21 13.5l-3.6.9 1 3.6M3 13.5l3.6.9-1 3.6M21 10.5l-3.6-.9 1-3.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-dash" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zM7 11v2h10v-2z" fill="currentColor"/></symbol>
-      <!-- Line illustrations: original drawings, one stroke color, a light tint inside. Used with <use href="#ill-...">. -->
-      <symbol id="ill-home" viewBox="0 0 120 96">
-        <path d="M24 84V48M96 84V48M14 52 60 16l46 36" />
-        <path d="M24 84h72" />
-        <path d="M80 30V18h10v22" />
-        <path d="M60 60s-12-6.6-12-14.6a6.4 6.4 0 0 1 12-3 6.4 6.4 0 0 1 12 3C72 53.4 60 60 60 60z" style="fill:var(--primary-tint)"/>
-        <path d="M52 84V70a8 8 0 0 1 16 0v14" />
-        <path d="M30 70h12v-8H30z" /><path d="M36 62v8" />
-        <path d="M6 88h108" />
-        <path d="M108 88V74" /><circle cx="108" cy="64" r="9" style="fill:var(--primary-tint)"/>
+      <!-- Illustrations: original flat drawings in the app's colors (the --ill-* tokens). Used with <use href="#ill-...">. -->
+      <symbol id="ill-home" viewBox="0 0 320 130">
+        <rect width="320" height="130" rx="20" style="fill:var(--ill-sky)"/>
+        <path d="M0 100 Q160 84 320 100 V110 A20 20 0 0 1 300 130 H20 A20 20 0 0 1 0 110Z" style="fill:var(--ill-ground)"/>
+        <circle cx="284" cy="30" r="18" style="fill:var(--ill-sun)"/>
+        <path d="M30 26a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H32a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
+        <path d="M196 20a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H198a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
+        <path d="M150 100 L170 100 L186 130 L134 130Z" style="fill:var(--ill-path)"/>
+        <path d="M104 62 L160.0 25 L216 62Z" style="fill:var(--ill-house)"/>
+        <path d="M102 62 L160.0 23 L218 62" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="112" y="58" width="96" height="44" style="fill:var(--ill-house)"/>
+        <rect x="121.6" y="67.68" width="21.12" height="15.4" rx="3" style="fill:var(--ill-window)"/>
+        <rect x="177.28" y="67.68" width="21.12" height="15.4" rx="3" style="fill:var(--ill-window)"/>
+        <rect x="150.4" y="71.2" width="19.2" height="30.8" rx="3" style="fill:var(--ill-door)"/>
+        <path d="M160 42s-8-4.6-8-10a4.4 4.4 0 0 1 8-2.4 4.4 4.4 0 0 1 8 2.4c0 5.4-8 10-8 10z" style="fill:var(--ill-heart)"/>
+        <circle cx="166" cy="88" r="1.6" style="fill:var(--ill-house)"/>
+        <rect x="228" y="88" width="14" height="14" rx="2" style="fill:var(--ill-pot)"/>
+        <ellipse cx="235" cy="77" rx="5" ry="12" style="fill:var(--ill-plant)"/>
+        <path d="M235 87V70" style="fill:none;stroke:var(--ill-pot);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"/>
+        <path d="M146 99q9-2 7-11" style="fill:none;stroke:var(--ill-cat);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/>
+        <ellipse cx="138" cy="96" rx="9" ry="7" style="fill:var(--ill-cat)"/>
+        <circle cx="131" cy="88" r="5.5" style="fill:var(--ill-cat)"/>
+        <path d="M126.5 86l1-6.5 4 4zM131.5 83.5l4-4.5 .5 6.5z" style="fill:var(--ill-cat)"/>
+        <path d="M62 74 56 92" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
+        <path d="M54 90 51 113" style="fill:none;stroke:var(--ill-cane);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="63" y="98" width="5" height="15" rx="2" style="fill:var(--ill-leg)"/>
+        <rect x="72" y="98" width="5" height="15" rx="2" style="fill:var(--ill-leg)"/>
+        <path d="M62 70h16l6 31H56z" style="fill:var(--ill-dress)"/>
+        <path d="M78 72 90 56" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
+        <circle cx="69" cy="57" r="9.5" style="fill:var(--ill-hair)"/>
+        <circle cx="71" cy="61" r="8" style="fill:var(--ill-skin)"/>
       </symbol>
-      <symbol id="ill-clinic" viewBox="0 0 120 96">
-        <rect x="12" y="28" width="58" height="56" rx="4" />
-        <path d="M41 36v14M34 43h14" />
-        <rect x="34" y="62" width="14" height="22" rx="2" />
-        <rect x="18" y="56" width="10" height="10" rx="1" /><rect x="54" y="56" width="10" height="10" rx="1" />
-        <path d="M76 76v-9a4 4 0 0 1 4-4h2l5-9h15l5 9h2a4 4 0 0 1 4 4v9" style="fill:var(--primary-tint)"/>
-        <path d="M76 76h34" /><circle cx="86" cy="78" r="4" /><circle cx="101" cy="78" r="4" />
-        <path d="M6 86h108" />
+      <symbol id="ill-clinic" viewBox="0 0 240 120">
+        <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+        <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+        <circle cx="150" cy="30" r="12" style="fill:var(--ill-sun)"/>
+        <path d="M0 101 Q120 84 240 96" style="fill:none;stroke:var(--ill-road);stroke-width:11;stroke-linecap:round;stroke-linejoin:round"/>
+        <path d="M6 101 Q120 84 234 96" style="fill:none;stroke:var(--ill-dash);stroke-width:2;stroke-dasharray:7 7"/>
+        <rect x="18" y="14" width="34" height="30" rx="5" style="fill:var(--ill-door)"/>
+        <path d="M18 23v-4a5 5 0 0 1 5-5h24a5 5 0 0 1 5 5v4z" style="fill:var(--ill-dress)"/>
+        <path d="M27 32l5 5 9-10" style="fill:none;stroke:var(--ill-plant);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round"/>
+        <path d="M78 88v-11a4 4 0 0 1 4-4h6l7-11h22l8 11h6a4 4 0 0 1 4 4v11z" style="fill:var(--ill-car)"/>
+        <rect x="97" y="65" width="9" height="7" rx="1.5" style="fill:var(--ill-door)"/>
+        <rect x="110" y="65" width="9" height="7" rx="1.5" style="fill:var(--ill-door)"/>
+        <circle cx="94" cy="89" r="6" style="fill:var(--ill-leg)"/>
+        <circle cx="122" cy="89" r="6" style="fill:var(--ill-leg)"/>
+        <circle cx="94" cy="89" r="2" style="fill:var(--ill-door)"/>
+        <circle cx="122" cy="89" r="2" style="fill:var(--ill-door)"/>
+        <path d="M180 64 L205.0 39 L230 64Z" style="fill:var(--ill-house)"/>
+        <path d="M178 64 L205.0 37 L232 64" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="188" y="60" width="34" height="28" style="fill:var(--ill-house)"/>
+        <rect x="191.4" y="66.16" width="7.48" height="9.8" rx="3" style="fill:var(--ill-window)"/>
+        <rect x="211.12" y="66.16" width="7.48" height="9.8" rx="3" style="fill:var(--ill-window)"/>
+        <path d="M205 51.6s-5.6-3.22-5.6-7.0a3.08 3.08 0 0 1 5.6-1.68 3.08 3.08 0 0 1 5.6 1.68c0 3.78-5.6 7.0-5.6 7.0z" style="fill:var(--ill-heart)"/>
+        <rect x="200" y="72" width="10" height="16" rx="1.5" style="fill:var(--ill-door)"/>
       </symbol>
-      <symbol id="ill-outage" viewBox="0 0 120 96">
-        <path d="M40 14a16 16 0 0 0-9 29v8h18v-8A16 16 0 0 0 40 14z" />
-        <path d="M34 57h12M36 63h8" />
-        <path d="M14 22l5 4M66 22l-5 4M10 40h6M64 40h6" stroke-dasharray="1 7" />
-        <rect x="80" y="54" width="18" height="30" rx="2" style="fill:var(--primary-tint)"/>
-        <path d="M89 54v-6" />
-        <path d="M89 26c6 7 8 11 8 15a8 8 0 0 1-16 0c0-4 2-8 8-15z" style="fill:var(--primary-tint)"/>
-        <path d="M6 86h108" />
+      <symbol id="ill-outage" viewBox="0 0 240 120">
+        <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+        <rect width="240" height="120" rx="20" style="fill:var(--ill-night)"/>
+        <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+        <circle cx="200" cy="26" r="11" style="fill:var(--ill-sun)"/>
+        <circle cx="206" cy="21" r="10" style="fill:var(--ill-night)"/>
+        <circle cx="26" cy="20" r="2.2" style="fill:var(--ill-cloud)"/>
+        <circle cx="58" cy="36" r="1.8" style="fill:var(--ill-cloud)"/>
+        <circle cx="108" cy="14" r="2.2" style="fill:var(--ill-cloud)"/>
+        <circle cx="150" cy="30" r="1.8" style="fill:var(--ill-cloud)"/>
+        <circle cx="176" cy="48" r="2.2" style="fill:var(--ill-cloud)"/>
+        <circle cx="18" cy="52" r="1.8" style="fill:var(--ill-cloud)"/>
+        <circle cx="226" cy="56" r="2" style="fill:var(--ill-cloud)"/>
+        <path d="M62 60 L105.0 29 L148 60Z" style="fill:var(--ill-house)"/>
+        <path d="M60 60 L105.0 27 L150 60" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="70" y="56" width="70" height="36" style="fill:var(--ill-house)"/>
+        <rect x="77" y="63.92" width="15.4" height="12.6" rx="3" style="fill:var(--ill-dark)"/>
+        <rect x="117.6" y="63.92" width="15.4" height="12.6" rx="3" style="fill:var(--ill-dark)"/>
+        <rect x="98" y="66.8" width="14" height="25.2" rx="3" style="fill:var(--ill-door)"/>
+        <circle cx="180" cy="84" r="17" style="fill:var(--ill-sun);opacity:.35"/>
+        <path d="M176 74a4 4 0 0 1 8 0" style="fill:none;stroke:var(--ill-leg);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="172" y="74" width="16" height="4" rx="1" style="fill:var(--ill-leg)"/>
+        <rect x="174" y="78" width="12" height="14" rx="2" style="fill:var(--ill-sun)"/>
+        <path d="M180 81c2 3 3 5 0 8-3-3-2-5 0-8z" style="fill:var(--ill-pot)"/>
+        <rect x="172" y="92" width="16" height="4" rx="1" style="fill:var(--ill-leg)"/>
       </symbol>
-      <symbol id="ill-pet" viewBox="0 0 120 96">
-        <circle cx="40" cy="38" r="16" style="fill:var(--primary-tint)"/>
-        <path d="M27 28 25 12l13 7M53 28l2-16-13 7" />
-        <circle cx="34" cy="38" r="1.6" style="fill:currentColor"/><circle cx="46" cy="38" r="1.6" style="fill:currentColor"/>
-        <path d="M38 44h4l-2 3zM24 42l-8-2M24 46l-8 2M56 42l8-2M56 46l8 2" />
-        <path d="M28 52c-8 8-8 24-2 32h28c6-8 6-24-2-32" />
-        <path d="M56 80c16 2 22-12 12-24" />
-        <path d="M80 66h30a15 14 0 0 1-30 0z" style="fill:var(--primary-tint)"/>
-        <path d="M88 62l2-2M96 62l2-2M104 62l2-2" />
-        <path d="M6 86h108" />
+      <symbol id="ill-pet" viewBox="0 0 240 120">
+        <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+        <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+        <circle cx="204" cy="26" r="12" style="fill:var(--ill-sun)"/>
+        <path d="M30 24a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H32a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
+        <path d="M108 94q20 2 15-20" style="fill:none;stroke:var(--ill-cat);stroke-width:5;stroke-linecap:round;stroke-linejoin:round"/>
+        <ellipse cx="92" cy="84" rx="20" ry="16" style="fill:var(--ill-cat)"/>
+        <circle cx="92" cy="58" r="13" style="fill:var(--ill-cat)"/>
+        <path d="M81 52l2-13 8 7zM103 52l-2-13-8 7z" style="fill:var(--ill-cat)"/>
+        <circle cx="87" cy="57" r="1.8" style="fill:var(--ill-window)"/>
+        <circle cx="97" cy="57" r="1.8" style="fill:var(--ill-window)"/>
+        <ellipse cx="152" cy="86" rx="18" ry="4" style="fill:var(--ill-pot)"/>
+        <path d="M134 86h36l-4 12h-28z" style="fill:var(--ill-dress)"/>
+        <path d="M152 58.8s-8.8-5.06-8.8-11.0a4.84 4.84 0 0 1 8.8-2.64 4.84 4.84 0 0 1 8.8 2.64c0 5.94-8.8 11.0-8.8 11.0z" style="fill:var(--ill-heart)"/>
       </symbol>
-      <symbol id="ill-mail" viewBox="0 0 120 96">
-        <path d="M24 58V44a16 16 0 0 1 16-16h14a16 16 0 0 1 16 16v14z" style="fill:var(--primary-tint)"/>
-        <path d="M70 38h10V24H70" /><path d="M24 58h46" />
-        <path d="M41 58v28M53 58v28" />
-        <path d="M33 44h26" />
-        <rect x="80" y="54" width="30" height="22" rx="2" />
-        <path d="m80 56 15 11 15-11" />
-        <path d="M6 86h108" />
+      <symbol id="ill-mail" viewBox="0 0 240 120">
+        <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+        <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+        <circle cx="204" cy="26" r="12" style="fill:var(--ill-sun)"/>
+        <path d="M150 20a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H152a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
+        <rect x="86" y="60" width="8" height="40" style="fill:var(--ill-cane)"/>
+        <path d="M58 62V46a14 14 0 0 1 14-14h36a14 14 0 0 1 14 14v16z" style="fill:var(--ill-car)"/>
+        <path d="M58 62V46a14 14 0 0 1 28 0v16z" style="fill:var(--ill-roof)"/>
+        <rect x="122" y="34" width="4" height="20" style="fill:var(--ill-dress)"/>
+        <rect x="122" y="34" width="12" height="7" style="fill:var(--ill-dress)"/>
+        <rect x="150" y="56" width="40" height="26" rx="3" style="fill:var(--ill-door)"/>
+        <path d="M150 58l20 13 20-13" style="fill:none;stroke:var(--ill-dash);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="160" y="72" width="40" height="26" rx="3" style="fill:var(--ill-door)"/>
+        <path d="M160 74l20 13 20-13" style="fill:none;stroke:var(--ill-dash);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>
+      </symbol>
+      <symbol id="ill-ready" viewBox="0 0 240 120">
+        <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+        <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+        <circle cx="28" cy="26" r="12" style="fill:var(--ill-sun)"/>
+        <path d="M120 18a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H122a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
+        <path d="M34 60 L75.0 29 L116 60Z" style="fill:var(--ill-house)"/>
+        <path d="M32 60 L75.0 27 L118 60" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="42" y="56" width="66" height="36" style="fill:var(--ill-house)"/>
+        <rect x="48.6" y="63.92" width="14.52" height="12.6" rx="3" style="fill:var(--ill-window)"/>
+        <rect x="86.88" y="63.92" width="14.52" height="12.6" rx="3" style="fill:var(--ill-window)"/>
+        <rect x="68.4" y="66.8" width="13.2" height="25.2" rx="3" style="fill:var(--ill-door)"/>
+        <path d="M75 44.4s-6.4-3.68-6.4-8.0a3.52 3.52 0 0 1 6.4-1.92 3.52 3.52 0 0 1 6.4 1.92c0 4.32-6.4 8.0-6.4 8.0z" style="fill:var(--ill-heart)"/>
+        <rect x="140" y="70" width="52" height="5" rx="2" style="fill:var(--ill-cane)"/>
+        <rect x="140" y="84" width="52" height="5" rx="2" style="fill:var(--ill-cane)"/>
+        <rect x="144" y="89" width="4" height="12" style="fill:var(--ill-cane)"/>
+        <rect x="184" y="89" width="4" height="12" style="fill:var(--ill-cane)"/>
+        <rect x="150" y="80" width="26" height="7" rx="3" style="fill:var(--ill-leg)"/>
+        <rect x="170" y="84" width="6" height="16" rx="2" style="fill:var(--ill-leg)"/>
+        <path d="M153 61h17l4 24h-25z" style="fill:var(--ill-dress)"/>
+        <path d="M168 67l9 8" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="176" y="71" width="8" height="9" rx="1.5" style="fill:var(--ill-door)"/>
+        <circle cx="160" cy="49" r="9.5" style="fill:var(--ill-hair)"/>
+        <circle cx="162" cy="53" r="8" style="fill:var(--ill-skin)"/>
+        <circle cx="212" cy="30" r="15" style="fill:var(--ill-plant)"/>
+        <path d="M205 30l5 5 9-10" style="fill:none;stroke:var(--ill-door);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round"/>
       </symbol>
     </defs>
   </svg>
@@ -812,10 +1034,6 @@
         <h2 id="f-access"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Accessibility</h2>
         <p>We work to make this site easy for everyone to use.</p>
         <details class="more"><summary>Show details</summary><p>We aim to meet WCAG 2.1 AA: large text you can make bigger, strong contrast in every theme, full keyboard use, screen reader labels, and no motion if your device asks for less.</p></details>
-      </section>
-      <section aria-labelledby="f-team">
-        <h2 id="f-team"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> Who we are</h2>
-        <p>Made by Leya Jacob, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae. Built for the UMass Boston Applied AI Microcredential.</p>
       </section>
     </div>
   </footer>

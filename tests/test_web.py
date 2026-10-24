@@ -436,7 +436,7 @@ def test_home_is_the_default_and_shows_only_three_big_buttons():
         assert label in home
     # About starts hidden, and About and Features live in the small menu.
     assert "hidden" in page[page.index('id="panel-about"'):].split(">", 1)[0]
-    menu = page[page.index('id="more-menu"'):page.index("</details>")]
+    menu = page[page.index('id="more-menu"'):page.index("</details>", page.index('id="more-menu"'))]
     assert 'href="#about"' in menu and 'href="#features"' in menu
 
 
@@ -503,8 +503,10 @@ class _CardText(__import__("html.parser", fromlist=["HTMLParser"]).HTMLParser):
 EXACT_LINES = {
     "Just in Case will never ask for money, bank details, or your Social Security number.",
     "In an emergency, call 911. Feeling alone or unsafe? Call or text 988.",   # safety wording is never shortened
-    "Leya Jacob, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae",   # the sign-off: names are not simplified
-    "Made by Leya Jacob, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae. Built for the UMass Boston Applied AI Microcredential.",  # names are not simplified
+    "Leya Jacob Kurzhiparambil, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae",   # the sign-off: names are not simplified
+    "Just in Case was built by a team at the University of Massachusetts Boston for the Applied AI Microcredential, hosted by the Paul English Applied Artificial Intelligence Institute.",  # Who we are: the team's exact words
+    "Professor Emerita, College of Education and Human Development",    # a title, not simplified
+    "PhD Student in Exercise and Health Sciences",                       # a title, not simplified
     "Haven is the app's AI planning helper. It suggests options, but you make every decision, and it never sends, shares, or books anything without your OK.",  # exact wording the team chose
 }
 
@@ -565,12 +567,12 @@ def test_next_step_card_follows_the_users_yes_done_and_later():
 def test_illustrations_exist_and_have_descriptive_alt_text():
     import re
     page = client.get("/").text
-    for name in ("home", "clinic", "outage", "pet", "mail"):
+    for name in ("home", "clinic", "outage", "pet", "mail", "ready"):
         assert f'id="ill-{name}"' in page
-    hero = re.search(r'<svg class="ill ill-hero"[^>]*aria-label="([^"]+)"', page)
+    hero = re.search(r'<svg class="ill ill-hero[^"]*"[^>]*aria-label="([^"]+)"', page)
     assert hero and len(hero.group(1).split()) >= 8 and 'role="img"' in hero.group(0)
     js = client.get("/static/app.js").text
-    alts = re.findall(r'"(Line drawing of [^"]+)"', js)
+    alts = re.findall(r'"(Illustration: [^"]+)"', js)
     assert len(alts) >= 4 and all(len(a.split()) >= 8 for a in alts)  # procedure, outage, pet, mail
     table = js[js.index("const ILLUSTRATION"):js.index("function illustration")]
     for need in ("ride_home_after_procedure", "power_outage", "pet_care_during_stay", "mail_while_away"):
@@ -706,7 +708,7 @@ def test_plan_warnings_stay_visible_and_every_consent_box_repeats_911():
     js = client.get("/static/app.js").text
     assert "li.insertBefore(ul, panel)" in js           # waitlist, escort rule, no phone: shown without a tap
     page = client.get("/").text
-    for dialog in ("consent-dialog", "summary-dialog"):
+    for dialog in ("consent-dialog", "summary-dialog", "settings-dialog"):
         box = page[page.index(f'id="{dialog}"'):]
         box = box[:box.index("</dialog>")]
         assert "In an emergency" in box and "911" in box
@@ -716,7 +718,10 @@ def test_plan_warnings_stay_visible_and_every_consent_box_repeats_911():
 
 def test_reading_voice_has_accent_female_male_sample_and_speed_controls():
     page = client.get("/").text
-    box = page[page.index('id="voice-row"'):page.index('class="step-nav"')]
+    box = page[page.index('id="voice-row"'):]
+    box = box[:box.index("</fieldset>")]
+    settings = page[page.index('id="settings-dialog"'):]
+    assert page.index('id="settings-dialog"') < page.index('id="voice-row"') < settings.index("</dialog>") + page.index('id="settings-dialog"')  # behind the gear
     for part in ('id="voice-accent"', 'id="voice-kind"', 'id="voice-sample"', 'id="voice-slower"', 'id="voice-faster"', 'id="voice"'):
         assert part in box
     assert "Play sample" in box and "Slower" in box and "Faster" in box
@@ -725,7 +730,7 @@ def test_reading_voice_has_accent_female_male_sample_and_speed_controls():
     assert len(full_only) == 1            # the full voice list
     assert 'class="voice-speed"' in box   # Slower and Faster are always there
     css = client.get("/static/style.css").text
-    assert ".chat.simple .voice-full-only { display: none; }" in css
+    assert ".simple-view .voice-full-only { display: none; }" in css
 
 
 def test_reading_voice_script_groups_by_accent_and_never_guesses_gender():
@@ -816,15 +821,260 @@ def test_chat_names_the_agent_for_everyone_including_screen_readers():
     assert "Haven, your planning helper" in page[page.index('id="panel-features"'):page.index('id="panel-privacy"')]
 
 
-def test_who_we_are_uses_the_team_full_names():
+def test_the_footer_has_no_team_section():
     page = client.get("/").text
-    footer = page[page.index('id="f-team"'):]
-    footer = footer[:footer.index("</section>")]
-    assert ("Made by Leya Jacob, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae. "
-            "Built for the UMass Boston Applied AI Microcredential.") in footer
+    footer = page[page.index('class="site-footer"'):page.index("</footer>")]
+    assert 'id="f-team"' not in footer and "Kurzhiparambil" not in footer and "Microcredential" not in footer
+    assert 'href="#who"' not in footer
+    for kept in ('id="f-help"', 'id="f-privacy"', 'id="f-access"', 'href="tel:911"', 'href="#privacy"'):
+        assert kept in footer                                       # help numbers, privacy, and accessibility stay
 
 
 def test_the_about_sign_off_uses_full_names_and_no_first_name_only_credit_is_left():
     page = client.get("/").text
-    assert '<p class="why-sign">Leya Jacob, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae</p>' in page
+    assert '<p class="why-sign">Leya Jacob Kurzhiparambil, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae</p>' in page
     assert "Leya, Seyi, Joan" not in page
+
+
+# ---- Round 6: a calmer page ----------------------------------------------------------
+
+def test_light_is_the_default_theme_and_old_saved_choices_are_ignored():
+    for url, js in (("/", "/static/app.js"), ("/share/anything", "/static/share.js")):
+        page, script = client.get(url).text, client.get(js).text
+        boot = page[page.index("Pick the theme") if "Pick the theme" in page else page.index('localStorage.getItem("jic-theme'):]
+        boot = boot[:boot.index("</script>")]
+        assert 'localStorage.getItem("jic-theme-v2")' in boot and 't = "light";' in boot
+        assert "prefers-color-scheme" not in boot                   # never follows the computer's dark setting
+        assert 'localStorage.setItem("jic-theme-v2", t)' in script
+        assert '"jic-theme"' not in page + script                   # the old key, which could hold "dark", is never read
+
+
+def test_only_the_next_step_card_and_plan_items_keep_an_outline():
+    import re
+    css = client.get("/static/style.css").text
+    calm = css[css.index("/* ---- Calm surfaces"):]
+    first = calm[:calm.index("{")]
+    for card in (".chat", ".fridge", ".helpers", ".about-box", ".faq", ".helper-box"):
+        assert card in first                                     # outlines removed from these cards
+    assert "border: 0; box-shadow: none; }" in calm[:calm.index("}") + 1]
+    assert 'html:not([data-theme="contrast"])' in first          # high contrast keeps every outline
+    assert re.search(r"\n\.next-step \{[^}]*border: 3px solid var\(--primary\)", calm)
+    assert re.search(r"\n\.tag \{[^}]*border: 2px solid var\(--line\)", calm)
+    assert "border: 2px solid var(--edge)" in calm               # text boxes still show where to type
+
+
+def test_chat_is_soft_bubbles_and_the_starters_are_chips_above_the_message_box():
+    import re
+    css = client.get("/static/style.css").text
+    chat = css[css.index("/* ---- Chat like a messaging app"):]
+    for who in ("agent", "user"):
+        rule = re.search(rf"\.msg-{who} \.msg-body \{{([^}}]*)\}}", chat).group(1)
+        assert "border: 0" in rule and "background: var(--" in rule          # a soft bubble, no outline
+    assert "overflow-wrap: anywhere" in chat and "min-width: 0" in chat     # long words never spill out
+    starter = re.search(r"\n\.starter \{([^}]*)\}", chat).group(1)
+    assert "border-radius: 999px" in starter and "border: 0" in starter and "min-height: 48px" in starter
+    page = client.get("/").text
+    assert page.index('id="starters"') < page.index('id="composer"')       # chips sit above the message box
+
+
+def test_voice_text_size_and_colors_sit_behind_a_settings_gear():
+    page = client.get("/").text
+    header = page[page.index('class="site-header"'):page.index("</header>")]
+    assert 'id="settings-open"' in header and "<span>Settings</span>" in header and "#i-gear" in header
+    assert 'id="voice-accent"' not in header and 'id="bigger"' not in header and 'id="theme-dark"' not in header
+    panel = page[page.index('id="settings-dialog"'):]
+    panel = panel[:panel.index("</dialog>")]
+    for part in ('id="voice-accent"', 'id="voice-slower"', 'id="voice-faster"', 'id="bigger"', 'id="smaller"',
+                 'id="theme-light"', 'id="theme-dark"', 'id="theme-contrast"', 'id="settings-close"'):
+        assert part in panel
+    chat = page[page.index('class="chat simple"'):page.index("</section>", page.index('class="chat simple"'))]
+    assert 'id="voice-row"' not in chat                                     # the chat itself stays uncluttered
+    js = client.get("/static/app.js").text
+    assert 'settings.showModal()' in js and 'settings.close()' in js
+
+
+def test_helper_table_download_and_print_are_behind_more_options():
+    page = client.get("/").text
+    more = page[page.index('<details id="helper-more" class="more-options">'):]
+    more = more[:more.index("</details>")]
+    assert "<summary>More options" in more and " open" not in more.split(">", 1)[0]   # starts closed
+    for part in ('id="helper-table"', 'id="task-form"', 'id="table-download"', 'id="table-print"'):
+        assert part in more
+    assert 'id="share-open"' not in more                                         # sharing stays in view
+    js = client.get("/static/app.js").text
+    assert '$("helper-more").open = true' in js and 'id="helper-count"' in page   # tasks are counted on the label
+
+
+def test_your_plan_waits_for_its_first_item_and_988_never_hides():
+    page = client.get("/").text
+    assert '<aside id="side" class="side plan-empty"' in page                     # starts empty
+    side = page[page.index('<aside id="side"'):page.index("</aside>")]
+    assert "Your plan will appear here as we talk." in side
+    css = client.get("/static/style.css").text
+    assert ".side.plan-empty > :not(#plan-section):not(#support):not(.tour-tip) { display: none; }" in css
+    assert ".side.plan-empty #plan-section > :not(#fridge-empty) { display: none; }" in css
+    js = client.get("/static/app.js").text
+    assert '$("side").classList.toggle("plan-empty", !plan.items.length && !(plan.tasks || []).length)' in js
+
+
+def test_illustrations_are_original_flat_scenes_with_a_calm_ready_picture():
+    import re
+    page = client.get("/").text
+    home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
+    hero = re.search(r'<svg class="ill ill-hero scene"[^>]*aria-label="([^"]+)"', home).group(1)
+    assert "older" in hero and "house" in hero and "sunny" in hero                   # the person outside their house
+    ready = re.search(r'<svg id="ready-ill"[^>]*aria-label="([^"]+)"[^>]*hidden', page)
+    assert ready and "plan is ready" in ready.group(1)
+    assert '$("ready-ill").toggleAttribute("hidden", !plan.ready)' in client.get("/static/app.js").text
+    for name in ("home", "clinic", "outage", "pet", "mail", "ready"):
+        sym = page[page.index(f'<symbol id="ill-{name}"'):]
+        sym = sym[:sym.index("</symbol>")]
+        assert "var(--ill-sky)" in sym and "<image" not in sym and "href=\"http" not in sym   # drawn here, in our colors
+
+
+def test_first_time_tour_has_four_tips_shows_once_and_can_be_replayed():
+    js = client.get("/static/app.js").text
+    tour = js[js.index("const TOUR = ["):js.index("let tourTip")]
+    assert tour.count("{ tab:") == 4
+    for target in ('.home-buttons .btn-primary', '$("mic")', '$("plan-section")', "fridge card"):
+        assert target in tour                                         # start, Speak, the plan, the fridge card
+    assert '"Skip tour"' in js and '"Next"' in js and '"Done"' in js
+    assert 'localStorage.setItem(TOUR_KEY, "1")' in js and "if (!toured && !EXAMPLE" in js   # once, never in the example
+    assert 'if (raw === "tour")' in js
+    page = client.get("/").text
+    home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
+    assert '<a href="#tour" class="tour-link">Show me how</a>' in home
+    assert '<li><a href="#tour">Show me how</a></li>' in page[page.index('id="more-menu"'):]
+    assert "position: fixed" not in client.get("/static/style.css").text.split("First-time tour")[1]  # never over the 911 bar
+
+
+def test_havens_heart_pulses_while_thinking_but_not_when_motion_is_reduced():
+    page = client.get("/").text
+    typing = page[page.index('id="typing"'):page.index("</div>", page.index('id="typing"'))]
+    assert 'class="thinking-heart"' in typing and "is thinking" in typing    # the words say it too
+    css = client.get("/static/style.css").text
+    assert "animation: heartbeat" in css
+    assert "@media (prefers-reduced-motion: reduce) { .thinking-heart { animation: none; } }" in css
+
+
+def test_one_seasonal_tip_on_home_links_to_that_part_of_the_plan():
+    page = client.get("/").text
+    home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
+    assert home.count('class="season-tip"') == 1
+    assert "Winter is coming." in home and "Is your power outage plan ready?" in home
+    assert '<a id="season-link" href="#plan-power_outage">Check it</a>' in home
+    js = client.get("/static/app.js").text
+    season = js[js.index("const SEASON"):js.index("// ---- first-time tour")]
+    assert '"power_outage"' in season and '"mail_while_away"' in season       # only parts the app can plan
+    assert "send(" not in season                                             # it never sends anything for you
+    from just_in_case.safeguards import pressure_phrases
+    for line in ("Winter is coming.", "Winter is here.", "Is your power outage plan ready?", "Going away this summer?"):
+        assert pressure_phrases(line) == []
+
+
+def test_leya_is_credited_with_the_full_name_everywhere():
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    for f in (root / "web/static/index.html", root / "README.md"):
+        text = f.read_text()
+        assert "Leya Jacob Kurzhiparambil" in text, f.name
+        assert text.count("Leya Jacob") == text.count("Leya Jacob Kurzhiparambil"), f.name
+
+
+def test_who_we_are_page_lists_the_team_and_is_linked_from_the_menu_and_footer():
+    import re
+    page = client.get("/").text
+    who = page[page.index('id="panel-who"'):]
+    who = who[:who.index("</section>")]
+    assert " hidden" in who.split(">", 1)[0]                                       # not shown until asked for
+    assert '<h1 id="who-title" class="page-title">Who we are</h1>' in who
+    assert ("Just in Case was built by a team at the University of Massachusetts Boston for the Applied AI "
+            "Microcredential, hosted by the Paul English Applied Artificial Intelligence Institute.") in who
+    names = re.findall(r'<h2 class="team-name">([^<]+)</h2>\s*<p class="team-program">([^<]+)</p>', who)
+    assert names == [("Leya Jacob Kurzhiparambil", "PhD Student in Gerontology"),
+                     ("Oluwaseyi Omisore", "Undergraduate in Computer Science"),
+                     ("Joan Arches", "Professor Emerita, College of Education and Human Development"),
+                     ("Satoshi Nagae", "PhD Student in Exercise and Health Sciences")]
+    roles = [re.findall(r'<li class="team-role">([^<]+)</li>', block) for block in who.split('<h2 class="team-name">')[1:]]
+    assert roles == [["Services and safeguards lead", "Technical lead"], ["Technical lead"],
+                     ["Evaluation and documentation lead"], ["Story, design, and presentation lead"]]   # one badge per role
+    assert "<img" not in who                                                       # no photos
+    assert '<li><a href="#who" data-tab="who">Who we are</a></li>' in page[page.index('id="more-menu"'):]
+    assert 'href="#who"' not in page[page.index('id="panel-home"'):page.index('id="panel-help"')]  # not a main tab
+    assert '"who"' in client.get("/static/app.js").text
+
+
+# ---- Round 7 ----------------------------------------------------------------------------
+
+def test_light_cannot_be_darkened_by_the_browser_and_files_are_never_stale():
+    css = client.get("/static/style.css").text
+    root = css[css.index(":root {"):css.index("}", css.index(":root {"))]
+    assert "color-scheme: only light;" in root                      # a browser's own dark mode may not repaint Light
+    for url in ("/", "/share/anything"):
+        r = client.get(url)
+        assert '<meta name="color-scheme" content="only light">' in r.text
+        assert r.headers["cache-control"] == "no-cache"
+    for f in ("/static/style.css", "/static/app.js"):
+        assert client.get(f).headers["cache-control"] == "no-cache"  # an old file never mixes with a new page
+    import inspect
+    import just_in_case.card as card, just_in_case.summary as summary
+    for mod in (card, summary):
+        assert '<meta name="color-scheme" content="only light">' in inspect.getsource(mod)   # printouts stay white
+
+
+def test_links_and_link_buttons_keep_palette_colors_after_a_visit():
+    import re
+    css = client.get("/static/style.css").text
+    assert "a:where(:link, :visited) { color: var(--link); }" in css
+    for sel, body in re.findall(r"([^{}]+)\{([^}]*)\}", css):
+        if ":visited" in sel and "color:" in body:
+            assert "var(--" in body, sel                         # a visited link never gets a fixed or browser color
+    page = client.get("/").text
+    for cls in ("btn-primary", "btn-quiet", "brand", "menu-home"):
+        assert re.search(rf"\.{cls}(?::where\([^)]*\))? \{{[^}}]*\bcolor: var\(--", css), cls   # each sets its own color
+    assert 'fill="#1F6F78"' not in page                         # the logo follows the theme too
+
+
+def test_who_we_are_is_a_main_tab_after_features_and_still_in_the_menu():
+    import re
+    page = client.get("/").text
+    tabs = page[page.index('<nav id="tabs"'):page.index("</nav>", page.index('<nav id="tabs"'))]
+    assert re.findall(r'data-tab="[^"]+">([^<]+)</a>', tabs) == ["About", "Features", "Who we are", "Make my plan"]
+    assert '<li><a href="#who" data-tab="who">Who we are</a></li>' in page[page.index('id="more-menu"'):]
+    js = client.get("/static/app.js").text
+    assert '.more-menu a, .tabs a' in js and 'aria-current' in js            # the current tab is marked for screen readers
+
+
+def test_display_button_in_the_header_has_text_size_and_colors_and_settings_keeps_them():
+    page = client.get("/").text
+    header = page[page.index('class="site-header"'):page.index("</header>")]
+    disp = header[header.index('id="display-menu"'):header.index("</details>", header.index('id="display-menu"'))]
+    assert "Display</summary>" in disp
+    for part in ('data-size="smaller"', 'data-size="bigger"', 'data-theme-pick="light"', 'data-theme-pick="dark"', 'data-theme-pick="contrast"'):
+        assert part in disp                                            # in the Display panel
+    settings = page[page.index('id="settings-dialog"'):]
+    settings = settings[:settings.index("</dialog>")]
+    for part in ('data-size="bigger"', 'data-theme-pick="light"'):
+        assert part in settings                                        # and still in Settings
+    bar = page.index('class="safety-strip"')
+    assert bar < page.index('class="site-header"') < page.index('id="panel-home"')   # the header sits on every screen
+    js = client.get("/static/app.js").text
+    assert 'querySelectorAll("[data-theme-pick]")' in js and 'querySelectorAll("[data-size]")' in js
+    assert 'localStorage.setItem("jic-theme-v2", t)' in js and 'localStorage.setItem("jic-size"' in js   # remembered
+
+
+def test_ruths_example_tells_the_newer_features_in_order_and_never_taps_yes_for_you():
+    js = client.get("/static/app.js").text
+    story = js[js.index("const STORY = ["):js.index("function storyTick")]
+    order = ["Ruth taps a sentence", "one short question at a time", "sums up", "yes to her ride home", "calendar",
+             "Someone's helping", "Call now", "yes to the rest", "plan is ready", "fridge card", "readiness summary",
+             "marks her plan as reviewed"]
+    at = [story.index(w) for w in order]
+    assert at == sorted(at)                                                   # the story goes in this order
+    assert ".click()" not in story.replace('document.querySelector(".starter").click()', "").replace("head.click()", "")
+    assert ".slip-actions .btn-primary" in story and "story-next" in js     # yes buttons are ringed, never pressed
+    assert 'EXAMPLE) cb.checked = ["contacts", "allergies", "papers"]' in js  # her card lists allergies and papers
+    assert "Ruth's example is always Simple" in js
+    page = client.get("/").text
+    guide = page[page.index('id="story-guide"'):]
+    assert " hidden" in guide.split(">", 1)[0] and "position: fixed" not in client.get("/static/style.css").text.split("Ruth's example: a story card")[1]

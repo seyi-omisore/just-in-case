@@ -12,6 +12,7 @@
   --wall: #F7F5F2;         /* page background, warm off-white */
   --paper: #FFFFFF;        /* cards */
   --enamel: #FBFAF7;       /* insets inside cards */
+  --soft: #EDE8E1;         /* soft beige fill: quiet tiles and boxes, in place of outlines */
   --line: #E2DDD6;         /* soft borders (decoration only) */
   --edge: #7B848E;         /* borders that must be seen: inputs, quiet buttons (3.5:1) */
 
@@ -31,6 +32,7 @@
   --strip: #1F2933;        /* emergency bar: strong contrast, calm */
   --strip-ink: #FFFFFF;
   --strip-icon: #FF6B6B;   /* red phone */
+  --alert-icon: #C53030;   /* red phone icon on a light tile (5.5:1 on white) */
 
   /* Old names, kept so every rule follows the palette. */
   --blue: var(--primary);
@@ -57,7 +59,7 @@
 
   --sheen: rgba(255, 255, 255, .7);
   --handle: linear-gradient(90deg, #D9D3CB, #ECE8E2);
-  color-scheme: light;
+  color-scheme: only light;   /* "only": a browser's own dark mode may not repaint Light */
 
   --fs: 20px;
   --radius-door: 28px;
@@ -156,7 +158,7 @@ a[href^="tel:"] { white-space: nowrap; }
   display: flex; gap: .6rem; align-items: center; justify-content: space-between;
   max-width: 1280px; margin: .4rem auto 0; padding: 0 1.25rem; min-height: 3rem;
 }
-.menu-home { display: inline-flex; gap: .4rem; align-items: center; min-height: 2.75rem; font-weight: 700; }
+.menu-home { display: inline-flex; gap: .4rem; align-items: center; min-height: 2.75rem; font-weight: 700; color: var(--link); }
 .menu-bar .more-menu { position: relative; margin-left: auto; }
 .more-menu summary {
   list-style: none; cursor: pointer; display: inline-flex; gap: .4rem; align-items: center;
@@ -521,6 +523,7 @@ a[href^="tel:"] { white-space: nowrap; }
   --wall: #1A1D21;
   --paper: #24282E;
   --enamel: #2B3037;
+  --soft: #2E333A;
   --line: #3B424B;
   --edge: #7D8691;
   --primary: #5FB3BB;
@@ -536,6 +539,7 @@ a[href^="tel:"] { white-space: nowrap; }
   --note: #38322A;
   --focus: #5FB3BB;
   --strip: #0F1113;
+  --alert-icon: #FF8A80;
   --route-person: #F2B8A2;
   --sheen: rgba(255, 255, 255, .03);
   --handle: linear-gradient(90deg, #3B424B, #4A525D);
@@ -551,6 +555,7 @@ a[href^="tel:"] { white-space: nowrap; }
   --wall: #000000;
   --paper: #000000;
   --enamel: #000000;
+  --soft: #000000;
   --line: #FFFFFF;
   --edge: #FFFFFF;
   --primary: #FFFF00;
@@ -568,6 +573,7 @@ a[href^="tel:"] { white-space: nowrap; }
   --strip: #000000;
   --strip-ink: #FFFFFF;
   --strip-icon: #FFFF00;
+  --alert-icon: #FFFF00;
   --route-person: #FFFFFF;
   --sheen: transparent;
   --handle: #FFFFFF;
@@ -1080,3 +1086,291 @@ fieldset.voice-row { min-width: 0; }
 .meet-agent { display: flex; gap: .6rem; align-items: center; margin: 0; padding: .8rem 1rem; background: var(--primary-tint);
   border-radius: 14px; font-size: 1.05rem; }
 .meet-agent .icon { flex: none; color: var(--primary); width: 1.5rem; height: 1.5rem; }
+
+/* ---- Calm surfaces: soft shades and space, not outlines ------------------------------ */
+/* Only two kinds of card keep an outline: the Next step card and the plan items.
+   Everything else is told apart by a soft fill and room around it.
+   High contrast keeps every outline: black on black needs a line to be seen. */
+html:not([data-theme="contrast"]) :is(.chat, .fridge, .helpers, .activity, .helper-box, .about-box, .how, .share-card,
+  .ruth-card, .why-built, .faq, .facts, .compare, .feature-grid > li) { border: 0; box-shadow: none; }
+html:not([data-theme="contrast"]) .fridge { background: var(--paper); padding-left: 1.4rem; }
+html:not([data-theme="contrast"]) .fridge-handle { display: none; }
+html:not([data-theme="contrast"]) :is(.review-box, .getting-ready, .task-form, .tag-answer, .support-lines li, .facts-list li,
+  .share-row, .helper-table tr, .slip, .msg-error .msg-body, .msg-recap .msg-body, .msg-ready .msg-body) {
+  border: 0; box-shadow: none; background: var(--soft);
+}
+html:not([data-theme="contrast"]) :is(.step, .slip-checks label, .share-box, .notice, .owner-banner, .restart-banner,
+  .demo-label, .initials, .tag-route, .status, .open-chip, .tab-updates, .compare-table tr) { border: 0; }
+html:not([data-theme="contrast"]) .step { background: var(--paper); }
+html:not([data-theme="contrast"]) .slip-checks label { background: var(--paper); }
+html:not([data-theme="contrast"]) .share-box { background: var(--primary-tint); }
+html:not([data-theme="contrast"]) :is(.share-zone, .tag-details) { border-top: 0; }
+html:not([data-theme="contrast"]) .ruth-card { border-left: 0; }
+html:not([data-theme="contrast"]) .site-footer { border-top: 0; }
+html:not([data-theme="contrast"]) .status-open { background: var(--soft); }
+html:not([data-theme="contrast"]) .open-chip { background: var(--success-tint); }
+
+/* Quiet buttons: white with a faint edge, like the mockup. Their words say what they do. */
+html:not([data-theme="contrast"]) .btn-quiet { background: var(--paper); border: 2px solid var(--line); }
+html:not([data-theme="contrast"]) .btn-quiet:hover { background: var(--soft); }
+html:not([data-theme="contrast"]) :is(.row-actions button, .read-aloud) { border: 2px solid var(--line); }
+html:not([data-theme="contrast"]) :is(.more-menu summary, .text-size button, .theme-switch, .view-switch button:not([aria-pressed="true"])) { border-color: transparent; background: var(--soft); }
+html:not([data-theme="contrast"]) .view-switch button[aria-pressed="true"] { border-color: var(--primary); }
+html:not([data-theme="contrast"]) .more-menu ul { border: 0; box-shadow: var(--shadow-card); }
+/* Fields keep an edge you can see (3.5 to 1), so it is clear where to type. */
+:is(.composer textarea, .task-form input, .share-link-row input, .consent-label input, .share-form input, .event-date-input, .voice-row select) {
+  border: 2px solid var(--edge);
+}
+
+/* Home: soft tiles. "Get help now" is a light tile with a red phone; the 911 button on Get help stays dark. */
+html:not([data-theme="contrast"]) .home-buttons .btn-quiet { background: var(--soft); border-color: transparent; }
+html:not([data-theme="contrast"]) .home-buttons .home-help { background: var(--soft); color: var(--ink); border-color: transparent; }
+.home-buttons .home-help .icon { color: var(--alert-icon); }
+.home-buttons .home-help:hover { filter: none; background: var(--line); }
+
+/* The promise: one quiet line with a shield, not a box. */
+html:not([data-theme="contrast"]) .promise { background: none; border: 0; padding: 0 .2rem; font-weight: 400; color: var(--ink-soft); }
+.promise .icon { color: var(--ok); }
+
+/* The two outlined cards. */
+.next-step { background: var(--paper); border: 3px solid var(--primary); border-radius: 22px; }
+.tag { border: 2px solid var(--line); box-shadow: none; transform: none; border-radius: 18px; }
+.tag.new { animation: settle .4s ease-out both; }
+@keyframes settle { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
+.magnet { border-radius: 12px; box-shadow: none; }
+
+/* ---- Chat like a messaging app: soft speech bubbles, starter chips ------------------- */
+.msg { gap: .55rem; max-width: min(46rem, 100%); }
+.msg-avatar { width: 2.1rem; height: 2.1rem; }
+.msg-body { min-width: 0; overflow-wrap: anywhere; border-radius: 22px; padding: .8rem 1.1rem; }
+html:not([data-theme="contrast"]) .msg-agent .msg-body { background: var(--soft); border: 0; border-top-left-radius: 6px; }
+html:not([data-theme="contrast"]) .msg-user .msg-body { background: var(--primary-tint); border: 0; border-top-right-radius: 6px; }
+[data-theme="contrast"] .msg-user .msg-body { border: 2px solid var(--line); }
+.msg-user .msg-body { max-width: 85%; margin-left: auto; }
+html:not([data-theme="contrast"]) .read-aloud { background: var(--paper); border-color: transparent; }
+html:not([data-theme="contrast"]) .read-aloud[aria-pressed="true"] { background: var(--primary-tint); border-color: var(--primary); }
+
+/* The example sentences: small rounded chips just above the message box. */
+.starters { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.starters-lead { flex: 1 1 100%; font-weight: 400; font-size: .9rem; color: var(--ink-soft); }
+.starter {
+  display: inline-flex; align-items: center; width: auto; max-width: 100%; min-height: 48px; padding: .45rem 1rem;
+  border: 0; border-radius: 999px; background: var(--primary-tint); color: var(--ink);
+  font-size: .95rem; line-height: 1.3; text-align: left;
+}
+.starter:hover { background: var(--soft); }
+[data-theme="contrast"] .starter { border: 2px solid var(--primary); }
+
+/* Back and Next wrap on a phone: the dots sit on their own line above. */
+.chat.simple .step-nav { flex-wrap: wrap; row-gap: .6rem; }
+.chat.simple .step-progress { flex: 1 1 100%; order: -1; }
+.chat.simple .step-nav .btn { flex: 1 1 5rem; }
+
+/* ---- Header: the brand on the left, Settings and Menu on the right ------------------- */
+.site-header { flex-wrap: wrap; }
+.header-actions { display: flex; gap: .5rem; align-items: center; margin-left: auto; }
+.header-actions nav { position: relative; }
+.settings-btn {
+  display: inline-flex; gap: .4rem; align-items: center; padding: .3rem .9rem; border-radius: 12px;
+  border: 2px solid transparent; background: var(--soft); color: var(--ink); font-size: .95rem; cursor: pointer;
+}
+.settings-btn .icon { width: 1.3rem; height: 1.3rem; }
+.settings-btn:hover { background: var(--line); }
+[data-theme="contrast"] .settings-btn { border-color: var(--ink); }
+.tagline { flex: 1 1 100%; order: 3; }
+.menu-bar:has(#menu-home[hidden]) { display: none; }
+
+/* The Settings panel. */
+.settings-head { display: flex; gap: .7rem; align-items: center; justify-content: space-between; }
+.settings-head h2 { display: flex; gap: .5rem; align-items: center; }
+.settings-head h2 .icon { color: var(--primary); }
+.settings-group { display: grid; gap: .45rem; }
+.settings-label { font-weight: 700; }
+.settings-dialog .theme-switch { justify-self: start; }
+.settings-dialog .text-size { gap: .6rem; }
+.simple-view .voice-full-only { display: none; }
+.settings-dialog fieldset.voice-row { border: 0; padding: 0; }
+.settings-dialog fieldset.voice-row legend { padding: 0 0 .3rem; }
+
+/* ---- "More options": the helper table, spreadsheet, and print, one tap away ---------- */
+details.more-options { margin: .4rem 0 .2rem; border-radius: 16px; background: var(--soft); padding: 0 1rem; }
+details.more-options[open] { padding-bottom: 1rem; }
+details.more-options > summary {
+  display: flex; gap: .5rem; align-items: center; cursor: pointer; list-style: none; font-weight: 700; padding: .4rem 0;
+}
+details.more-options > summary::-webkit-details-marker { display: none; }
+details.more-options > summary::after {
+  content: ""; margin-left: auto; width: .65rem; height: .65rem; flex: none;
+  border-right: 3px solid currentColor; border-bottom: 3px solid currentColor; transform: rotate(45deg) translateY(-3px);
+}
+details.more-options[open] > summary::after { transform: rotate(225deg) translateY(-3px); }
+.helper-count { font-weight: 400; color: var(--ink-soft); }
+details.more-options > .helper-small:first-of-type { margin: 0 0 .8rem; }
+html:not([data-theme="contrast"]) details.more-options :is(.task-form, .helper-table tr) { background: var(--paper); }
+[data-theme="contrast"] details.more-options { border: 2px solid var(--line); }
+
+/* ---- An empty plan is one friendly line, not an empty box ---------------------------- */
+/* "People you can talk to" (988) always stays in view. */
+.side.plan-empty > :not(#plan-section):not(#support):not(.tour-tip) { display: none; }
+.side.plan-empty #plan-section > :not(#fridge-empty) { display: none; }
+.side.plan-empty #plan-section { min-height: 0; padding: .6rem .3rem; background: none; border: 0; box-shadow: none; }
+.side.plan-empty .fridge-empty { font-size: 1.05rem; }
+
+/* ---- Illustrations: flat scenes in the app's colors. Decoration beside words, never the only meaning. ---- */
+:root {
+  --ill-sky: #E3EFEC; --ill-ground: #CFE3DC; --ill-sun: #F6C978; --ill-cloud: #FFFFFF; --ill-path: #E9E1D6;
+  --ill-house: var(--primary); --ill-roof: #16545B; --ill-window: #F9E7B8; --ill-dark: #3E4A56; --ill-door: #FFFFFF;
+  --ill-heart: var(--accent); --ill-skin: #E8B48F; --ill-hair: #D3D8DC; --ill-dress: #E07A5F; --ill-leg: #4A5560;
+  --ill-cane: #8A5A3B; --ill-cat: #5B6670; --ill-plant: #2F855A; --ill-pot: #C8735A; --ill-car: #2B6CB0;
+  --ill-road: #FFFFFF; --ill-dash: #A9C1C9; --ill-night: #9FB6C6;
+}
+[data-theme="dark"] {
+  --ill-sky: #22393C; --ill-ground: #2C4A44; --ill-sun: #E8B860; --ill-cloud: #4A525D; --ill-path: #3B424B;
+  --ill-roof: #2F8D96; --ill-window: #E8D49A; --ill-dark: #1A1D21; --ill-door: #E7EAED; --ill-hair: #C3CAD2;
+  --ill-leg: #9AA5B1; --ill-cat: #8D99A6; --ill-car: #4F8FD6; --ill-road: #3B424B; --ill-dash: #6B7A84; --ill-night: #142027;
+}
+[data-theme="contrast"] {
+  --ill-sky: #000000; --ill-ground: #000000; --ill-sun: #FFFF00; --ill-cloud: #FFFFFF; --ill-path: #FFFFFF;
+  --ill-house: #FFFF00; --ill-roof: #FFFFFF; --ill-window: #000000; --ill-dark: #000000; --ill-door: #FFFFFF;
+  --ill-heart: #FFFFFF; --ill-skin: #FFFFFF; --ill-hair: #FFFFFF; --ill-dress: #FFFF00; --ill-leg: #FFFFFF;
+  --ill-cane: #FFFFFF; --ill-cat: #FFFFFF; --ill-plant: #FFFF00; --ill-pot: #FFFF00; --ill-car: #FFFF00;
+  --ill-road: #FFFFFF; --ill-dash: #000000; --ill-night: #000000;
+}
+.ill.scene { fill: none; stroke: none; border-radius: 20px; }
+[data-theme="contrast"] .ill.scene { outline: 2px solid #FFFFFF; }
+.ill-hero.scene { max-width: 100%; margin: 0; }
+.tag-ill.scene { max-width: 15rem; margin: .2rem 0 .7rem; }
+.next-ill.scene { max-width: 100%; }
+.ready-ill { max-width: 18rem; margin: 0 0 .7rem; }
+
+/* Home: a greeting under the picture, like the mockup. */
+.home-greeting { display: grid; gap: .3rem; }
+.home .home-title { text-align: left; }
+.home .tagline { color: var(--ink-soft); font-size: 1.1rem; }
+.home-buttons .home-btn small { color: var(--ink-soft); }
+
+/* Next step: Done and Remind me later side by side, under Call now. */
+.next-step-actions { grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr)); }  /* side by side only when there is room */
+.next-step-actions #next-call { grid-column: 1 / -1; }
+
+/* ---- First-time tour: a dark tip card with a small pointer, in the page (never over the 911 bar) ---- */
+.tour-tip {
+  position: relative; display: grid; gap: .6rem; margin: .4rem 0; padding: 1.1rem 1.25rem;
+  background: var(--strip); color: var(--strip-ink); border-radius: 22px;
+}
+.tour-tip::before {
+  content: ""; position: absolute; top: -9px; left: 2.2rem; width: 18px; height: 18px;
+  background: var(--strip); transform: rotate(45deg); border-radius: 3px;
+}
+.tour-count { font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.tour-text { font-size: 1.1rem; line-height: 1.4; }
+.tour-actions { display: flex; flex-wrap: wrap; gap: .6rem 1.2rem; align-items: center; justify-content: flex-end; }
+.tour-skip { background: none; border: 0; padding: .3rem .2rem; color: var(--strip-ink); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.tour-next { background: var(--paper); color: var(--ink); min-width: 6rem; }
+.tour-tip:focus-visible { outline-color: var(--strip-ink); }
+.tour-target { box-shadow: 0 0 0 4px var(--wall), 0 0 0 7px var(--primary); }
+[data-theme="contrast"] .tour-tip, [data-theme="contrast"] .tour-tip::before { border: 2px solid #FFFF00; }
+.home-links { text-align: center; }
+.tour-link { font-weight: 700; }
+
+/* ---- Thinking: the agent's heart beats gently. Still when the device asks for less motion. ---- */
+.typing { padding-left: 0; gap: .5rem; }
+.thinking-mark { width: 2.1rem; height: 2.1rem; flex: none; }
+.thinking-heart { transform-box: fill-box; transform-origin: center; animation: heartbeat 1.6s ease-in-out infinite; }
+@keyframes heartbeat { 0%, 100% { transform: scale(1); opacity: 1; } 45% { transform: scale(1.18); opacity: .8; } }
+@media (prefers-reduced-motion: reduce) { .thinking-heart { animation: none; } }
+
+/* ---- The seasonal tip on Home: a soft yellow note, not an alarm ---------------------- */
+.season-tip {
+  display: flex; gap: .7rem; align-items: center; padding: .9rem 1.1rem; border-radius: 20px;
+  background: var(--note); color: var(--ink);
+}
+.season-tip .icon { width: 1.8rem; height: 1.8rem; color: var(--season-icon); }
+.season-tip a { font-weight: 700; color: var(--ink); text-decoration-thickness: 2px; }
+:root { --season-icon: #A8641A; }
+[data-theme="dark"] { --season-icon: #F6C26B; }
+[data-theme="contrast"] { --season-icon: #FFFF00; }
+[data-theme="contrast"] .season-tip { border: 2px solid #FFFFFF; }
+
+/* ---- Who we are: names and roles, no photos ------------------------------------------ */
+.who { max-width: 56rem; }
+.team-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr)); }
+.team-list > li { display: grid; gap: .25rem; align-content: start; padding: 1.2rem 1.3rem; border-radius: 20px; background: var(--paper); }
+.team-name { font-size: 1.2rem; }
+.team-program { color: var(--ink-soft); }
+.team-role { color: var(--link); font-weight: 700; }
+[data-theme="contrast"] .team-list > li { border: 2px solid var(--line); }
+
+/* ---- Links: the palette's colors before and after a visit, in every theme ------------- */
+/* :where() keeps this rule weak, so every button and link style below still sets its own color. */
+a:where(:link, :visited) { color: var(--link); }
+.brand:where(:link, :visited) { color: var(--ink); }
+:root { --brand-heart: var(--accent); }
+[data-theme="contrast"] { --brand-heart: #000000; }
+
+/* ---- Tabs: About, Features, Who we are, Make my plan. They wrap on a phone, so none hides off the edge. ---- */
+.tabs { display: flex; flex-wrap: wrap; gap: .4rem; max-width: 1280px; margin: .6rem auto 0; padding: 0 1.25rem; }
+.tabs a {
+  padding: .35rem .85rem; border-radius: 999px; font-weight: 700; font-size: .95rem; text-decoration: none;
+  color: var(--ink-soft); background: transparent; border: 2px solid transparent;
+}
+.tabs a:hover { background: var(--soft); color: var(--ink); }
+.tabs a[aria-current="page"] { background: var(--primary); color: var(--on-primary); }
+[data-theme="contrast"] .tabs a { border-color: var(--line); }
+
+/* ---- Team: initials, name, program, and each role as a small badge ------------------- */
+.team-list > li { grid-template-columns: auto minmax(0, 1fr); gap: .9rem; align-items: start; }
+.team-initials {
+  width: 3.2rem; height: 3.2rem; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 700; font-size: 1.05rem; background: var(--tint); color: var(--tint-ink);
+}
+.team-text { display: grid; gap: .3rem; min-width: 0; }
+.team-roles { list-style: none; margin: .2rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; }
+.team-role { padding: .2rem .8rem; border-radius: 999px; font-size: .9rem; font-weight: 700; background: var(--tint); color: var(--tint-ink); }
+.team-teal { --tint: var(--primary-tint); --tint-ink: var(--link); }
+.team-coral { --tint: var(--accent-tint); --tint-ink: var(--route-person); }
+.team-green { --tint: var(--success-tint); --tint-ink: var(--ok); }
+.team-yellow { --tint: var(--note); --tint-ink: var(--ink); }
+[data-theme="contrast"] :is(.team-role, .team-initials) { border: 2px solid var(--line); }
+
+/* ---- Display: text size and colors, one tap away on every screen -------------------- */
+.display-menu { position: static; }
+.header-actions { position: relative; }
+.display-menu > summary {
+  list-style: none; cursor: pointer; display: inline-flex; gap: .4rem; align-items: center;
+  padding: .3rem .8rem; border-radius: 12px; background: var(--soft); color: var(--ink); font-size: .95rem; font-weight: 700;
+}
+.display-menu > summary::-webkit-details-marker { display: none; }
+.display-menu .aa { font-weight: 700; font-size: 1.05rem; }
+.display-menu[open] > summary { background: var(--primary-tint); }
+.display-panel {
+  position: absolute; right: 0; z-index: 25; margin-top: .4rem; width: min(19rem, calc(100vw - 2.5rem));
+  display: grid; gap: .9rem; padding: 1rem; border-radius: 18px; background: var(--paper); box-shadow: var(--shadow-card);
+}
+.display-panel .theme-switch { justify-self: start; }
+[data-theme="contrast"] .display-menu > summary, [data-theme="contrast"] .display-panel { border: 2px solid var(--line); }
+/* Three header buttons fit one row on a phone. */
+.header-actions { flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
+.header-actions :is(.settings-btn, .display-menu > summary, .more-menu > summary) { padding-inline: .7rem; font-size: .92rem; }
+@media (max-width: 560px) {
+  /* A phone: the brand on top, then Display, Settings, and Menu on one compact row. */
+  .header-actions { flex: 1 1 100%; flex-wrap: nowrap; justify-content: flex-start; }
+  .header-actions :is(.settings-btn, .display-menu > summary, .more-menu > summary) { padding-inline: .6rem; font-size: .88rem; }
+  .header-actions nav { margin-left: auto; }
+}
+
+/* ---- Ruth's example: a story card at the bottom of the screen, and a ring on the next button ---- */
+.story-guide {
+  grid-column: 1 / -1; position: sticky; bottom: .75rem; z-index: 15; display: grid; gap: .4rem;
+  max-width: 44rem; width: 100%; margin: 0 auto; padding: .9rem 1.1rem;
+  background: var(--strip); color: var(--strip-ink); border-radius: 20px; box-shadow: var(--shadow-card);
+}
+.story-count { font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.story-text { font-size: 1.02rem; line-height: 1.4; }
+.story-actions { display: flex; justify-content: flex-end; gap: .6rem; }
+.story-actions .btn:empty, .story-actions [hidden] { display: none; }
+[data-theme="contrast"] .story-guide { border: 2px solid #FFFF00; }
+.story-next { box-shadow: 0 0 0 3px var(--wall), 0 0 0 6px var(--accent) !important; border-radius: 14px; animation: ring 1.8s ease-in-out infinite; }
+@keyframes ring { 50% { box-shadow: 0 0 0 3px var(--wall), 0 0 0 9px var(--accent-tint) !important; } }
+@media (prefers-reduced-motion: reduce) { .story-next { animation: none; } }
+[data-theme="dark"] :is(.story-guide, .tour-tip) { border: 1px solid var(--line); }

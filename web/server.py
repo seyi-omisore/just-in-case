@@ -458,6 +458,17 @@ class Session:
 # Routes
 # ---------------------------------------------------------------------------
 
+@app.middleware("http")
+async def check_for_updates(request, call_next):
+    """Pages and their files are re-checked on each visit (a quick 304 when unchanged),
+    so a browser never mixes an old style.css or app.js with a new page."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith(("/static/", "/share/")):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
+
+
 def render_page(name: str, agent_name: str = AGENT_NAME) -> str:
     """A page with the agent's name filled in. The name lives in config.py, nowhere else."""
     return (STATIC / name).read_text().replace("{{AGENT_NAME}}", htmlmod.escape(agent_name))
@@ -614,7 +625,7 @@ async def table_print(sid: str):
                    f"<td>{e(t['person']) or '<em>Open: add your name</em>'}</td>"
                    f"<td>{TASK_STATUS[task_status(t)]}</td></tr>" for t in s.agent.state.helper_tasks)
     rows = rows or '<tr><td colspan="5">No rows yet.</td></tr>'
-    return HTMLResponse(f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+    return HTMLResponse(f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="only light">
 <title>Who is helping</title>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>

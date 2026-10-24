@@ -59,21 +59,21 @@
     b.setAttribute("aria-hidden", "true"); b.appendChild(icon(NEED_ICON[need] || "check"));
     return b;
   };
-  // Line illustrations for the situations. Each has words that describe it for screen readers.
+  // Illustrations for the situations. Each has words that describe it for screen readers.
   const ILLUSTRATION = (() => {
-    const clinic = ["clinic", "Line drawing of a clinic with a plus sign above its door, and a small car waiting outside to take someone home."];
+    const clinic = ["clinic", "Illustration: a blue car drives along a road toward a small teal house, with a calendar marked with a check, for getting home after a procedure."];
     return {
       ride_home_after_procedure: clinic, check_in_after_procedure: clinic, transportation: clinic,
-      power_outage: ["outage", "Line drawing of an unlit light bulb next to a lit candle, for a winter power outage."],
-      pet_care_during_stay: ["pet", "Line drawing of a cat sitting next to its food bowl."],
-      mail_while_away: ["mail", "Line drawing of a mailbox on a post, with a letter beside it."],
+      power_outage: ["outage", "Illustration: a small teal house with dark windows on a snowy winter night, with a glowing lantern beside it, for a power outage."],
+      pet_care_during_stay: ["pet", "Illustration: a gray cat sits next to a full food bowl, with a small heart above, for pet care while you are away."],
+      mail_while_away: ["mail", "Illustration: a blue mailbox on a wooden post with its flag up, and envelopes waiting beside it, for holding your mail."],
     };
   })();
   function illustration(need, cls) {
     const art = ILLUSTRATION[need];
     if (!art) return null;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "ill " + (cls || "")); svg.setAttribute("viewBox", "0 0 120 96");
+    svg.setAttribute("class", "ill scene " + (cls || "")); svg.setAttribute("viewBox", "0 0 240 120");
     svg.setAttribute("role", "img"); svg.setAttribute("aria-label", art[1]);
     const use = document.createElementNS("http://www.w3.org/2000/svg", "use"); use.setAttribute("href", "#ill-" + art[0]);
     svg.appendChild(use);
@@ -316,7 +316,7 @@
     const saved = voiceStore.get("uri");
     chosenVoice = voices.find((v) => v.voiceURI === saved) || voices.slice().sort(byScore)[0];
     renderVoiceControls();
-    $("voice-row").hidden = false;
+    $("voice-row").hidden = false; $("voice-none").hidden = true;
   }
   function stopSpeaking() {
     speechSynthesis.cancel();
@@ -367,7 +367,6 @@
   const EXAMPLE = new URLSearchParams(location.search).get("example") === "1";
   let lastAgent = "", exampleTimer = null;
   const RUTH = [  // [what Just in Case asked, what Ruth says]. Fictional details only.
-    [/what's coming up/i, "I'm Ruth. I have a procedure next month and may stay two nights in the hospital. My cat Fifi needs feeding."],
     [/comfortable asking/i, "Yes, I could ask Doris."],
     [/phone numbers/i, "Marion Kelly, 617-555-0142, and Doris Chen, 617-555-0177"],
     [/medications/i, "Blood pressure pill in the morning; eye drops at night"],
@@ -423,6 +422,7 @@
       for (const o of data.options) {
         const li2 = el("li"); const lab = el("label");
         const cb = el("input"); cb.type = "checkbox"; cb.value = o.key;
+        if (EXAMPLE) cb.checked = ["contacts", "allergies", "papers"].includes(o.key);   // Ruth's picks; you still tap Continue
         lab.append(cb, icon(SECTION_ICON[o.key] || "check"), document.createTextNode(o.label));
         li2.appendChild(lab); ul.appendChild(li2);
       }
@@ -557,6 +557,8 @@
   $("review-undo").addEventListener("click", () => sendReview("undo"));
 
   function renderPlan(plan) {
+    // Until something is in the plan, the side shows one friendly line (and the support lines, always).
+    $("side").classList.toggle("plan-empty", !plan.items.length && !(plan.tasks || []).length);
     $("fridge-empty").hidden = plan.items.length > 0 || plan.notes.length > 0;
     const prog = plan.progress || { covered: 0, total: 0 };
     $("plan-progress").textContent = prog.total ? `: ${prog.covered} of ${prog.total} covered` : "";
@@ -566,6 +568,7 @@
     ring.querySelector(".ring-fill").style.strokeDashoffset = String(prog.total ? C * (1 - prog.covered / prog.total) : C);
     // A calm line at each milestone. The words come from the server, never from the model.
     $("plan-ready").hidden = !plan.encouragement;
+    $("ready-ill").toggleAttribute("hidden", !plan.ready);  // the calm "you're prepared" picture, once every part is covered
     $("plan-ready-text").textContent = plan.encouragement || "";
     renderNextStep(plan.next_step);
     renderReview(plan.review);
@@ -673,6 +676,7 @@
   }
   $("show-table").addEventListener("click", () => {
     showTableAnyway = true; $("services-only").hidden = true; $("helper-body").hidden = false;
+    $("helper-more").open = true;
     form.elements.task.focus();
   });
 
@@ -933,7 +937,7 @@
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input.value); }
   });
   for (const b of document.querySelectorAll(".starter")) b.addEventListener("click", () => send(b.dataset.text));
-  if (EXAMPLE) { $("starters").hidden = true; $("example-open").hidden = true; $("example-exit").hidden = false; }
+  if (EXAMPLE) { $("example-open").hidden = true; $("example-exit").hidden = false; }   // the starters stay: Ruth taps one
 
   // ---- text size (remembered on this device only) ------------------------
   const SIZES = [18, 20, 22, 24, 27];
@@ -944,8 +948,10 @@
     try { localStorage.setItem("jic-size", SIZES[sizeIdx]); } catch (_) {}
   };
   applySize();
-  $("bigger").onclick = () => { sizeIdx = Math.min(SIZES.length - 1, sizeIdx + 1); applySize(); };
-  $("smaller").onclick = () => { sizeIdx = Math.max(0, sizeIdx - 1); applySize(); };
+  // A− and A+ live in two places, the Display panel and Settings. Both do the same thing.
+  for (const b of document.querySelectorAll("[data-size]")) {
+    b.onclick = () => { sizeIdx = Math.max(0, Math.min(SIZES.length - 1, sizeIdx + (b.dataset.size === "bigger" ? 1 : -1))); applySize(); };
+  }
 
   // ---- helper table ------------------------------------------------------
   let editingId = null, seenTasks = new Set(), tableUrls = {};
@@ -957,6 +963,7 @@
     const tasks = plan.tasks || [];
     $("helper-table").hidden = !tasks.length;
     $("table-empty").hidden = !!tasks.length;
+    $("helper-count").textContent = tasks.length ? `· ${tasks.length} ${tasks.length === 1 ? "task" : "tasks"}` : "";
     for (const t of tasks) {
       const tr = el("tr", seenTasks.has(t.id) ? "" : "new-row"); seenTasks.add(t.id);
       const td = (v, label, cls) => { const c = el("td", cls || "", v || ""); if (label) c.dataset.label = label; return c; };
@@ -1003,6 +1010,7 @@
   }
   function startEdit(t) {
     editingId = t.id;
+    $("helper-more").open = true;
     for (const k of ["task", "person", "date", "time"]) form.elements[k].value = t[k] || "";
     $("task-form-title").textContent = "Change this row";
     $("task-save").querySelector("span").textContent = "Save changes";
@@ -1025,7 +1033,7 @@
   $("task-cancel").onclick = resetForm;
   $("table-print").addEventListener("click", () => {
     if (!tableUrls.print) return;
-    $("card-dialog-title").textContent = "Who's helping";
+    $("card-dialog-title").textContent = "Who's helping"; frame.title = "Who's helping"; $("card-print-label").textContent = "Print table";
     frame.src = tableUrls.print + "?t=" + Date.now();
     dialog.showModal();
   });
@@ -1088,7 +1096,7 @@
   const dialog = $("card-dialog"), frame = $("card-frame");
   $("card-link").addEventListener("click", () => {
     if (!cardUrl) return;
-    $("card-dialog-title").textContent = "Your fridge card";
+    $("card-dialog-title").textContent = "Your fridge card"; frame.title = "Your fridge card"; $("card-print-label").textContent = "Print card";
     frame.src = cardUrl + "?t=" + Date.now();
     dialog.showModal();
   });
@@ -1096,7 +1104,8 @@
   // Opt in only: the button asks first. Nothing is made until the person says yes.
   let summaryUrl = null, openSummaryWhenReady = false;
   function openSummary() {
-    $("card-dialog-title").textContent = "My readiness summary"; frame.title = "My readiness summary";
+    story.summary = true;
+    $("card-dialog-title").textContent = "My readiness summary"; frame.title = "My readiness summary"; $("card-print-label").textContent = "Print summary";
     frame.src = summaryUrl + "?t=" + Date.now();
     dialog.showModal();
   }
@@ -1109,7 +1118,7 @@
   });
   $("plan-print").addEventListener("click", () => {
     if (!planPrintUrl) return;
-    $("card-dialog-title").textContent = "Your plan"; frame.title = "Your plan";
+    $("card-dialog-title").textContent = "Your plan"; frame.title = "Your plan"; $("card-print-label").textContent = "Print plan";
     frame.src = planPrintUrl + "?t=" + Date.now();
     dialog.showModal();
   });
@@ -1138,16 +1147,29 @@
     }
   }).catch(() => {});
 
+  // ---- Settings: reading voice, text size, and colors, behind the gear -----
+  const settings = $("settings-dialog");
+  $("settings-open").addEventListener("click", () => settings.showModal());
+  $("settings-close").addEventListener("click", () => settings.close());
+  settings.addEventListener("click", (e) => { if (e.target === settings) settings.close(); });
+  settings.addEventListener("close", () => $("settings-open").focus());
+
   // ---- light / dark (remembered on this device only) ---------------------
   const setTheme = (t, save = true) => {
     document.documentElement.dataset.theme = t;
-    for (const k of ["light", "dark", "contrast"]) $("theme-" + k).setAttribute("aria-pressed", String(t === k));
-    if (save) { try { localStorage.setItem("jic-theme", t); } catch (_) {} }
+    for (const b of document.querySelectorAll("[data-theme-pick]")) b.setAttribute("aria-pressed", String(b.dataset.themePick === t));
+    if (save) { try { localStorage.setItem("jic-theme-v2", t); } catch (_) {} }
   };
   setTheme(["dark", "contrast"].includes(document.documentElement.dataset.theme) ? document.documentElement.dataset.theme : "light", false);
-  $("theme-light").onclick = () => setTheme("light");
-  $("theme-dark").onclick = () => setTheme("dark");
-  $("theme-contrast").onclick = () => setTheme("contrast");
+  for (const b of document.querySelectorAll("[data-theme-pick]")) b.onclick = () => setTheme(b.dataset.themePick);
+
+  // The Display and Menu drop-downs close when you tap outside them or press Escape.
+  const dropdowns = [$("display-menu"), $("more-menu")];
+  document.addEventListener("click", (e) => { for (const d of dropdowns) if (d.open && !d.contains(e.target)) d.open = false; });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    for (const d of dropdowns) if (d.open) { d.open = false; d.querySelector("summary").focus(); }
+  });
 
   // Warn if the code was updated (git pull) but the server was not restarted.
   const checkRestart = () => fetch("/api/config").then((r) => r.json())
@@ -1190,6 +1212,7 @@
   function setView(mode, save = true) {
     const simple = mode !== "full";
     chat.classList.toggle("simple", simple);
+    document.body.classList.toggle("simple-view", simple);  // the Settings panel shows "All voices" in Full view only
     $("view-simple").setAttribute("aria-pressed", String(simple));
     $("view-full").setAttribute("aria-pressed", String(!simple));
     if (save) { try { localStorage.setItem("jic-view", simple ? "simple" : "full"); } catch (_) {} }
@@ -1198,21 +1221,162 @@
   $("view-simple").onclick = () => setView("simple");
   $("view-full").onclick = () => setView("full");
   let savedView = null; try { savedView = localStorage.getItem("jic-view"); } catch (_) {}
-  setView(savedView === "full" ? "full" : "simple", false);  // Simple is the default
+  setView(savedView === "full" && !EXAMPLE ? "full" : "simple", false);  // Simple is the default, and Ruth's example is always Simple
 
+
+  // ---- one seasonal tip on Home, for a part of the plan the app already knows ----
+  // "Check it" opens that part of the plan, or puts a starting sentence in the box. Nothing is sent for you.
+  const SEASON = (m) => (m >= 8 || m <= 1)   // September to February
+    ? { need: "power_outage", icon: "snow", lead: m >= 11 || m <= 1 ? "Winter is here." : "Winter is coming.",
+        ask: "Is your power outage plan ready?", say: "I'd like to get ready for a winter power outage." }
+    : { need: "mail_while_away", icon: "mail", lead: m <= 4 ? "Going away this spring?" : "Going away this summer?",
+        ask: "Is your mail plan ready?", say: "I'm going away for two weeks." };
+  const season = SEASON(new Date().getMonth());
+  $("season-lead").textContent = season.lead; $("season-ask").textContent = season.ask;
+  $("season-link").href = "#plan-" + season.need;
+  $("season-tip").querySelector("use").setAttribute("href", "#i-" + season.icon);
+  function openPlanPart(need) {
+    const tag = planEl.querySelector(`.tag[data-need="${need}"]`);
+    if (tag) {
+      const head = tag.querySelector(".tag-head");
+      if (head.getAttribute("aria-expanded") === "false") head.click();
+      tag.scrollIntoView({ block: "center" }); head.focus({ preventScroll: true });
+    } else if (need === season.need) {
+      if (!input.value.trim()) input.value = season.say;
+      input.scrollIntoView({ block: "center" }); input.focus({ preventScroll: true });
+    }
+  }
+
+  // ---- Ruth's example: a guided story -------------------------------------------
+  // Ruth's words are typed for her. Every yes is still a real tap: the guide rings the button to tap.
+  const story = { at: 0, shown: -1, mark: null, card: false, summary: false, done: false };
+  const isoIn = (days) => { const d = new Date(); d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  function yesOn(need) {   // the "Yes, add this" button on a plan part, opened so it can be seen
+    const tag = [...planEl.querySelectorAll(".tag")].find((t) => t.querySelector(".tag-answer") && (!need || t.dataset.need === need));
+    if (!tag) return null;
+    const head = tag.querySelector(".tag-head");
+    if (head.getAttribute("aria-expanded") === "false") head.click();
+    return tag.querySelector(".tag-answer .btn-primary");
+  }
+  const lastPage = () => { view = pages.length - 1; renderView(); };
+  const STORY = [
+    { text: `${AGENT} says hello. Ruth taps a sentence to start.`, target: () => document.querySelector(".starter"),
+      auto: () => setTimeout(() => { if (!chatHistory.some((m) => m.who === "user")) document.querySelector(".starter").click(); }, 2200),
+      done: () => chatHistory.some((m) => m.who === "user") },
+    { text: `${AGENT} asks one short question at a time. Ruth answers, and you tap the ringed button for her.`,
+      target: () => messages.querySelector(".slip-actions .btn-primary"),
+      done: () => !!cardUrl && !busy && !messages.querySelector(".slip-actions") },
+    { text: `${AGENT} sums up what is planned so far. Back and Next move between the steps.`, next: true,
+      show: () => { const r = [...messages.querySelectorAll(".msg-recap")].pop(); if (r) { view = +r.dataset.page; renderView(); } },
+      target: () => [...messages.querySelectorAll(".msg-recap")].pop() },
+    // The timeline lists only parts Ruth said yes to, so her first yes comes before it.
+    { text: "Ruth says yes to her ride home.", target: () => yesOn("ride_home_after_procedure"),
+      done: () => !!planEl.querySelector('.tag[data-need="ride_home_after_procedure"] .status-ok') },
+    { text: "Ruth picks the date of her procedure. Each step to get ready can go in her calendar.", next: true,
+      show: () => { lastPage(); const d = $("event-date"); if (!d.value) { d.value = isoIn(30); d.dispatchEvent(new Event("change")); } },
+      target: () => document.querySelector("#steps .cal-btn") || $("getting-ready") },
+    { text: "Doris will check in on Ruth. Her row in the helper table says \u201cSomeone's helping.\u201d", next: true,
+      show: () => { $("helper-more").open = true; }, target: () => document.querySelector("#helper-rows .status-helping") },
+    { text: "Her next step card has Call now. When the ride is booked, she taps Done.", target: () => $("next-done"), done: () => story.done },
+    { text: "Ruth says yes to the rest of her plan.", target: () => yesOn(), done: () => !planEl.querySelector(".tag-answer") },
+    { text: "Every part is covered. A calm picture shows that her plan is ready.", next: true, target: () => $("ready-ill") },
+    { text: "Ruth opens her fridge card. It lists her allergies and where her papers are.", target: () => $("card-link"), done: () => story.card },
+    { text: "She makes a readiness summary. She decides who sees it.", target: () => $("summary-print"), done: () => story.summary },
+    { text: "Last, she marks her plan as reviewed.", target: () => $("review-mark"), done: () => $("review-mark").hidden },
+    { text: "That's Ruth's story. Your own plan works the same way, one question at a time.", last: true },
+  ];
+  function storyTick() {
+    if (!EXAMPLE || $("panel-plan").hidden) return;
+    while (STORY[story.at].done && STORY[story.at].done()) story.at += 1;
+    const step = STORY[story.at];
+    if (story.shown !== story.at) {
+      story.shown = story.at;
+      $("story-guide").hidden = false;
+      $("story-count").textContent = `Ruth's example \u00b7 step ${story.at + 1} of ${STORY.length}`;
+      $("story-text").textContent = step.text;
+      $("story-next").hidden = !step.next; $("story-own").hidden = !step.last;
+      if (step.show) step.show();
+      if (step.auto) step.auto();
+    }
+    const t = step.target ? step.target() : null;
+    if (t !== story.mark) {
+      if (story.mark) story.mark.classList.remove("story-next");
+      story.mark = t;
+      if (t) { t.classList.add("story-next"); t.scrollIntoView({ block: "center" }); }
+    }
+  }
+  $("story-next").addEventListener("click", () => { story.at = Math.min(story.at + 1, STORY.length - 1); storyTick(); });
+  $("next-done").addEventListener("click", () => { story.done = true; });
+  $("card-link").addEventListener("click", () => { story.card = true; });
+  if (EXAMPLE) {
+    let queued = false;
+    new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; storyTick(); }); } })
+      .observe($("main"), { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+    // The fridge card and summary open in dialogs outside the page, so also look again after each tap and each close.
+    document.addEventListener("click", () => setTimeout(storyTick, 0));
+    for (const d of document.querySelectorAll("dialog")) d.addEventListener("close", () => setTimeout(storyTick, 0));
+  }
+
+  // ---- first-time tour: four short tips, shown once. "Show me how" plays it again. ----
+  // Each tip sits in the page next to what it points to, so it never covers the 911 and 988 bar.
+  const TOUR_KEY = "jic-tour-done";
+  const TOUR = [
+    { tab: "home", target: () => document.querySelector(".home-buttons .btn-primary"),
+      text: () => `Start here. ${AGENT} asks a few short questions, one at a time.` },
+    { tab: "plan", target: () => ($("mic").hidden ? input : $("mic")), after: () => $("composer"),
+      text: () => ($("mic").hidden ? "Type your answer in this box. Or tap one of the sentences above it."
+                                    : "Tap Speak to talk instead of typing. You check the words before they are sent.") },
+    { tab: "plan", target: () => $("plan-section"),
+      text: () => "Your plan shows up here as you talk. Nothing is added until you say yes." },
+    { tab: "plan", target: () => $("plan-section"),
+      text: () => "When your plan is ready, print your fridge card here. It has 911 at the top and who to call." },
+  ];
+  let tourTip = null, tourTarget = null;
+  function endTour() {
+    if (tourTip) tourTip.remove();
+    if (tourTarget) tourTarget.classList.remove("tour-target");
+    tourTip = tourTarget = null;
+  }
+  function showTip(i, focus) {
+    endTour();
+    const step = TOUR[i], last = i === TOUR.length - 1;
+    if (location.hash.slice(1) !== step.tab) { history.pushState(null, "", "#" + step.tab); showTab(step.tab, false); }
+    tourTarget = step.target(); tourTarget.classList.add("tour-target");
+    tourTip = el("section", "tour-tip"); tourTip.tabIndex = -1;
+    tourTip.setAttribute("aria-labelledby", "tour-count");
+    const count = el("p", "tour-count", `Tip ${i + 1} of ${TOUR.length}`); count.id = "tour-count";
+    const row = el("div", "tour-actions");
+    const skip = el("button", "tour-skip", "Skip tour"); skip.type = "button"; skip.onclick = endTour; skip.hidden = last;
+    const next = el("button", "btn tour-next", last ? "Done" : "Next"); next.type = "button";
+    next.onclick = () => (last ? endTour() : showTip(i + 1, true));
+    row.append(skip, next);
+    tourTip.append(count, el("p", "tour-text", step.text()), row);
+    tourTip.addEventListener("keydown", (e) => { if (e.key === "Escape") endTour(); });
+    (step.after || step.target)().after(tourTip);
+    tourTip.scrollIntoView({ block: "center" });
+    if (focus) tourTip.focus({ preventScroll: true });
+  }
+  function startTour(focus) {
+    try { localStorage.setItem(TOUR_KEY, "1"); } catch (_) {}   // shown once, whether finished or skipped
+    showTip(0, focus);
+  }
 
   // ---- screens: Home (the default), Make my plan, Get help, and the Menu ----
   // Home shows three big buttons. About and Features live in the small Menu.
   // The 911 and 988 strip sits above everything, so it shows on every screen.
   // The chat connects the first time "Make my plan" opens, not before.
-  const TABS = ["home", "about", "features", "privacy", "plan", "help"];
+  const TABS = ["home", "about", "features", "privacy", "who", "plan", "help"];
   let connected = false;
   function showTab(raw, focus) {
+    if (raw.startsWith("plan-")) { history.replaceState(null, "", "#plan"); showTab("plan", false); openPlanPart(raw.slice(5)); return; }
+    if (raw === "tour") { history.replaceState(null, "", "#home"); showTab("home", false); startTour(true); return; }
     const seePlan = raw === "my-plan";           // "See my plan": the plan screen, scrolled to your plan
     let name = seePlan ? "plan" : raw;
     if (!TABS.includes(name)) name = EXAMPLE ? "plan" : "home";
     for (const t of TABS) $("panel-" + t).hidden = t !== name;
-    for (const a of document.querySelectorAll(".more-menu a")) {
+    $("tabs").hidden = !["about", "features", "who", "privacy"].includes(name);   // the tab row, on the pages about the app
+    for (const a of document.querySelectorAll(".more-menu a, .tabs a")) {
       if (a.dataset.tab === name) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     }
     $("menu-home").hidden = name === "home";
@@ -1222,6 +1386,8 @@
     else if (focus) { window.scrollTo(0, 0); $("panel-" + name).focus({ preventScroll: true }); }
   }
   $("more-menu").addEventListener("click", (e) => { if (e.target.closest("a")) $("more-menu").open = false; });
-  window.addEventListener("hashchange", () => showTab(location.hash.slice(1), true));
+  window.addEventListener("hashchange", () => { endTour(); showTab(location.hash.slice(1), true); });
   showTab(location.hash.slice(1), false);
+  let toured = "1"; try { toured = localStorage.getItem(TOUR_KEY); } catch (_) {}   // no storage: never nag
+  if (!toured && !EXAMPLE && !$("panel-home").hidden) startTour(false);
 })();
