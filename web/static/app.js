@@ -257,7 +257,7 @@
   const accentName = (k) => ACCENTS[k] ? `${ACCENTS[k]} (${k})` : (k === "en-other" ? "Other English" : "Other voices");
   const SAMPLE = "Hi, I'm here to help you make your plan.";
   const SPEEDS = [0.7, 0.8, 0.9, 1.0, 1.1];                 // 0.9 is the warm default
-  const SPEED_WORDS = ["Slowest", "Slower", "Warm (usual)", "Faster", "Fastest"];
+  const SPEED_WORDS = ["Slowest", "Slower", "Normal", "Faster", "Fastest"];
   const voiceStore = {
     get: (k) => { try { return localStorage.getItem("jic-voice-" + k); } catch (_) { return null; } },
     set: (k, v) => { try { localStorage.setItem("jic-voice-" + k, String(v)); } catch (_) {} },
@@ -299,7 +299,10 @@
       const o = el("option", null, x.g ? `${x.label} (${x.v.name.replace(/^Microsoft\s+|\s*\(.*?\)\s*$|\s*-\s*English.*$/gi, "")})` : x.label);
       o.value = x.v.voiceURI; o.selected = x.v === chosenVoice; return o;
     }));
-    $("voice-speed").textContent = "Speed: " + SPEED_WORDS[speedIdx];
+    $("voice-speed").textContent = SPEED_WORDS[speedIdx];
+    // The closed Reading voice heading says the current choice, like "American, female, normal speed".
+    const g = genderOf(chosenVoice);
+    $("now-voice").textContent = [ACCENTS[accent] || accentName(accent), g, SPEED_WORDS[speedIdx].toLowerCase() + " speed"].filter(Boolean).join(", ");
     $("voice-slower").disabled = speedIdx === 0; $("voice-faster").disabled = speedIdx === SPEEDS.length - 1;
   }
   function chooseVoice(v) {
@@ -943,8 +946,10 @@
   const SIZES = [18, 20, 22, 24, 27];
   let sizeIdx = 1;
   try { const s = Number(localStorage.getItem("jic-size")); if (SIZES.includes(s)) sizeIdx = SIZES.indexOf(s); } catch (_) {}
+  const SIZE_WORDS = ["Small", "Normal", "Large", "Larger", "Largest"];
   const applySize = () => {
     document.documentElement.style.setProperty("--fs", SIZES[sizeIdx] + "px");
+    $("now-size").textContent = $("size-word").textContent = SIZE_WORDS[sizeIdx];
     try { localStorage.setItem("jic-size", SIZES[sizeIdx]); } catch (_) {}
   };
   applySize();
@@ -1158,6 +1163,7 @@
   const setTheme = (t, save = true) => {
     document.documentElement.dataset.theme = t;
     for (const b of document.querySelectorAll("[data-theme-pick]")) b.setAttribute("aria-pressed", String(b.dataset.themePick === t));
+    $("now-colors").textContent = { light: "Light", dark: "Dark", contrast: "High contrast" }[t];
     if (save) { try { localStorage.setItem("jic-theme-v2", t); } catch (_) {} }
   };
   setTheme(["dark", "contrast"].includes(document.documentElement.dataset.theme) ? document.documentElement.dataset.theme : "light", false);

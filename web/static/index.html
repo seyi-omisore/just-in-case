@@ -736,41 +736,66 @@
         <button type="button" id="settings-close" class="btn btn-quiet">Close</button>
       </div>
       <p class="notice-911"><svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg><span><strong>In an emergency, call 911.</strong> Feeling alone or unsafe? Call or text <strong>988</strong>.</span></p>
-      <fieldset id="voice-row" class="voice-row" hidden>
-        <legend><svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg> Reading voice</legend>
-        <label class="voice-field">Accent <select id="voice-accent"></select></label>
-        <div id="voice-kind" class="voice-kind view-switch" role="group" aria-label="Female or male voice"></div>
-        <label class="voice-field voice-full-only">All voices <select id="voice"></select></label>
-        <div class="voice-actions">
-          <button type="button" id="voice-sample" class="btn btn-quiet">
-            <svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg> Play sample
+      <div class="set-sections">
+      <details id="set-voice" class="set-sec set-voice" open>
+        <summary>
+          <span class="set-tile" aria-hidden="true"><svg class="icon"><use href="#i-speaker"/></svg></span>
+          <span class="set-heading"><span class="set-title">Reading voice</span><span class="sr-only">: </span><span id="now-voice" class="set-now">Not available in this browser</span></span>
+          <span class="set-chevron" aria-hidden="true"></span>
+        </summary>
+        <fieldset id="voice-row" class="voice-row set-body" hidden>
+          <legend class="sr-only">Reading voice</legend>
+          <label class="voice-field">Accent <select id="voice-accent"></select></label>
+          <div class="set-field"><span class="settings-label" id="voice-kind-label">Voice</span>
+            <div id="voice-kind" class="voice-kind view-switch" role="group" aria-labelledby="voice-kind-label"></div></div>
+          <label class="voice-field voice-full-only">All voices <select id="voice"></select></label>
+          <div class="set-field"><span class="settings-label" id="speed-label">Speed</span>
+            <span class="voice-speed" role="group" aria-labelledby="speed-label">
+              <button type="button" id="voice-slower" class="btn btn-quiet">Slower</button>
+              <span id="voice-speed" class="voice-speed-text" role="status"></span>
+              <button type="button" id="voice-faster" class="btn btn-quiet">Faster</button>
+            </span></div>
+          <button type="button" id="voice-sample" class="btn btn-primary btn-block">
+            <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Play sample
           </button>
-          <span class="voice-speed" role="group" aria-label="Reading speed">
-            <button type="button" id="voice-slower" class="btn btn-quiet">Slower</button>
-            <span id="voice-speed" class="voice-speed-text" role="status"></span>
-            <button type="button" id="voice-faster" class="btn btn-quiet">Faster</button>
-          </span>
+        </fieldset>
+        <p id="voice-none" class="helper-small set-body">Read aloud is not available in this browser.</p>
+      </details>
+      <details id="set-size" class="set-sec set-size">
+        <summary>
+          <span class="set-tile" aria-hidden="true">Aa</span>
+          <span class="set-heading"><span class="set-title">Text size</span><span class="sr-only">: </span><span id="now-size" class="set-now">Normal</span></span>
+          <span class="set-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="set-body size-body" role="group" aria-labelledby="size-now">
+          <p id="size-now" class="size-now">Current size: <strong id="size-word">Normal</strong></p>
+          <div class="text-size">
+            <button type="button" id="smaller" data-size="smaller" aria-label="Make text smaller">A<span aria-hidden="true">−</span></button>
+            <button type="button" id="bigger" data-size="bigger" aria-label="Make text bigger">A<span aria-hidden="true">+</span></button>
+          </div>
         </div>
-      </fieldset>
-      <p id="voice-none" class="helper-small">Read aloud is not available in this browser.</p>
-      <div class="settings-group" role="group" aria-labelledby="size-label">
-        <p id="size-label" class="settings-label">Text size</p>
-        <div class="text-size">
-          <button type="button" id="smaller" data-size="smaller" aria-label="Make text smaller">A<span aria-hidden="true">−</span></button>
-          <button type="button" id="bigger" data-size="bigger" aria-label="Make text bigger">A<span aria-hidden="true">+</span></button>
-        </div>
-      </div>
-      <div class="settings-group" role="group" aria-labelledby="theme-label">
-        <p id="theme-label" class="settings-label">Colors</p>
-        <div class="theme-switch" role="group" aria-label="Color theme">
-          <button type="button" id="theme-light" data-theme-pick="light" aria-label="Light mode">
-            <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg> <span aria-hidden="true">Light</span>
+      </details>
+      <details id="set-colors" class="set-sec set-colors">
+        <summary>
+          <span class="set-tile" aria-hidden="true"><svg class="icon"><use href="#i-contrast"/></svg></span>
+          <span class="set-heading"><span class="set-title">Colors</span><span class="sr-only">: </span><span id="now-colors" class="set-now">Light</span></span>
+          <span class="set-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="set-body theme-choices" role="group" aria-label="Color theme">
+          <button type="button" id="theme-light" data-theme-pick="light" class="theme-choice">
+            <span class="theme-preview preview-light" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="theme-choice-name"><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg> Light</span>
           </button>
-          <button type="button" id="theme-dark" data-theme-pick="dark" aria-label="Dark mode">
-            <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> <span aria-hidden="true">Dark</span>
+          <button type="button" id="theme-dark" data-theme-pick="dark" class="theme-choice">
+            <span class="theme-preview preview-dark" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="theme-choice-name"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> Dark</span>
           </button>
-          <button type="button" id="theme-contrast" data-theme-pick="contrast" aria-label="High contrast"><svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg> <span aria-hidden="true">High contrast</span></button>
+          <button type="button" id="theme-contrast" data-theme-pick="contrast" class="theme-choice">
+            <span class="theme-preview preview-contrast" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="theme-choice-name"><svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg> High contrast</span>
+          </button>
         </div>
+      </details>
       </div>
       <p class="helper-small">These choices are saved only in this browser.</p>
     </div>

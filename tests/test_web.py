@@ -1078,3 +1078,25 @@ def test_ruths_example_tells_the_newer_features_in_order_and_never_taps_yes_for_
     page = client.get("/").text
     guide = page[page.index('id="story-guide"'):]
     assert " hidden" in guide.split(">", 1)[0] and "position: fixed" not in client.get("/static/style.css").text.split("Ruth's example: a story card")[1]
+
+
+# ---- Round 7, part 2: Settings ---------------------------------------------------------
+
+def test_settings_has_three_collapsible_sections_with_the_current_choice_and_911_first():
+    import re
+    page = client.get("/").text
+    panel = page[page.index('id="settings-dialog"'):]
+    panel = panel[:panel.index("</dialog>")]
+    sections = re.findall(r'<details id="set-(\w+)" class="set-sec[^"]*"', panel)
+    assert sections == ["voice", "size", "colors"]
+    for name, now in (("Reading voice", "now-voice"), ("Text size", "now-size"), ("Colors", "now-colors")):
+        assert f'<span class="set-title">{name}</span><span class="sr-only">: </span><span id="{now}"' in panel
+    assert panel.index("In an emergency, call 911.") < panel.index('class="set-sections"')       # 911 stays first
+    assert panel.rindex("These choices are saved only in this browser.") > panel.index('id="set-colors"')  # the note stays last
+    for part in ('id="voice-accent"', 'id="voice-kind"', 'id="voice-slower"', 'id="voice-faster"', 'id="voice-sample"'):
+        assert part in panel[panel.index('id="set-voice"'):panel.index('id="set-size"')]
+    assert 'id="size-word"' in panel and 'data-size="bigger"' in panel and 'data-size="smaller"' in panel
+    colors = panel[panel.index('id="set-colors"'):]
+    assert colors.count('class="theme-choice"') == 3 and colors.count('class="theme-preview') == 3
+    js = client.get("/static/app.js").text
+    assert '$("now-colors").textContent' in js and '$("now-size").textContent' in js and '$("now-voice").textContent' in js

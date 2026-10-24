@@ -112,3 +112,10 @@ def test_soft_tiles_and_the_red_phone_icon_are_readable():
 def test_the_seasonal_tip_icon_shows_on_its_note():
     for theme in THEMES:
         assert ratio(color(theme, "season-icon"), color(theme, "note")) >= 3, theme
+
+
+def test_settings_section_tiles_show_their_icons():
+    for theme in THEMES:
+        assert ratio(color(theme, "on-season"), color(theme, "season-icon")) >= 3, theme
+        assert ratio(color(theme, "ink"), color(theme, "blue-tint")) >= 4.5, theme
+        assert ratio(color(theme, "ink-soft"), color(theme, "blue-tint")) >= 4.5, theme
