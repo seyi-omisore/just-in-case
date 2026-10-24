@@ -91,6 +91,13 @@ class PlanState:
     # "Getting ready" timeline: the date the user picked, and the steps they ticked.
     event_date: str = ""
     steps_done: set = field(default_factory=set)
+    # "Your next step" card: parts the user marked Done, and parts they moved to later.
+    actions_done: set = field(default_factory=set)
+    actions_later: list = field(default_factory=list)
+    # Dates (YYYY-MM-DD) the user marked their plan as reviewed, oldest first.
+    reviews: list = field(default_factory=list)
+    # The day the user first confirmed what to plan for (YYYY-MM-DD). Shown on the readiness summary.
+    started: str = ""
 
     def people_allowed(self) -> bool:
         return self.comfortable_asking_people and not self.worried_about_burden

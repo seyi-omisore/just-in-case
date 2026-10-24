@@ -86,6 +86,8 @@ class Toolbox:
         if unknown:
             raise ToolError(f"Unknown needs {unknown}. Use only: {list(NEEDS)}")
         self.state.confirmed_needs = list(dict.fromkeys(needs))
+        if not self.state.started and self.state.confirmed_needs:
+            self.state.started = self.today.isoformat()  # the day the plan began
         self.state.log(f"checkpoint 1: user confirmed needs {self.state.confirmed_needs}")
         return {"confirmed_needs": self.state.confirmed_needs}
 
@@ -343,6 +345,39 @@ class Toolbox:
         s.log(f"user {'confirmed' if ok else 'said no thanks to'} {need}")
         self.refresh_card()
 
+    def user_next_step(self, need: str, action: str) -> None:
+        """The user answers the "next step" card: Done, or Remind me later."""
+        s = self.state
+        item = next((i for i in s.items if i.need == need), None)
+        if item is None or item.route == "blank" or not item.user_ok or action not in ("done", "later"):
+            raise ToolError("That step is not on your plan anymore.")
+        s.actions_later = [n for n in s.actions_later if n != need]
+        if action == "done":
+            s.actions_done.add(need)
+        else:
+            s.actions_later.append(need)  # goes to the end of the line
+        s.log(f"user marked the step for {need}: {action}")
+
+    def user_review(self, action: str) -> None:
+        """The user marks their plan as reviewed today, or takes back today's mark."""
+        from . import reviews
+        s = self.state
+        today = self.today.isoformat()
+        if action == "mark":
+            if not any(i.user_ok and i.route != "blank" for i in s.items):
+                raise ToolError("Add something to your plan first, then you can mark it as reviewed.")
+            if today not in s.reviews:  # one mark per day is enough
+                s.reviews.append(today)
+                s.reviews = s.reviews[-reviews.MAX_REVIEWS:]
+        elif action == "undo":
+            if today not in s.reviews:
+                raise ToolError("There is no review from today to take back.")
+            s.reviews.remove(today)
+        else:
+            raise ToolError("Choose mark or undo.")
+        s.log(f"user review: {action}")
+        self.refresh_card()
+
     # ---- "Getting ready" timeline (the user's own date and ticks) -------------
     def user_set_event_date(self, value: str) -> None:
         if value and timeline.parse_day(value, self.today) is None:
@@ -397,6 +432,8 @@ class Toolbox:
                           for i in s.items],
                 "notes": s.helper_notes, "tasks": s.helper_tasks, "sections": s.card_sections,
                 "event_date": s.event_date, "steps_done": sorted(s.steps_done),
+                "actions_done": sorted(s.actions_done), "actions_later": list(s.actions_later),
+                "reviews": list(s.reviews), "started": s.started,
                 "card": getattr(self, "card", None)}
 
     def restore(self, saved: dict) -> list[str]:
@@ -451,6 +488,16 @@ class Toolbox:
             attempt("the card", remake)
         attempt("the timeline date", lambda: self.user_set_event_date(str(saved.get("event_date") or "")))
         s.steps_done = {str(x)[:80] for x in as_list(saved.get("steps_done"), 100)}
+        planned = {i.need for i in s.items if i.user_ok}  # only for parts the user said yes to
+        s.actions_done = {str(x) for x in as_list(saved.get("actions_done"), len(NEEDS))} & planned
+        s.actions_later = [str(x) for x in as_list(saved.get("actions_later"), len(NEEDS)) if str(x) in planned]
+        from . import reviews as _reviews
+        kept = {d.isoformat() for d in (_reviews.parse(x) for x in as_list(saved.get("reviews"), _reviews.MAX_REVIEWS))
+                if d and d <= self.today}  # real dates, never in the future
+        s.reviews = sorted(kept)
+        began = _reviews.parse(saved.get("started"))
+        if began and began <= self.today:
+            s.started = began.isoformat()   # keep the original start day, never a future one
         s.log(f"restored a saved plan; left out: {skipped or 'nothing'}")
         return skipped
 

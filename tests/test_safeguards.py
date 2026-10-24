@@ -602,3 +602,307 @@ def test_task_status_open_helping_confirmed(box):
     assert box.tasks_csv().splitlines()[1].endswith(",Doris,Confirmed")
     box.user_edit_task("update", {"id": t["id"], "task": "Feed the cat", "person": "Marion"})
     assert task_status(t) == "helping"  # a confirmation never moves to a new name
+
+
+# ---- "Your next step" card ----------------------------------------------------
+
+def _item(need, route="service", name="FriendshipWorks Medical Escort", phone="617-482-1510", url="", ok=True):
+    return {"need": need, "route": route, "name": name, "phone": phone, "url": url, "user_ok": ok}
+
+
+def test_next_step_is_the_most_important_accepted_part():
+    from just_in_case.next_step import pick_next_step
+    items = [_item("mail_while_away", "preparation", "USPS Hold Mail", "", "https://www.usps.com"),
+             _item("ride_home_after_procedure")]
+    step = pick_next_step(items, set(), [])
+    assert step["text"] == "Call FriendshipWorks Medical Escort to book your ride home."
+    assert step["phone"] == "617-482-1510" and step["left"] == 1
+
+
+def test_next_step_ignores_parts_the_user_has_not_said_yes_to():
+    from just_in_case.next_step import pick_next_step
+    waiting = [_item("ride_home_after_procedure", ok=False), _item("spare_key_access", "blank", ok=True)]
+    assert pick_next_step(waiting, set(), []) is None  # no step until a part is accepted
+
+
+def test_done_shows_the_next_step_and_later_goes_to_the_back():
+    from just_in_case.next_step import pick_next_step
+    items = [_item("ride_home_after_procedure"), _item("pet_care_during_stay", name="MSPCA-Angell", phone="", url="https://www.mspca.org")]
+    assert pick_next_step(items, {"ride_home_after_procedure"}, [])["need"] == "pet_care_during_stay"
+    assert pick_next_step(items, set(), ["ride_home_after_procedure"])["need"] == "pet_care_during_stay"
+    only = pick_next_step(items[:1], set(), ["ride_home_after_procedure"])  # nothing else: it comes back
+    assert only["need"] == "ride_home_after_procedure"
+    assert pick_next_step(items, {"ride_home_after_procedure", "pet_care_during_stay"}, []) == {"all_done": True}
+
+
+def test_next_step_words_fit_what_we_know():
+    from just_in_case.next_step import step_text
+    assert step_text(_item("pet_care_during_stay", name="MSPCA-Angell", phone="", url="https://x.org")) == \
+        "Visit the MSPCA-Angell website to plan care for your pet."
+    assert step_text(_item("transportation", name="City of Boston Age Strong Commission (Boston's Council on Aging)")) == \
+        "Call City of Boston Age Strong Commission to set up your rides."
+    assert step_text(_item("spare_key_access", "person", "Doris", "")) == \
+        "Ask Doris if they can help you set up a spare key."
+
+
+def test_user_next_step_needs_an_accepted_part_and_survives_save_and_restore(box):
+    box.confirm_needs(["spare_key_access"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    with pytest.raises(ToolError):
+        box.user_next_step("spare_key_access", "done")  # not accepted yet
+    box.user_confirm_item("spare_key_access", True)
+    box.user_next_step("spare_key_access", "later")
+    assert box.state.actions_later == ["spare_key_access"]
+    box.user_next_step("spare_key_access", "done")
+    assert box.state.actions_done == {"spare_key_access"} and box.state.actions_later == []
+    with pytest.raises(ToolError):
+        box.user_next_step("spare_key_access", "snooze")  # only done or later
+    saved = box.export()
+    assert saved["actions_done"] == ["spare_key_access"]
+
+
+# ---- Encouragement at milestones -----------------------------------------------
+
+def test_encouragement_names_what_the_person_did_in_plain_words():
+    from just_in_case.encouragement import encouragement
+    assert encouragement(0, 4, False) is None and encouragement(0, 0, False) is None
+    assert encouragement(1, 4, False) == "You've planned for 1 of 4 situations. A good start."
+    assert encouragement(3, 4, False) == "You've planned for 3 of 4 situations. Nice work."
+    assert encouragement(4, 4, True) == "Your plan is ready. You can print your card at any time."
+    # No card yet: do not promise a card that does not exist.
+    assert "fridge card when you'd like" in encouragement(2, 2, False)
+
+
+def test_encouragement_never_gushes_or_talks_down():
+    from just_in_case.encouragement import encouragement
+    from just_in_case.safeguards import reading_grade
+    lines = [encouragement(c, t, card) for t in range(1, 11) for c in range(0, t + 1) for card in (True, False)]
+    lines = [l for l in lines if l]
+    banned = ("great job", "good job", "awesome", "amazing", "proud of you", "well done", "you did it", "sweetie", "dear")
+    for line in lines:
+        assert "!" not in line, line
+        assert not any(b in line.lower() for b in banned), line
+        assert len(line.split(". ")) <= 3 and reading_grade(line) <= 7, line
+
+
+# ---- Privacy: the AI toolkit must not leave a copy of the chat behind ----------
+
+def test_agent_keeps_its_conversation_log_in_a_private_folder_that_is_deleted(monkeypatch):
+    import asyncio
+    import os
+    from pathlib import Path
+    import just_in_case.agent as agent_mod
+    monkeypatch.setattr(agent_mod, "runtime_env", lambda: {"ANTHROPIC_AUTH_TOKEN": "test"})
+    agent = agent_mod.JustInCaseAgent(trace=lambda *_: None)
+    folder = Path(agent.options.env["CLAUDE_CONFIG_DIR"])
+    assert folder.is_dir() and folder != Path.home() / ".claude"   # never the shared ~/.claude folder
+    assert str(folder).startswith(os.path.realpath(__import__("tempfile").gettempdir())) or "jic-private-" in folder.name
+
+    class Client:  # stands in for the SDK client
+        async def disconnect(self):
+            pass
+    agent.client = Client()
+    asyncio.run(agent.__aexit__(None, None, None))
+    assert not folder.exists()  # gone when the visit ends
+
+
+# ---- "Mark my plan as reviewed" ----------------------------------------------
+
+def _plan_with_one_accepted_part(box):
+    box.confirm_needs(["spare_key_access"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    box.user_confirm_item("spare_key_access", True)
+
+
+def test_review_needs_something_in_the_plan_and_records_only_the_date(box):
+    with pytest.raises(ToolError):
+        box.user_review("mark")                      # nothing to review yet
+    _plan_with_one_accepted_part(box)
+    box.user_review("mark")
+    box.user_review("mark")                          # a second tap the same day adds nothing
+    assert box.state.reviews == [box.today.isoformat()]
+    with pytest.raises(ToolError):
+        box.user_review("remind")                    # only mark or undo
+    box.user_review("undo")
+    assert box.state.reviews == []
+    with pytest.raises(ToolError):
+        box.user_review("undo")
+
+
+def test_review_suggestion_is_gentle_and_comes_after_a_few_months():
+    from datetime import date, timedelta
+    from just_in_case.reviews import review_status
+    today = date(2026, 10, 24)
+    assert review_status([], today, has_plan=False) is None
+    first = review_status([], today, has_plan=True)
+    assert "when you are ready" in first["text"].lower() and first["count"] == 0
+    recent = review_status(["2026-10-24"], today, True)
+    assert recent["reviewed_today"] is True and "October 24, 2026" in recent["text"]
+    old = review_status([(today - timedelta(days=130)).isoformat()], today, True)
+    assert "few months" in old["text"] and "If you would like" in old["text"]
+    for status in (first, recent, old):
+        text = status["text"].lower()
+        assert "!" not in text
+        assert not any(w in text for w in ("overdue", "late", "must", "urgent", "don't forget", "warning"))
+
+
+def test_review_dates_show_on_the_plan_print_and_the_card_and_survive_saving(box):
+    from datetime import timedelta
+    from just_in_case.card import render_plan_html
+    _plan_with_one_accepted_part(box)
+    box.user_review("mark")
+    page = render_plan_html(box.state, box.dir, box.today)
+    assert "Plan last reviewed:" in page
+    by = (box.today + timedelta(days=30 * 4)).strftime("%B %Y")
+    assert f"Review this plan by: {by}" in page      # counted from the review, not from the card
+    saved = box.export()
+    assert saved["reviews"] == [box.today.isoformat()]
+
+
+def test_restoring_ignores_review_dates_that_are_not_real(box):
+    box.restore({"reviews": ["2026-01-05", "not a date", "2999-01-01", 5, None]})
+    assert box.state.reviews == ["2026-01-05"] or box.state.reviews == []  # only a real, past date can stay
+    assert "2999-01-01" not in box.state.reviews and "not a date" not in box.state.reviews
+
+
+# ---- "My readiness summary" ----------------------------------------------------
+
+def test_readiness_counts_only_what_the_person_said_yes_to(box):
+    from just_in_case.summary import readiness
+    box.confirm_needs(["spare_key_access", "power_outage"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    box.add_to_plan("power_outage", "service", "svc_utility_medical")
+    d = readiness(box.state, box.dir, box.today)
+    assert d["covered"] == 0 and d["total"] == 2          # nothing yet: no yes from the person
+    assert all(s["supports"][0]["kind"] == "waiting" for s in d["situations"])
+    box.user_confirm_item("spare_key_access", True)
+    d = readiness(box.state, box.dir, box.today)
+    assert d["covered"] == 1 and d["across"]["key_lockbox"] is True and d["across"]["fridge_card"] is False
+    key = next(s for s in d["situations"] if s["need"] == "spare_key_access")
+    assert key["supports"][0]["label"] == "Ready: Key lockbox"
+
+
+def test_readiness_dates_and_review_count_come_from_the_plan(box):
+    from just_in_case.summary import readiness
+    box.confirm_needs(["spare_key_access"])
+    assert box.state.started == box.today.isoformat()      # the day the plan began
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    box.user_confirm_item("spare_key_access", True)
+    box.user_review("mark")
+    d = readiness(box.state, box.dir, box.today)
+    assert d["review_count"] == 1 and d["last_review"] == d["started"] == d["created"]
+    box.confirm_needs(["spare_key_access", "power_outage"])  # asking again never moves the start day
+    assert box.state.started == box.today.isoformat()
+
+
+def test_start_day_survives_saving_but_never_a_future_date(box):
+    saved = {"started": "2026-01-05", "needs": ["spare_key_access"]}
+    box.restore(saved)
+    assert box.state.started == "2026-01-05"
+    other = box.__class__(type(box.state)(), box.dir, box.out_dir)
+    other.restore({"started": "2999-01-01", "needs": ["spare_key_access"]})
+    assert other.state.started == other.today.isoformat()
+
+
+def test_summary_page_is_built_from_the_plan_with_icons_and_short_labels(box):
+    from just_in_case.summary import render_summary_html
+    box.confirm_needs(["spare_key_access"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    box.user_confirm_item("spare_key_access", True)
+    page = render_summary_html(box.state, box.dir, box.today)
+    for words in ("My readiness summary", "Started:", "Last reviewed:", "Not yet", "Times reviewed:",
+                  "Key lockbox", "Fridge card:", "Not made yet", "In an emergency, call 911."):
+        assert words in page
+    assert "<svg" in page and 'aria-hidden="true"' in page
+
+
+def test_summary_lets_the_person_choose_parts_and_hides_the_choosing_when_printed(box):
+    from just_in_case.summary import render_summary_html
+    box.confirm_needs(["spare_key_access"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    box.user_confirm_item("spare_key_access", True)
+    page = render_summary_html(box.state, box.dir, box.today)
+    for part in ("dates", "situations", "helpers", "lockbox", "card"):
+        assert f'<input type="checkbox" value="{part}" checked>' in page   # all start ticked
+        assert f'data-part="{part}"' in page                               # and each one names a real part
+    assert "Choose what to include" in page and "Save as PDF" in page
+    assert "@media print" in page and ".print, .choose { display: none; }" in page.replace("{{", "{").replace("}}", "}")
+    assert "In an emergency, call 911." in page.split("<form")[0] .upper().title() or "IN AN EMERGENCY, CALL 911." in page
+    assert "fetch(" not in page and "XMLHttpRequest" not in page         # choosing never sends anything
+
+
+def test_summary_says_clearly_at_the_top_that_it_is_self_reported_and_not_an_assessment(box):
+    from just_in_case.summary import SELF_REPORT_NOTE, render_summary_html
+    page = render_summary_html(box.state, box.dir, box.today)
+    assert SELF_REPORT_NOTE == "This is a self reported summary of my planning. It is not a medical or functional assessment."
+    top = page[:page.index("Choose what to include")]
+    assert SELF_REPORT_NOTE in top and 'class="note"' in top          # above the tick boxes and every section
+    assert page.index(SELF_REPORT_NOTE) < page.index("Made on")
+    assert 'value="note"' not in page                                  # it is never an option to leave off
+    assert ".choose { display: none; }" not in page.split(".note")[1].split("}")[0]  # and the print rules never hide it
+
+
+def test_summary_shows_helpers_by_first_name_only_like_the_shared_list(box):
+    from just_in_case.summary import render_summary_html
+    from just_in_case.safeguards import first_name
+    from web.share_store import first_name as shared_first
+    assert first_name("Doris Chen") == shared_first("Doris Chen") == "Doris"   # one rule for both
+    box.confirm_needs(["spare_key_access"])
+    box.set_comfort(True, False)
+    box.add_to_plan("spare_key_access", "person", None)
+    box.user_confirm_item("spare_key_access", True)
+    box.state.helper_notes = [{"helpers": ["Doris Chen"], "role": "key", "text": "x"}]
+    page = render_summary_html(box.state, box.dir, box.today)
+    assert "Helper chosen: Doris" in page and "Chen" not in page
+
+
+def test_nothing_about_reviews_or_the_summary_goes_into_a_shared_list(tmp_path):
+    from web.share_store import ShareStore
+    store = ShareStore(tmp_path)
+    rec, _ = store.create("Gloria", [{"id": 1, "task": "Rides", "date": "", "time": "", "person": ""}])
+    assert set(rec) == {"id", "owner_hash", "label", "created", "expires", "tasks"}   # only the helper list
+    text = (tmp_path / f"{rec['id']}.json").read_text().lower()
+    assert "review" not in text and "summary" not in text and "started" not in text
+
+
+# ---- No tracking, no scoring, no judging ---------------------------------------
+
+def test_agent_is_told_never_to_judge_score_or_track_the_person():
+    from just_in_case.prompts import SYSTEM_PROMPT
+    text = " ".join(SYSTEM_PROMPT.split()).lower()
+    for rule in ("never judge how well the person is doing or whether they can live alone",
+                 "do not score, rate, or comment on their health, memory, or independence",
+                 "track or mention how long they use the app or how often they come back"):
+        assert rule in text
+
+
+def test_the_agent_has_only_these_tools_and_none_can_track_score_or_assess():
+    import inspect
+    import just_in_case.tools as tools_mod
+    names = set(__import__("re").findall(r'@tool\("([a-z_]+)"', inspect.getsource(tools_mod)))
+    assert names == {"confirm_helping_someone", "confirm_needs", "set_comfort", "find_services", "find_preparations",
+                     "add_to_plan", "draft_helper_note", "add_helper_task", "choose_card_sections",
+                     "make_fridge_card", "get_support_lines", "review_plan"}   # a new tool must be added here on purpose
+
+
+def test_the_plan_keeps_no_visit_timing_login_counts_or_scores(box):
+    import dataclasses
+    import re
+    from just_in_case.state import PlanState
+    banned = re.compile(r"login|log_in|logged|last_seen|last_visit|visit|session_time|time_spent|duration|elapsed|"
+                        r"score|rating|grade_of|cognit|memory_|capacity|ability|independen|risk", re.I)
+    fields = [f.name for f in dataclasses.fields(PlanState)]
+    assert not [f for f in fields if banned.search(f)], fields
+    saved = box.export()
+    assert not [k for k in saved if banned.search(k)], list(saved)       # nothing like it in a saved plan either
+
+
+def test_no_code_measures_time_in_the_app_or_counts_visits():
+    import pathlib
+    import re
+    pattern = re.compile(r"time_spent|session_length|visit_count|login_count|last_seen|performance\.now|setInterval\([^)]*(count|track)|"
+                         r"(health|memory|cognitive|independence)_?score", re.I)
+    root = pathlib.Path(__file__).resolve().parent.parent
+    files = [*root.glob("just_in_case/*.py"), *root.glob("web/*.py"), *root.glob("web/static/*.js")]
+    hits = [f"{f.name}: {m.group(0)}" for f in files for m in [pattern.search(f.read_text())] if m]
+    assert not hits, hits

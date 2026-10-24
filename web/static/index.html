@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
+  <script>window.JIC_AGENT_NAME = "{{AGENT_NAME}}";</script>
   <script>
     // Pick the theme before the page draws: the saved choice, or Light.
     (function () {
@@ -32,7 +33,7 @@
   </div>
 
   <header class="site-header">
-    <a class="brand" href="/" aria-label="Just in Case, home">
+    <a class="brand" href="#home" aria-label="Just in Case, home">
       <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
         <path d="M6 22 24 6l18 16v20H6z" fill="#1F6F78"/>
         <path d="M24 37s-9-5.4-9-11.4a5 5 0 0 1 9-2.9 5 5 0 0 1 9 2.9c0 6-9 11.4-9 11.4z" fill="#E07A5F"/>
@@ -71,19 +72,57 @@
     </a>
   </div>
 
-  <nav class="tabs" aria-label="Sections of Just in Case">
-    <a href="#about" data-tab="about"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> About</a>
-    <a href="#features" data-tab="features"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg> Features</a>
-    <a href="#plan" data-tab="plan"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg> Make my plan <span id="tab-updates" class="tab-updates" hidden></span></a>
+  <nav class="menu-bar" aria-label="Menu">
+    <a id="menu-home" class="menu-home" href="#home" hidden>
+      <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Home
+    </a>
+    <details id="more-menu" class="more-menu">
+      <summary>Menu <span id="tab-updates" class="tab-updates" hidden></span></summary>
+      <ul>
+        <li><a href="#home" data-tab="home">Home</a></li>
+        <li><a href="#about" data-tab="about">About</a></li>
+        <li><a href="#features" data-tab="features">Features</a></li>
+        <li><a href="#privacy" data-tab="privacy">Your privacy</a></li>
+      </ul>
+    </details>
   </nav>
 
   <main id="main">
-  <section id="panel-about" class="panel intro" data-panel="about" tabindex="-1" aria-labelledby="hero-title">
+  <section id="panel-home" class="panel home" data-panel="home" tabindex="-1" aria-labelledby="home-title">
+    <svg class="ill ill-hero" viewBox="0 0 120 96" role="img" aria-label="Line drawing of a small house with a heart on its front, a chimney, a door, and a tree beside it."><use href="#ill-home"/></svg>
+    <h1 id="home-title" class="home-title">What would you like to do?</h1>
+    <div class="home-buttons">
+      <a class="btn btn-primary home-btn" href="#plan">
+        <svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg> <span>Make my plan</span>
+      </a>
+      <a class="btn btn-quiet home-btn" href="#my-plan">
+        <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> <span>See my plan</span>
+      </a>
+      <a class="btn home-btn home-help" href="#help">
+        <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg> <span>Get help now</span>
+      </a>
+    </div>
+  </section>
+
+  <section id="panel-help" class="panel help" data-panel="help" tabindex="-1" aria-labelledby="help-title" hidden>
+    <h1 id="help-title" class="home-title">Get help now</h1>
+    <ul class="call-list">
+      <li><a class="btn home-btn home-help" href="tel:911"><svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg>
+        <span>Call 911<small>For an emergency</small></span></a></li>
+      <li><a class="btn btn-quiet home-btn" href="tel:988"><svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg>
+        <span>Call or text 988<small>If you feel alone or unsafe</small></span></a></li>
+      <li><a class="btn btn-quiet home-btn" href="tel:211"><svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg>
+        <span>Call 2-1-1<small>Mass 211: find local help</small></span></a></li>
+    </ul>
+    <p class="helper-small call-note">On a computer? Pick up your phone and dial the number.</p>
+  </section>
+
+  <section id="panel-about" class="panel intro" data-panel="about" tabindex="-1" aria-labelledby="hero-title" hidden>
     <div class="hero">
       <div class="hero-text">
         <p class="hero-kicker">For people who live alone</p>
         <h1 id="hero-title" class="hero-title">Plan today. Rest easier tomorrow.</h1>
-        <p class="hero-lead">Just in Case helps you make a small backup plan, and a card for your fridge, in case you need a hand while living alone.</p>
+        <p class="hero-lead">Make a small backup plan and a card for your fridge. It helps if you live alone and need a hand.</p>
         <div class="how-actions">
           <a class="btn btn-primary btn-big" href="#plan">
             <svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg> Make my plan
@@ -125,6 +164,11 @@
       <span><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> Supported.</span>
     </p>
 
+    <p class="meet-agent">
+      <svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg>
+      <span><strong>Meet {{AGENT_NAME}}</strong>, a digital helper. You make every choice.</span>
+    </p>
+
     <section class="how" aria-labelledby="how-title">
       <h2 id="how-title" class="section-title">How it works</h2>
       <ol class="how-steps">
@@ -134,7 +178,7 @@
         </li>
         <li>
           <span class="how-icon" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
-          <span><strong>Choose what helps.</strong> Free services and simple steps first. You say yes to each one.</span>
+          <span><strong>Choose what helps.</strong> You say yes to each step.</span>
         </li>
         <li>
           <span class="how-icon" aria-hidden="true"><svg class="icon"><use href="#i-card"/></svg></span>
@@ -146,19 +190,22 @@
     <div class="about-pair">
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Our goal</h2>
-        <p>Help people who live alone stay independent, with a simple plan made before anything happens.</p>
+        <p>Help people who live alone stay in charge. Make a plan before you need it.</p>
       </div>
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> Our mission</h2>
-        <p>Free local services and simple steps come first. Friends come in only if you choose. No pressure, nothing to buy, and nothing is ever sent for you.</p>
+        <p>Free local services come first. Friends join only if you choose.</p>
+        <details class="more"><summary>Show details</summary><p>Free local services and simple steps come first. Friends come in only if you choose. No pressure, nothing to buy, and nothing is ever sent for you.</p></details>
       </div>
     </div>
 
     <article class="ruth-card" aria-labelledby="ruth-title">
       <p class="example-tag"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Example story</p>
       <h2 id="ruth-title" class="section-title">Meet Ruth</h2>
-      <p>Ruth is a made-up example, not a real person. She is 74, lives alone in Boston with her cat, Fifi, and has a procedure next month. Her clinic says someone has to take her home.</p>
-      <p>In the example, Just in Case finds a free volunteer escort, suggests a key lockbox and USPS Hold Mail, and helps her write a gentle note to her friend Doris about feeding Fifi. Ruth says yes or no to each step.</p>
+      <p>Ruth is a made-up example, not a real person. She lives alone in Boston and has a procedure next month.</p>
+      <details class="more"><summary>Show details</summary><p>She is 74, lives alone in Boston with her cat, Fifi, and has a procedure next month. Her clinic says someone has to take her home.</p></details>
+      <p>{{AGENT_NAME}} finds her a free ride home and helps with her mail and her cat. Ruth says yes or no to each step.</p>
+      <details class="more"><summary>Show details</summary><p>In the example, {{AGENT_NAME}} finds a free volunteer escort, suggests a key lockbox and USPS Hold Mail, and helps her write a gentle note to her friend Doris about feeding Fifi. Ruth says yes or no to each step.</p></details>
       <a class="btn btn-quiet" href="/?example=1#plan">
         <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Watch Ruth's example
       </a>
@@ -168,11 +215,11 @@
       <h2 id="facts-title" class="section-title">By the numbers</h2>
       <p class="facts-note">Counted from the app itself, so they stay true.</p>
       <ul class="facts-list">
-        <li><strong data-fact="services"></strong><span>Boston services in our list, each checked on its official website</span></li>
+        <li><strong data-fact="services"></strong><span>Boston services we checked on their own sites</span></li>
         <li><strong data-fact="free_services"></strong><span>of those are free, and free ones always come first</span></li>
         <li><strong data-fact="support_lines"></strong><span>support lines you can call, like 988</span></li>
         <li><strong data-fact="checkpoints"></strong><span>kinds of steps that wait for your OK</span></li>
-        <li><strong data-fact="safeguard_tests"></strong><span>automated tests that check every safety rule</span></li>
+        <li><strong data-fact="safeguard_tests"></strong><span>tests that check our safety rules</span></li>
         <li><strong>0</strong><span>messages sent for you. You send anything yourself.</span></li>
         <li><strong>0</strong><span>data sold. Ever.</span></li>
       </ul>
@@ -180,32 +227,42 @@
 
     <section class="why-built" aria-labelledby="why-title">
       <h2 id="why-title" class="section-title">Why we built this</h2>
-      <p>Many people who live alone have a quiet worry: what happens if I need a hand? A ride home after a procedure, someone to feed the cat, a way for help to get in. These are small things, but they are hard to plan for alone.</p>
-      <p>We built Just in Case to make that planning calm and simple. It leans on free local services first, asks before every step, and never pressures anyone. You stay in charge of your own plan.</p>
-      <p class="why-sign">Leya, Seyi, Joan, and Satoshi</p>
+      <p>Many people who live alone worry about needing a hand. Small things, like a ride home, are hard to plan alone.</p>
+      <p>We make that planning calm and simple. You stay in charge of your plan.</p>
+      <details class="more"><summary>Show details</summary><p>Many people who live alone have a quiet worry: what happens if I need a hand? A ride home after a procedure, someone to feed the cat, a way for help to get in. These are small things, but they are hard to plan for alone.</p><p>We built Just in Case to make that planning calm and simple. It leans on free local services first, asks before every step, and never pressures anyone. You stay in charge of your own plan.</p></details>
+      <p class="why-sign">Leya Jacob, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae</p>
     </section>
 
     <section class="faq" aria-labelledby="faq-title">
       <h2 id="faq-title" class="section-title">Questions</h2>
       <details>
+        <summary>Who is {{AGENT_NAME}}?</summary>
+        <p>{{AGENT_NAME}} is the app's AI planning helper. It suggests options, but you make every decision, and it never sends, shares, or books anything without your OK.</p>
+      </details>
+      <details>
         <summary>Is it free?</summary>
-        <p>Yes. Just in Case is free to use. Some services it suggests have a cost. Free ones always come first.</p>
+        <p>Yes. Just in Case is free, and free services come first.</p>
+        <details class="more"><summary>Show details</summary><p>Some services it suggests have a cost. Free ones always come first.</p></details>
       </details>
       <details>
         <summary>Who can see my information?</summary>
-        <p>Only you, unless you choose to share. What you type is sent to an AI service so it can write replies. Nothing is kept after your visit unless you tap "Save my progress" (saved only on your device) or "Share with family" (your helper list only, with first names, deleted after 30 days). We never sell data.</p>
+        <p>Only you, unless you choose to share. We never sell data.</p>
+        <details class="more"><summary>Show details</summary><p>What you type is sent to an AI service so it can write replies. Nothing is kept after your visit unless you tap "Save my progress" (saved only on your device) or "Share with family" (your helper list only, with first names, deleted after 30 days).</p></details>
       </details>
       <details>
         <summary>I'm not good with technology. Can I still use it?</summary>
-        <p>Yes. You can type, or tap Speak and talk. You can make the text bigger and have answers read aloud. Nothing happens until you say yes. A friend or family member can sit with you, too.</p>
+        <p>Yes. You can type or talk, and make the text bigger.</p>
+        <details class="more"><summary>Show details</summary><p>You can type, or tap Speak and talk. You can make the text bigger and have answers read aloud. Nothing happens until you say yes. A friend or family member can sit with you, too.</p></details>
       </details>
       <details>
         <summary>What if I don't have anyone to ask?</summary>
-        <p>That's okay. Your plan can use services and simple steps only. Boston's Age Strong Commission (Boston's Council on Aging) and Mass 211 can help you find more.</p>
+        <p>That's okay. Your plan can use services and simple steps only.</p>
+        <details class="more"><summary>Show details</summary><p>Boston's Age Strong Commission (Boston's Council on Aging) and Mass 211 can help you find more.</p></details>
       </details>
       <details>
         <summary>Is this an emergency service?</summary>
-        <p><strong>No. In an emergency, always call 911.</strong> Just in Case is a planning tool. It does not watch over you, and it cannot call anyone.</p>
+        <p><strong>No. In an emergency, always call 911.</strong></p>
+        <p>Just in Case does not watch over you, and it cannot call anyone.</p>
       </details>
     </section>
 
@@ -217,8 +274,9 @@
 
   <section id="panel-features" class="panel intro" data-panel="features" tabindex="-1" aria-labelledby="features-title" hidden>
     <h1 id="features-title" class="page-title">What Just in Case can do</h1>
-    <p class="hero-lead">Everything here is built and working today.</p>
+    <p class="hero-lead">Everything here works today.</p>
     <ul class="feature-grid">
+      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-chat"/></svg></span><div><h3>{{AGENT_NAME}}, your planning helper</h3><p>A digital helper that gives ideas. You choose every step.</p></div></li>
       <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-search"/></svg></span><div><h3>Free services first</h3><p>Boston services, free ones first, each with the month it was checked.</p></div></li>
       <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-shield"/></svg></span><div><h3>Private by design</h3><p>Nothing is kept after your visit unless you choose to save or share.</p></div></li>
       <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span><div><h3>You stay in control</h3><p>Nothing goes into your plan until you say yes.</p></div></li>
@@ -233,7 +291,7 @@
       <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-heart"/></svg></span><div><h3>Share with family</h3><p>Only if you agree. First names only, and you can stop sharing any time.</p></div></li>
       <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-info"/></svg></span><div><h3>Helper updates</h3><p>In an emergency, call 911 first. These are calm, non-urgent updates, like when a helper signs up or steps back.</p></div></li>
       <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-hand"/></svg></span><div><h3>Planning for someone else</h3><p>For a parent, relative, or friend, once they agree. They decide what goes in it.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-home"/></svg></span><div><h3>No one to ask? That's okay.</h3><p>A plan with services only, plus Boston's Council on Aging and Mass 211.</p></div></li>
+      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-home"/></svg></span><div><h3>No one to ask? That's okay.</h3><p>A plan with services only. Boston's Council on Aging can help.</p></div></li>
       <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-mail"/></svg></span><div><h3>Hold your mail</h3><p>Step-by-step help with free USPS Hold Mail.</p></div></li>
       <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-phone"/></svg></span><div><h3>People you can talk to</h3><p>988 and other free support lines. 988 is there any time, day or night.</p></div></li>
       <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-contrast"/></svg></span><div><h3>Easy to see</h3><p>Bigger text, and light, dark, or high contrast.</p></div></li>
@@ -257,7 +315,8 @@
           </tbody>
         </table>
       </div>
-      <p class="helper-small compare-note"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> A medical alert pendant does something Just in Case does not: it can call for help. The two can work well together. Pendant features and prices vary by company.</p>
+      <p class="helper-small compare-note"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> A medical alert pendant can call for help. Just in Case cannot.</p>
+      <details class="more"><summary>Show details</summary><p class="helper-small">A medical alert pendant does something Just in Case does not: it can call for help. The two can work well together. Pendant features and prices vary by company.</p></details>
     </section>
 
     <a class="btn btn-primary btn-big" href="#plan">
@@ -265,32 +324,61 @@
     </a>
   </section>
 
+  <section id="panel-privacy" class="panel intro" data-panel="privacy" tabindex="-1" aria-labelledby="privacy-title" hidden>
+    <h1 id="privacy-title" class="page-title">Your privacy</h1>
+    <p class="hero-lead">Here is what we save, who can see it, and how to delete it.</p>
+    <div class="about-pair">
+      <div class="about-box">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> What we save</h2>
+        <p>By default, nothing. Your plan stays on this page, and it is gone when you close it.</p>
+        <details class="more"><summary>Show details</summary><p>Your plan and card printouts are made during your visit and deleted when it ends. So is the AI toolkit's own log of the chat.</p></details>
+      </div>
+      <div class="about-box">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg> Only if you choose</h2>
+        <p>"Save my progress" keeps your plan on this device. "Share with family" saves your helper list on our server.</p>
+        <details class="more"><summary>Show details</summary><p>Saved progress holds your plan, helper table, card details, review dates, the day you started, and your last 100 chat messages. It stays in this browser. A shared list holds each task, date, time, and name, plus the first name you chose to show.</p><p>A readiness summary is made only when you ask and say yes. It is not saved, it shows helpers by first name only, and Just in Case never sends it. You choose who sees it.</p></details>
+      </div>
+      <div class="about-box">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> Who can see it</h2>
+        <p>Only you, unless you share a list. People with your link see first names and tasks only.</p>
+        <details class="more"><summary>Show details</summary><p>What you type is sent to an AI service so it can reply. That service is OpenRouter, which passes your words to an AI model, and their own privacy rules apply. Please do not type bank details or account numbers.</p><p>Anyone who has your share link can open it, so send it only to people you trust. Your private link, which can remove names or stop sharing, is separate.</p><p>If you use Speak, your browser may send your voice to its maker to turn it into text. This site also loads a font from Google, so Google can see that your browser visited.</p></details>
+      </div>
+      <div class="about-box">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> How long we keep it</h2>
+        <p>Your visit ends when you close the page. A shared list is deleted after 30 days.</p>
+        <details class="more"><summary>Show details</summary><p>Saved progress stays on your device until you delete it. Your light, dark, text size, view, and reading voice choices stay in your browser too.</p></details>
+      </div>
+      <div class="about-box">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> How to delete it</h2>
+        <p>Close the page to clear your visit. Use the delete buttons on "Make my plan" for the rest.</p>
+        <details class="more"><summary>Show details</summary><p>Saved progress: tap "Stop saving and delete". It appears once saving is on.</p><p>A shared list: tap "Stop sharing and delete", or open your private link and tap "Stop sharing". The list is deleted for everyone, and the link stops working.</p><p>A helper can remove their own name from a shared list. Files you download or print are yours, so delete them from your computer. Clearing your browser data also removes saved progress and your choices.</p></details>
+      </div>
+      <div class="about-box">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> Our promise</h2>
+        <p>We never sell your data. Just in Case never sends, shares, or books anything without your OK.</p>
+      </div>
+    </div>
+  </section>
+
   <div id="panel-plan" class="panel layout" data-panel="plan" tabindex="-1" hidden>
-    <section class="chat" aria-label="Conversation with Just in Case">
+    <p class="promise" role="note">
+      <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span>Just in Case never sends, shares, or books anything without your OK.</span>
+    </p>
+    <section class="chat simple" aria-label="Conversation with {{AGENT_NAME}}">
       <ol id="messages" class="messages" aria-live="polite"></ol>
 
       <div id="typing" class="typing" hidden>
         <span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span>
-        <span class="typing-text">Thinking…</span>
+        <span class="typing-text">{{AGENT_NAME}} is thinking…</span>
       </div>
 
       <div id="starters" class="starters" role="group" aria-label="Ways to start">
-        <button type="button" class="starter" data-text="I have a procedure next month and the clinic says someone has to take me home.">
-          <span class="starter-icon" data-sit="ride" aria-hidden="true"><svg class="icon"><use href="#i-car"/></svg></span>
-          <span class="starter-text"><strong>I have a procedure coming up</strong><span>Getting home safely afterward</span></span>
-        </button>
-        <button type="button" class="starter" data-text="I'd like a plan for my pet in case I have to go to the hospital.">
-          <span class="starter-icon" data-sit="pet" aria-hidden="true"><svg class="icon"><use href="#i-paw"/></svg></span>
-          <span class="starter-text"><strong>A plan for my pet</strong><span>If I have to go to the hospital</span></span>
-        </button>
-        <button type="button" class="starter" data-text="I'd like to be ready for a winter power outage.">
-          <span class="starter-icon" aria-hidden="true"><svg class="icon"><use href="#i-bolt"/></svg></span>
-          <span class="starter-text"><strong>Ready for a power outage</strong><span>Staying warm and safe in winter</span></span>
-        </button>
-        <button type="button" class="starter" data-text="I'm helping someone else make a plan.">
-          <span class="starter-icon" aria-hidden="true"><svg class="icon"><use href="#i-hand"/></svg></span>
-          <span class="starter-text"><strong>I'm helping someone else plan</strong><span>For a parent, relative, or friend</span></span>
-        </button>
+        <p class="starters-lead">Tap one to start, or type your own below.</p>
+        <button type="button" class="starter" data-text="I have a procedure next month and need a ride home.">I have a procedure next month and need a ride home.</button>
+        <button type="button" class="starter" data-text="I'm going away for two weeks.">I'm going away for two weeks.</button>
+        <button type="button" class="starter" data-text="Who would feed my cat if I went to the hospital?">Who would feed my cat if I went to the hospital?</button>
+        <button type="button" class="starter" data-text="I'm helping someone else make a plan.">I'm helping someone else make a plan.</button>
       </div>
 
       <form id="composer" class="composer">
@@ -308,15 +396,45 @@
       </form>
       <p id="mic-status" class="mic-status" role="status"></p>
       <p id="mic-note" class="helper-small mic-note" hidden>In some browsers, your voice may be sent to the browser's maker to turn it into text.</p>
-      <label id="voice-row" class="voice-row" hidden>
-        <svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg>
-        <span>Reading voice</span>
-        <select id="voice"></select>
-      </label>
+      <fieldset id="voice-row" class="voice-row" hidden>
+        <legend><svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg> Reading voice</legend>
+        <label class="voice-field">Accent <select id="voice-accent"></select></label>
+        <div id="voice-kind" class="voice-kind view-switch" role="group" aria-label="Female or male voice"></div>
+        <label class="voice-field voice-full-only">All voices <select id="voice"></select></label>
+        <div class="voice-actions">
+          <button type="button" id="voice-sample" class="btn btn-quiet">
+            <svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg> Play sample
+          </button>
+          <span class="voice-speed" role="group" aria-label="Reading speed">
+            <button type="button" id="voice-slower" class="btn btn-quiet">Slower</button>
+            <span id="voice-speed" class="voice-speed-text" role="status"></span>
+            <button type="button" id="voice-faster" class="btn btn-quiet">Faster</button>
+          </span>
+        </div>
+      </fieldset>
+      <div class="step-nav" role="group" aria-label="Steps">
+        <button type="button" id="step-back" class="btn btn-quiet" disabled><span aria-hidden="true">&larr;</span> Back</button>
+        <div class="step-progress">
+          <span id="step-dots" class="step-dots" aria-hidden="true"></span>
+          <span id="step-count" class="step-count" role="status"></span>
+        </div>
+        <button type="button" id="step-next" class="btn btn-primary" disabled>Next <span aria-hidden="true">&rarr;</span></button>
+      </div>
+      <p id="step-hint" class="helper-small step-hint" role="status"></p>
+      <p id="step-announce" class="sr-only" role="status" aria-live="polite"></p>
+      <div class="view-switch" role="group" aria-label="How to show the conversation">
+        <span class="view-label" id="view-label">View:</span>
+        <button type="button" id="view-simple" aria-pressed="true" aria-describedby="view-label">
+          <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Simple view
+        </button>
+        <button type="button" id="view-full" aria-pressed="false" aria-describedby="view-label">
+          <svg class="icon" aria-hidden="true"><use href="#i-chat"/></svg> Full view
+        </button>
+      </div>
     </section>
 
     <aside class="side" aria-label="Your plan">
-      <section class="fridge" aria-labelledby="fridge-title">
+      <section id="plan-section" class="fridge" aria-labelledby="fridge-title" tabindex="-1">
         <div class="fridge-handle" aria-hidden="true"></div>
         <div class="fridge-head">
           <svg id="progress-ring" class="progress-ring" viewBox="0 0 48 48" aria-hidden="true" hidden>
@@ -325,11 +443,44 @@
           </svg>
           <h2 id="fridge-title">Your plan<span id="plan-progress"></span></h2>
         </div>
+        <section id="next-step" class="next-step" aria-labelledby="next-step-title" hidden>
+          <h3 id="next-step-title" class="next-step-title"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg> Your next step</h3>
+          <svg id="next-ill" class="ill next-ill" viewBox="0 0 120 96" role="img" aria-label="" hidden><use href="#ill-clinic"/></svg>
+          <p id="next-step-text" class="next-step-text"></p>
+          <div class="next-step-actions">
+            <a id="next-call" class="btn btn-primary next-btn" href="#" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg> <span id="next-call-label">Call now</span>
+            </a>
+            <button type="button" id="next-done" class="btn btn-quiet next-btn">
+              <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Done
+            </button>
+            <button type="button" id="next-later" class="btn btn-quiet next-btn">
+              <svg class="icon" aria-hidden="true"><use href="#i-wait"/></svg> Remind me later
+            </button>
+          </div>
+          <p id="next-left" class="helper-small" role="status"></p>
+          <details class="more"><summary>Show details</summary>
+            <p>"Remind me later" moves this step to the end of your list. Just in Case never sends alerts, so open this page to see it again.</p>
+          </details>
+        </section>
         <p id="plan-ready" class="plan-ready" hidden>
-          <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Ready. Nothing you need to do right now.
+          <svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> <span id="plan-ready-text"></span>
         </p>
         <p id="fridge-empty" class="fridge-empty"><svg class="icon" aria-hidden="true"><use href="#i-chat"/></svg> <span>Your plan will appear here as we talk.</span></p>
         <ul id="plan" class="plan"></ul>
+        <section id="review-box" class="review-box" aria-labelledby="review-title" hidden>
+          <h3 id="review-title" class="review-title"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Keep your plan current</h3>
+          <p id="review-text" class="review-text"></p>
+          <button type="button" id="review-mark" class="btn btn-quiet btn-block">
+            <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Mark my plan as reviewed
+          </button>
+          <p id="review-status" class="helper-small" role="status"></p>
+          <button type="button" id="review-undo" class="details-link" hidden>Undo today's review</button>
+          <details class="more"><summary>Show details</summary>
+            <p>Each review saves only the date. Your printed plan and fridge card show when you last looked. Just in Case never sends reminders, so this is up to you.</p>
+            <ul id="review-history" class="review-history"></ul>
+          </details>
+        </section>
         <section id="getting-ready" class="getting-ready" aria-labelledby="getting-ready-title" hidden>
           <h3 id="getting-ready-title"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Getting ready</h3>
           <label class="event-date" for="event-date">When is your <span id="event-label">day</span>?</label>
@@ -346,6 +497,9 @@
         </button>
         <button type="button" id="plan-print" class="btn btn-quiet btn-block plan-print" hidden>
           <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg> Print my plan
+        </button>
+        <button type="button" id="summary-print" class="btn btn-quiet btn-block plan-print" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Create my readiness summary
         </button>
         <div id="save-zone" class="save-zone" hidden>
           <button type="button" id="save-start" class="btn btn-quiet btn-block">
@@ -386,7 +540,7 @@
         </div>
         <div id="helper-body">
         <p class="helper-intro">Things you'd like help with. Leave the name blank and family can sign up.</p>
-        <p id="table-empty" class="table-empty"><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> <span>Your helper list will appear here. Add something you'd like help with, or leave it empty. That's okay too.</span></p>
+        <p id="table-empty" class="table-empty"><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> <span>Your helper list shows up here. It's okay to leave it empty.</span></p>
         <table id="helper-table" class="helper-table" hidden>
           <thead><tr><th scope="col">Task</th><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Who</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Change</span></th></tr></thead>
           <tbody id="helper-rows"></tbody>
@@ -432,7 +586,8 @@
             <button type="button" id="share-stop" class="btn btn-quiet btn-block btn-stop">
               <svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Stop sharing and delete
             </button>
-            <p>Send this link to the people you choose. They can add their name to open tasks. The shared page shows first names only.</p>
+            <p>Send this link to the people you choose. They can add their name to open tasks.</p>
+            <details class="more"><summary>Show details</summary><p>The shared page shows first names only.</p></details>
             <div class="share-link-row">
               <input id="share-link" readonly aria-label="Link to your helper list">
               <button type="button" id="share-copy" class="btn btn-quiet">Copy link</button>
@@ -478,11 +633,12 @@
           <svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>
           Go to USPS Hold Mail
         </a>
-        <p class="helper-small">This opens the official USPS website in a new tab. You sign in there. Just in Case never sees your password.</p>
+        <p class="helper-small">This opens the USPS website. You sign in there.</p>
+        <details class="more"><summary>Show details</summary><p class="helper-small">It opens in a new tab. Just in Case never sees your password.</p></details>
       </details>
 
       <section class="activity" aria-labelledby="activity-title">
-        <h2 id="activity-title">What Just in Case is doing</h2>
+        <h2 id="activity-title">What {{AGENT_NAME}} is doing</h2>
         <ol id="feed" class="feed" aria-live="polite"></ol>
       </section>
     </aside>
@@ -508,6 +664,27 @@
           <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Yes, save and make a link
         </button>
         <button type="submit" value="no" class="btn btn-quiet">No, thank you</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="summary-dialog" class="consent-dialog" aria-labelledby="summary-consent-title">
+    <form method="dialog" class="consent-form">
+      <h2 id="summary-consent-title">Make my readiness summary?</h2>
+      <p class="notice-911"><svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg><span><strong>In an emergency, call 911.</strong> Feeling alone or unsafe? Call or text <strong>988</strong>.</span></p>
+      <p>It shows your dates, reviews, and what is in place. Just in Case does not save it or send it.</p>
+      <details class="more"><summary>Show details</summary>
+        <ul class="consent-facts">
+          <li><strong>What it shows:</strong> the day you started, your reviews, and what is in place for each situation. Helpers appear by first name only.</li>
+          <li><strong>Who sees it:</strong> only you. You choose whether to print it, save it as a PDF, or show it to anyone.</li>
+          <li><strong>How long:</strong> it is made fresh when you ask and is gone when you close the page.</li>
+        </ul>
+      </details>
+      <div class="consent-actions">
+        <button type="button" id="summary-yes" class="btn btn-primary">
+          <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Yes, make it
+        </button>
+        <button type="submit" value="no" class="btn btn-quiet">Not now</button>
       </div>
     </form>
   </dialog>
@@ -563,6 +740,55 @@
       <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 2 1 21h22zm-1 7h2v6h-2zm0 8h2v2h-2z" fill="currentColor"/></symbol>
       <symbol id="i-folder" viewBox="0 0 24 24"><path d="M2 5a1 1 0 0 1 1-1h6l2 2h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" fill="currentColor"/></symbol>
       <symbol id="i-dash" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zM7 11v2h10v-2z" fill="currentColor"/></symbol>
+      <!-- Line illustrations: original drawings, one stroke color, a light tint inside. Used with <use href="#ill-...">. -->
+      <symbol id="ill-home" viewBox="0 0 120 96">
+        <path d="M24 84V48M96 84V48M14 52 60 16l46 36" />
+        <path d="M24 84h72" />
+        <path d="M80 30V18h10v22" />
+        <path d="M60 60s-12-6.6-12-14.6a6.4 6.4 0 0 1 12-3 6.4 6.4 0 0 1 12 3C72 53.4 60 60 60 60z" style="fill:var(--primary-tint)"/>
+        <path d="M52 84V70a8 8 0 0 1 16 0v14" />
+        <path d="M30 70h12v-8H30z" /><path d="M36 62v8" />
+        <path d="M6 88h108" />
+        <path d="M108 88V74" /><circle cx="108" cy="64" r="9" style="fill:var(--primary-tint)"/>
+      </symbol>
+      <symbol id="ill-clinic" viewBox="0 0 120 96">
+        <rect x="12" y="28" width="58" height="56" rx="4" />
+        <path d="M41 36v14M34 43h14" />
+        <rect x="34" y="62" width="14" height="22" rx="2" />
+        <rect x="18" y="56" width="10" height="10" rx="1" /><rect x="54" y="56" width="10" height="10" rx="1" />
+        <path d="M76 76v-9a4 4 0 0 1 4-4h2l5-9h15l5 9h2a4 4 0 0 1 4 4v9" style="fill:var(--primary-tint)"/>
+        <path d="M76 76h34" /><circle cx="86" cy="78" r="4" /><circle cx="101" cy="78" r="4" />
+        <path d="M6 86h108" />
+      </symbol>
+      <symbol id="ill-outage" viewBox="0 0 120 96">
+        <path d="M40 14a16 16 0 0 0-9 29v8h18v-8A16 16 0 0 0 40 14z" />
+        <path d="M34 57h12M36 63h8" />
+        <path d="M14 22l5 4M66 22l-5 4M10 40h6M64 40h6" stroke-dasharray="1 7" />
+        <rect x="80" y="54" width="18" height="30" rx="2" style="fill:var(--primary-tint)"/>
+        <path d="M89 54v-6" />
+        <path d="M89 26c6 7 8 11 8 15a8 8 0 0 1-16 0c0-4 2-8 8-15z" style="fill:var(--primary-tint)"/>
+        <path d="M6 86h108" />
+      </symbol>
+      <symbol id="ill-pet" viewBox="0 0 120 96">
+        <circle cx="40" cy="38" r="16" style="fill:var(--primary-tint)"/>
+        <path d="M27 28 25 12l13 7M53 28l2-16-13 7" />
+        <circle cx="34" cy="38" r="1.6" style="fill:currentColor"/><circle cx="46" cy="38" r="1.6" style="fill:currentColor"/>
+        <path d="M38 44h4l-2 3zM24 42l-8-2M24 46l-8 2M56 42l8-2M56 46l8 2" />
+        <path d="M28 52c-8 8-8 24-2 32h28c6-8 6-24-2-32" />
+        <path d="M56 80c16 2 22-12 12-24" />
+        <path d="M80 66h30a15 14 0 0 1-30 0z" style="fill:var(--primary-tint)"/>
+        <path d="M88 62l2-2M96 62l2-2M104 62l2-2" />
+        <path d="M6 86h108" />
+      </symbol>
+      <symbol id="ill-mail" viewBox="0 0 120 96">
+        <path d="M24 58V44a16 16 0 0 1 16-16h14a16 16 0 0 1 16 16v14z" style="fill:var(--primary-tint)"/>
+        <path d="M70 38h10V24H70" /><path d="M24 58h46" />
+        <path d="M41 58v28M53 58v28" />
+        <path d="M33 44h26" />
+        <rect x="80" y="54" width="30" height="22" rx="2" />
+        <path d="m80 56 15 11 15-11" />
+        <path d="M6 86h108" />
+      </symbol>
     </defs>
   </svg>
 
@@ -578,15 +804,18 @@
       </section>
       <section aria-labelledby="f-privacy">
         <h2 id="f-privacy"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> Privacy</h2>
-        <p>Nothing is kept after your visit unless you choose to save or share. What you type is sent to an AI service to write replies. We never sell data.</p>
+        <p>Nothing is kept after your visit unless you save or share. We never sell data.</p>
+        <details class="more"><summary>Show details</summary><p>What you type is sent to an AI service to write replies.</p></details>
+        <p><a href="#privacy">Read our privacy page</a></p>
       </section>
       <section aria-labelledby="f-access">
         <h2 id="f-access"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Accessibility</h2>
-        <p>We aim to meet WCAG 2.1 AA: large text you can make bigger, strong contrast in every theme, full keyboard use, screen reader labels, and no motion if your device asks for less.</p>
+        <p>We work to make this site easy for everyone to use.</p>
+        <details class="more"><summary>Show details</summary><p>We aim to meet WCAG 2.1 AA: large text you can make bigger, strong contrast in every theme, full keyboard use, screen reader labels, and no motion if your device asks for less.</p></details>
       </section>
       <section aria-labelledby="f-team">
         <h2 id="f-team"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> Who we are</h2>
-        <p>Made by Leya, Seyi, Joan, and Satoshi. Built for the UMass Boston Applied AI Microcredential.</p>
+        <p>Made by Leya Jacob, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae. Built for the UMass Boston Applied AI Microcredential.</p>
       </section>
     </div>
   </footer>
