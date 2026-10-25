@@ -431,7 +431,7 @@ def test_home_is_the_default_and_shows_only_three_big_buttons():
     page = client.get("/").text
     home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
     assert "hidden" not in home.split(">", 1)[0]  # Home is shown first
-    assert home.count('class="btn') == 3
+    assert home.count(' home-btn') == 3                              # three big buttons; Show me how and Ruth's example are small
     for label in ("Make my plan", "See my plan", "Get help now"):
         assert label in home
     # About starts hidden, and About and Features live in the small menu.
@@ -870,7 +870,9 @@ def test_chat_is_soft_bubbles_and_the_starters_are_chips_above_the_message_box()
     for who in ("agent", "user"):
         rule = re.search(rf"\.msg-{who} \.msg-body \{{([^}}]*)\}}", chat).group(1)
         assert "border: 0" in rule and "background: var(--" in rule          # a soft bubble, no outline
-    assert "overflow-wrap: anywhere" in chat and "min-width: 0" in chat     # long words never spill out
+    assert "overflow-wrap: break-word" in chat and "min-width: 0" in chat   # long words never spill out...
+    assert "overflow-wrap: anywhere" not in chat                            # ...and short ones never split
+    assert ".msg-user .msg-body { flex: 0 1 auto; width: fit-content; max-width: 80%;" in chat
     starter = re.search(r"\n\.starter \{([^}]*)\}", chat).group(1)
     assert "border-radius: 999px" in starter and "border: 0" in starter and "min-height: 48px" in starter
     page = client.get("/").text
@@ -911,7 +913,7 @@ def test_your_plan_waits_for_its_first_item_and_988_never_hides():
     side = page[page.index('<aside id="side"'):page.index("</aside>")]
     assert "Your plan will appear here as we talk." in side
     css = client.get("/static/style.css").text
-    assert ".side.plan-empty > :not(#plan-section):not(#support):not(.tour-tip) { display: none; }" in css
+    assert ".side.plan-empty > :not(#plan-section):not(#support):not(#family-loop):not(.tour-tip) { display: none; }" in css
     assert ".side.plan-empty #plan-section > :not(#fridge-empty) { display: none; }" in css
     js = client.get("/static/app.js").text
     assert '$("side").classList.toggle("plan-empty", !plan.items.length && !(plan.tasks || []).length)' in js
@@ -942,7 +944,7 @@ def test_first_time_tour_has_four_tips_shows_once_and_can_be_replayed():
     assert 'if (raw === "tour")' in js
     page = client.get("/").text
     home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
-    assert '<a href="#tour" class="tour-link">Show me how</a>' in home
+    assert '<a href="#tour" class="btn btn-quiet home-link"><svg class="icon" aria-hidden="true"><use href="#i-help"/></svg> Show me how</a>' in home
     assert '<li><a href="#tour">Show me how</a></li>' in page[page.index('id="more-menu"'):]
     assert "position: fixed" not in client.get("/static/style.css").text.split("First-time tour")[1]  # never over the 911 bar
 
@@ -1008,17 +1010,17 @@ def test_who_we_are_page_lists_the_team_and_is_linked_from_the_menu_and_footer()
 def test_light_cannot_be_darkened_by_the_browser_and_files_are_never_stale():
     css = client.get("/static/style.css").text
     root = css[css.index(":root {"):css.index("}", css.index(":root {"))]
-    assert "color-scheme: only light;" in root                      # a browser's own dark mode may not repaint Light
+    assert "color-scheme: light only;" in root                      # a browser's own dark mode may not repaint Light
     for url in ("/", "/share/anything"):
         r = client.get(url)
-        assert '<meta name="color-scheme" content="only light">' in r.text
+        assert '<meta name="color-scheme" content="light only"><meta name="darkreader-lock">' in r.text
         assert r.headers["cache-control"] == "no-cache"
     for f in ("/static/style.css", "/static/app.js"):
         assert client.get(f).headers["cache-control"] == "no-cache"  # an old file never mixes with a new page
     import inspect
     import just_in_case.card as card, just_in_case.summary as summary
     for mod in (card, summary):
-        assert '<meta name="color-scheme" content="only light">' in inspect.getsource(mod)   # printouts stay white
+        assert '<meta name="color-scheme" content="light only"><meta name="darkreader-lock">' in inspect.getsource(mod)   # printouts stay white
 
 
 def test_links_and_link_buttons_keep_palette_colors_after_a_visit():
@@ -1292,11 +1294,14 @@ def test_ruths_example_is_named_and_reachable_from_home_and_about():
     page = client.get("/").text
     home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
     about = page[page.index('id="panel-about"'):page.index('id="panel-features"')]
-    assert '<a href="/?example=1#plan" class="tour-link">See Ruth\'s example</a>' in home
+    assert '<a href="/?example=1#plan" class="btn btn-quiet home-link"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See Ruth\'s example</a>' in home
     assert "See Ruth's example" in about and "See an example" not in page
     assert 'href="#plan"' in home                                         # Make my plan starts the visitor's own plan
     js = client.get("/static/app.js").text
-    assert '$("demo-title").textContent = "Guided planner."; $("demo-text").textContent = "No AI is used.";' in js
+    assert "No AI is used" not in page + js and "with no AI" not in page          # no "no AI" labels on screen
+    assert '$("demo-banner").hidden = m.mode === "guided";' in js                 # the guided planner has no label
+    assert '`${AGENT} is an AI planning helper.`' in js                           # the live agent says it is AI
+    assert 'if (c.ai === false) $("faq-who").textContent' in js                   # the FAQ stays true without AI
     privacy = page[page.index('id="panel-privacy"'):page.index('id="panel-who"')]
     assert "The guided planner and Ruth's example use no AI" in privacy
 
@@ -1384,3 +1389,45 @@ def test_read_aloud_prefers_premium_and_enhanced_voices_and_keeps_the_users_choi
     assert 'chosenVoice = voices.find((v) => v.voiceURI === saved) || voices.slice().sort(byScore)[0];' in js   # the choice wins
     assert "SPEEDS = [0.7, 0.8, 0.9, 1.0, 1.1]" in js and "u.pitch = 1.1" in js and "speedIdx = 2" in js       # warm: 0.9, a bit higher
     assert "zoe" in js[js.index("const FEMALE_NAMES"):js.index("const MALE_NAMES")]
+
+
+def test_home_has_two_separate_buttons_that_stack_on_a_phone():
+    page = client.get("/").text
+    links = page[page.index('<div class="home-links">'):page.index("</div>", page.index('<div class="home-links">'))]
+    assert links.count('class="btn btn-quiet home-link"') == 2 and "#i-help" in links and "#i-play" in links
+    css = client.get("/static/style.css").text
+    assert ".home-link { min-height: 48px;" in css
+    assert "@media (max-width: 560px) { .home-links { grid-template-columns: minmax(0, 1fr); } }" in css
+
+
+def test_every_kind_of_link_has_its_own_color_after_a_visit_too():
+    import re
+    css = client.get("/static/style.css").text
+    block = css[css.index("/* ---- Every link and link-styled button has its own color"):]
+    for sel in ("a.btn-primary", "a.btn-quiet", "a.brand", "a.menu-home", ".tabs a", ".more-menu li a", ".season-tip a",
+                ".footer-help a", ".tag-links a", "a.demo-exit", ".call-list a.home-help", ".home-buttons a.home-help", "a.tour-next"):
+        assert re.search(re.escape(sel) + r":is\(:link, :visited\)", block), sel
+    for url in ("/", "/share/anything"):
+        assert '<meta name="darkreader-lock">' in client.get(url).text
+
+
+# ---- Round 9: Keep family in the loop ------------------------------------------------------
+
+def test_keep_family_in_the_loop_sits_below_support_and_comes_from_the_services_list():
+    import re
+    page = client.get("/").text
+    side = page[page.index('<aside id="side"'):page.index("</aside>")]
+    support, family = side.index('id="support"'), side.index('id="family-loop"')
+    assert support < family < side.index('id="usps"')                            # directly below People you can talk to
+    box = side[family:side.index("</details>", family)]
+    assert "Keep family in the loop" in box and "#i-people" in box and " open" not in box.split(">", 1)[0]   # closed
+    assert "helper list in your plan is simpler" in box
+    talk = side[support:side.index("</details>", support)]
+    assert "family-services" not in talk                                         # support stays emotional support only
+    cb = client.get("/api/family-updates").json()
+    assert [s["name"] for s in cb] == ["CaringBridge"] and cb[0]["url"] == "https://www.caringbridge.org"
+    assert cb[0]["cost"] == "free" and cb[0]["last_verified"].startswith("2026-10")
+    assert "separate service with its own privacy settings" in cb[0]["separate"]
+    assert len(re.findall(r"[.!?](?:\s|$)", cb[0]["how_to_use"])) == 1          # one sentence
+    js = client.get("/static/app.js").text
+    assert "if (familyOpened) return;" in js and '`Open ${s.name} (new tab)`' in js and 'a.rel = "noopener noreferrer"' in js

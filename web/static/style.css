@@ -59,7 +59,7 @@
 
   --sheen: rgba(255, 255, 255, .7);
   --handle: linear-gradient(90deg, #D9D3CB, #ECE8E2);
-  color-scheme: only light;   /* "only": a browser's own dark mode may not repaint Light */
+  color-scheme: light only;   /* "only": a browser's own dark mode may not repaint Light */
 
   --fs: 20px;
   --radius-door: 28px;
@@ -1138,11 +1138,15 @@ html:not([data-theme="contrast"]) .promise { background: none; border: 0; paddin
 /* ---- Chat like a messaging app: soft speech bubbles, starter chips ------------------- */
 .msg { gap: .55rem; max-width: min(46rem, 100%); }
 .msg-avatar { width: 2.1rem; height: 2.1rem; }
-.msg-body { min-width: 0; overflow-wrap: anywhere; border-radius: 22px; padding: .8rem 1.1rem; }
+/* Words break only if they would spill out (a long web address); "anywhere" also let the bubble
+   shrink until short words split, like "Le / ya". */
+.msg-body { min-width: 0; overflow-wrap: break-word; word-break: normal; border-radius: 22px; padding: .8rem 1.1rem; }
 html:not([data-theme="contrast"]) .msg-agent .msg-body { background: var(--soft); border: 0; border-top-left-radius: 6px; }
 html:not([data-theme="contrast"]) .msg-user .msg-body { background: var(--primary-tint); border: 0; border-top-right-radius: 6px; }
 [data-theme="contrast"] .msg-user .msg-body { border: 2px solid var(--line); }
-.msg-user .msg-body { max-width: 85%; margin-left: auto; }
+/* Your replies: as wide as the words, up to 80% of the chat, on the right. */
+.msg-user { align-self: stretch; max-width: 100%; justify-content: flex-start; }
+.msg-user .msg-body { flex: 0 1 auto; width: fit-content; max-width: 80%; margin-left: 0; }
 html:not([data-theme="contrast"]) .read-aloud { background: var(--paper); border-color: transparent; }
 html:not([data-theme="contrast"]) .read-aloud[aria-pressed="true"] { background: var(--primary-tint); border-color: var(--primary); }
 
@@ -1207,7 +1211,7 @@ html:not([data-theme="contrast"]) details.more-options :is(.task-form, .helper-t
 
 /* ---- An empty plan is one friendly line, not an empty box ---------------------------- */
 /* "People you can talk to" (988) always stays in view. */
-.side.plan-empty > :not(#plan-section):not(#support):not(.tour-tip) { display: none; }
+.side.plan-empty > :not(#plan-section):not(#support):not(#family-loop):not(.tour-tip) { display: none; }
 .side.plan-empty #plan-section > :not(#fridge-empty) { display: none; }
 .side.plan-empty #plan-section { min-height: 0; padding: .6rem .3rem; background: none; border: 0; box-shadow: none; }
 .side.plan-empty .fridge-empty { font-size: 1.05rem; }
@@ -1540,3 +1544,30 @@ html { scroll-padding-top: 6rem; }   /* a link or focus never lands hidden under
 .tour-steps { margin: 0; padding-left: 1.4rem; display: grid; gap: .35rem; text-align: left; }
 [data-theme="contrast"] .tour-video { border: 2px solid var(--line); }
 #hero-scene g.flip { transform-box: view-box; transform-origin: 0 0; }   /* the mirror uses the picture's own corner */
+
+/* ---- Home: "Show me how" and "See Ruth's example", two clear buttons -------------------- */
+.home-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; text-align: initial; }
+.home-link { min-height: 48px; font-size: 1rem; white-space: normal; text-align: center; }
+.home-link .icon { color: var(--primary); width: 1.3em; height: 1.3em; }
+@media (max-width: 560px) { .home-links { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- Every link and link-styled button has its own color, before and after a visit, in every theme ----
+   Nothing is left to the browser's default blue or visited purple. */
+a:is(:link, :visited) { color: var(--link); }
+a.btn-primary:is(:link, :visited) { color: var(--on-primary); }
+a.btn-quiet:is(:link, :visited), a.tour-next:is(:link, :visited), a.brand:is(:link, :visited),
+a.skip:is(:link, :visited), .more-menu li a:is(:link, :visited), .season-tip a:is(:link, :visited) { color: var(--ink); }
+.home-buttons a.home-help:is(:link, :visited) { color: var(--ink); }
+.call-list a.home-help:is(:link, :visited) { color: var(--strip-ink); }
+a.menu-home:is(:link, :visited), a.demo-exit:is(:link, :visited), .footer-help a:is(:link, :visited),
+.tag-links a:is(:link, :visited), details.more a:is(:link, :visited) { color: var(--link); }
+.tabs a:is(:link, :visited) { color: var(--ink-soft); }
+.tabs a[aria-current="page"]:is(:link, :visited) { color: var(--on-primary); }
+.story-actions a.tour-next:is(:link, :visited) { color: var(--ink); }
+
+/* ---- Keep family in the loop ----------------------------------------------------------- */
+.family-box summary .icon { color: var(--sit-ride); }
+.family-services li { display: grid; gap: .35rem; }
+.free-badge { display: inline-block; padding: .05rem .6rem; border-radius: 999px; font-size: .8rem; font-weight: 700;
+  background: var(--success-tint); color: var(--ok); vertical-align: middle; }
+[data-theme="contrast"] .free-badge { border: 2px solid var(--line); }

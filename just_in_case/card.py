@@ -178,7 +178,7 @@ def render_plan_html(state: PlanState, directory: Directory, today: date | None 
         return f'<section><h2>{_icon(title)}{e(title)}</h2><ul>{body}</ul></section>' if body else ""
 
     return f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="only light">
+<html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="light only"><meta name="darkreader-lock">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>My plan</title>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
@@ -244,7 +244,7 @@ def render_card_html(lines: list[str]) -> str:
             parts.append(f'<p class="foot">{"".join(html.escape(r) for r in sec["rows"])}</p>')
 
     return f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="only light">
+<html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="light only"><meta name="darkreader-lock">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>If something happens{": " + title if title else ""}</title>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">

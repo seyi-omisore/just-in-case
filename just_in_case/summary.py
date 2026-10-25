@@ -106,7 +106,7 @@ def render_summary_html(state: PlanState, directory: Directory, today: date | No
     across_html = "".join(f'<li class="chip" data-part="{part}">{_svg(icon)}<span><strong>{e(name)}:</strong> {e(text)}</span></li>'
                           for part, (icon, name, text, _) in zip(parts, across))
     return f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="only light">
+<html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="light only"><meta name="darkreader-lock">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>My readiness summary</title>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">

@@ -515,6 +515,17 @@ async def support():
     return JSONResponse([{k: l.get(k, "") for k in keep} for l in lines])
 
 
+@app.get("/api/family-updates")
+async def family_updates():
+    """For "Keep family in the loop": outside services for sharing updates, only from the services list."""
+    from just_in_case.directory import Directory
+    from just_in_case.safeguards import separate_service_line
+    d = Directory()
+    return JSONResponse([{**{k: s[k] for k in ("name", "url", "cost", "how_to_use")},
+                          "last_verified": d.by_id[s["id"]]["last_verified"],
+                          "separate": separate_service_line(s["name"])} for s in d.find_services("family_updates", "Boston")])
+
+
 @app.get("/card/{sid}")
 async def card(sid: str):
     s = SESSIONS.get(sid)
@@ -630,7 +641,7 @@ async def table_print(sid: str):
                    f"<td>{e(t['person']) or '<em>Open: add your name</em>'}</td>"
                    f"<td>{TASK_STATUS[task_status(t)]}</td></tr>" for t in s.agent.state.helper_tasks)
     rows = rows or '<tr><td colspan="5">No rows yet.</td></tr>'
-    return HTMLResponse(f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="only light">
+    return HTMLResponse(f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="light only"><meta name="darkreader-lock">
 <title>Who is helping</title>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>

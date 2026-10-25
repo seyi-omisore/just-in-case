@@ -503,6 +503,7 @@
 
   // ---- an optional outside service: a link the person may choose, never used for them ----
   function addSuggestion(s) {
+    if (familyOpened) return;   // they already looked at "Keep family in the loop"
     const li = el("li", "slip suggest");
     li.dataset.page = Math.max(0, pages.length - 1);
     const head = el("div", "slip-head"); head.append(icon("info"), document.createTextNode("You might also like"));
@@ -871,10 +872,13 @@
       const m = JSON.parse(e.data);
       switch (m.type) {
         case "hello":
-          sessionId = m.session; $("demo-banner").hidden = !m.demo;
-          if (m.mode === "guided") {   // a visitor's own plan, made with the app's rules: say clearly that no AI is used
-            $("demo-title").textContent = "Guided planner."; $("demo-text").textContent = "No AI is used.";
-            $("demo-icon").setAttribute("href", "#i-check");
+          sessionId = m.session;
+          // Ruth's example says it is a made-up story. The live agent says clearly that it is AI.
+          // The guided planner (the app's own rules, no AI) needs no label.
+          $("demo-banner").hidden = m.mode === "guided";
+          if (m.mode === "live") {
+            $("demo-title").textContent = `${AGENT} is an AI planning helper.`; $("demo-text").textContent = "You make every choice.";
+            $("demo-icon").setAttribute("href", "#i-info");
           }
           $("table-download").href = `/table/${sessionId}.csv`;
           setBusy(false);
@@ -1225,6 +1229,26 @@
     $("facts").hidden = false;
   }).catch(() => {});  // if it can't load, the section stays hidden rather than showing a guess
 
+  // ---- Keep family in the loop: outside services from the services list, a link they may choose ----
+  let familyOpened = false;
+  $("family-loop").addEventListener("toggle", () => { if ($("family-loop").open) familyOpened = true; });
+  fetch("/api/family-updates").then((r) => r.json()).then((list) => {
+    const ul = $("family-services");
+    for (const s of list) {
+      const li = el("li");
+      const name = el("p", "s-name", s.name);
+      if (s.cost === "free") name.append(" ", el("span", "free-badge", "Free"));
+      li.append(name, el("p", "s-what", s.how_to_use));
+      const checked = checkedLabel(s.last_verified);
+      if (checked) { const c = el("p", "tag-checked"); c.append(icon("check"), document.createTextNode(checked)); li.appendChild(c); }
+      li.appendChild(el("p", "helper-small", s.separate));
+      const a = el("a", "btn btn-quiet btn-block"); a.href = s.url; a.target = "_blank"; a.rel = "noopener noreferrer";
+      a.append(icon("info"), document.createTextNode(`Open ${s.name} (new tab)`));
+      li.appendChild(a);
+      ul.appendChild(li);
+    }
+  }).catch(() => {});
+
   // ---- people you can talk to ---------------------------------------------
   fetch("/api/support").then((r) => r.json()).then((lines) => {
     const ul = $("support-lines");
@@ -1268,6 +1292,9 @@
       $("restart-banner").hidden = c.needs_restart === false;   // missing = older server
       // The demo runs without an AI key, so it restarts with --demo; the live app does not.
       $("restart-cmd").textContent = c.demo ? "python serve.py --demo" : "python serve.py";
+      // Without AI running, the FAQ does not call the helper AI.
+      if (c.ai === false) $("faq-who").textContent = `${AGENT} is the app's planning helper. It suggests options, ` +
+        "but you make every decision, and it never sends, shares, or books anything without your OK.";
     }).catch(() => {});
   checkRestart(); setInterval(checkRestart, 60000);
 

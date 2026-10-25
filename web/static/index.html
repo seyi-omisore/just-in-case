@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- "only light": browsers may not darken Light by themselves. The Dark and High contrast themes set their own colors. -->
-  <meta name="color-scheme" content="only light">
+  <meta name="color-scheme" content="light only"><meta name="darkreader-lock">
   <title>Just in Case</title>
   <meta name="description" content="A friendly helper that makes a small backup plan for people who live alone.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -93,7 +93,7 @@
     <p class="demo-label">
       <svg class="icon" aria-hidden="true"><use id="demo-icon" href="#i-play"/></svg>
       <strong id="demo-title">Ruth's example.</strong>
-      <span id="demo-text">A made-up story, with no AI.</span>
+      <span id="demo-text">A made-up story.</span>
     </p>
     <a id="example-exit" class="demo-exit" href="/#plan" hidden>
       <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Start my own plan
@@ -181,7 +181,10 @@
       <span><strong id="season-lead">Winter is coming.</strong> <span id="season-ask">Is your power outage plan ready?</span>
         <a id="season-link" href="#plan-power_outage">Check it</a></span>
     </p>
-    <p class="home-links"><a href="#tour" class="tour-link">Show me how</a> <a href="/?example=1#plan" class="tour-link">See Ruth's example</a></p>
+    <div class="home-links">
+      <a href="#tour" class="btn btn-quiet home-link"><svg class="icon" aria-hidden="true"><use href="#i-help"/></svg> Show me how</a>
+      <a href="/?example=1#plan" class="btn btn-quiet home-link"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See Ruth's example</a>
+    </div>
   </section>
 
   <section id="panel-help" class="panel help" data-panel="help" tabindex="-1" aria-labelledby="help-title" hidden>
@@ -327,7 +330,7 @@
       <h2 id="faq-title" class="section-title">Questions</h2>
       <details>
         <summary>Who is {{AGENT_NAME}}?</summary>
-        <p>{{AGENT_NAME}} is the app's AI planning helper. It suggests options, but you make every decision, and it never sends, shares, or books anything without your OK.</p>
+        <p id="faq-who">{{AGENT_NAME}} is the app's AI planning helper. It suggests options, but you make every decision, and it never sends, shares, or books anything without your OK.</p>
       </details>
       <details>
         <summary>Is it free?</summary>
@@ -890,6 +893,16 @@
         <ul id="support-lines" class="support-lines"></ul>
       </details>
 
+      <details id="family-loop" class="helper-box family-box">
+        <summary>
+          <svg class="icon" aria-hidden="true"><use href="#i-people"/></svg>
+          Keep family in the loop
+        </summary>
+        <p class="helper-intro">A place to share updates, where many people can sign up to help over time.</p>
+        <ul id="family-services" class="support-lines family-services"></ul>
+        <p class="helper-small">For one or two small tasks, the helper list in your plan is simpler.</p>
+      </details>
+
       <details id="usps" class="helper-box usps-box">
         <summary>
           <svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>
@@ -1098,6 +1111,7 @@
       <symbol id="i-unlink" viewBox="0 0 24 24"><path d="M10 7H7a5 5 0 0 0 0 10h3v-2H7a3 3 0 0 1 0-6h3zm4 0v2h3a3 3 0 0 1 0 6h-3v2h3a5 5 0 0 0 0-10zM3.7 2.3 2.3 3.7l18 18 1.4-1.4z" fill="currentColor"/></symbol>
       <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z" fill="currentColor"/></symbol>
       <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z" fill="currentColor"/></symbol>
+      <symbol id="i-help" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm-1 11h2v2h-2zm1-9a3.5 3.5 0 0 1 1.6 6.6c-.4.2-.6.5-.6.9V14h-2v-.5a3 3 0 0 1 1.7-2.7A1.5 1.5 0 1 0 10.5 9.5h-2A3.5 3.5 0 0 1 12 6z" fill="currentColor"/></symbol>
       <symbol id="i-dash" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zM7 11v2h10v-2z" fill="currentColor"/></symbol>
       <!-- Illustrations: original flat drawings in the app's colors (the --ill-* tokens). Used with <use href="#ill-...">. -->
       <symbol id="ill-clinic" viewBox="0 0 240 120">
