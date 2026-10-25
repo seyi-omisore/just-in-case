@@ -13,7 +13,7 @@ flowchart TD
     F2 -->|still needed| F3{People allowed?}
     F3 -->|yes| F4[3. One small role for a chosen person]
     F3 -->|no or burden worry| F5[4. Blank + point to Council on Aging / Mass211]
-    F4 --> G{{Checkpoint 2: user approves the note<br/>user sends it herself}}
+    F4 --> G{{Checkpoint 2: user approves the note<br/>user sends it from their own phone or email}}
     F1 --> H
     F2 --> H
     F5 --> H

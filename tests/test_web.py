@@ -1481,3 +1481,142 @@ def test_wrong_password_is_refused_and_right_one_signs_in(monkeypatch):
     assert c.get("/").status_code == 200 and c.get("/api/config").status_code == 200
     with c.websocket_connect("/ws?example=1") as ws:                     # signed in: the live chat opens
         assert ws.receive_json()["type"] in ("hello", "plan", "activity", "busy")
+
+
+def test_about_caption_is_not_covered_by_the_house_drawing():
+    css = client.get("/static/style.css").text
+    # The house sits above the caption line (its bottom is raised past the caption's height).
+    assert ".hero-illustration { position: absolute; left: 0; bottom: 3.6rem;" in css
+    assert ".phone figcaption { position: relative; text-align: center; font-size: .9rem;" in css
+
+
+# ---- Round 10: invite and remind helpers ------------------------------------
+
+def test_helper_contact_never_reaches_the_server_or_the_shared_list():
+    """A phone number or email typed for a helper stays in the browser. If one ever
+    arrives anyway, the server drops it: it is not in the plan, the spreadsheet, or the share."""
+    with client.websocket_connect("/ws") as ws:
+        sid = until(ws, "hello")["session"]
+        ws.send_json({"type": "table", "action": "add",
+                      "row": {"task": "Feed Fifi", "person": "Doris", "contact": "617-555-0177"}})
+        plan = until(ws, "plan")["plan"]
+        assert "contact" not in plan["tasks"][0] and "617-555-0177" not in str(plan)
+        assert "617-555-0177" not in client.get(f"/table/{sid}.csv").text
+        ws.send_json({"type": "share_create", "consent": True, "label": "Ruth"})
+        share = until(ws, "plan")["plan"]["share"]
+        assert "617-555-0177" not in client.get("/api" + share["url"]).text
+    page = client.get("/").text
+    assert '<input name="contact"' in page and "Stays on this device only" in page
+    js = client.get("/static/app.js").text
+    # The row sent to the server is built from these four fields only; the contact is kept apart.
+    assert 'const row = {}; for (const k of ["task", "person", "date", "time"]) row[k]' in js
+    assert "const contacts = new Map();" in js
+
+
+def test_plan_carries_checked_invite_drafts_and_the_share_link_only_when_shared():
+    with client.websocket_connect("/ws") as ws:
+        until(ws, "hello")
+        ws.send_json({"type": "table", "action": "add", "row": {"task": "Feed Fifi", "person": "Doris", "date": "Nov 14"}})
+        plan = until(ws, "plan")["plan"]
+        tid = str(plan["tasks"][0]["id"])
+        assert plan["invites"][tid]["invite"].startswith("Hi Doris,") and plan["invites"][tid]["invite_ok"]
+        assert plan["invite_words"]["you_send"] == "Haven writes the message. You send it from your own phone or email."
+        assert plan["share"] is None       # the page adds the list link only once the person has shared it
+    js = client.get("/static/app.js").text
+    assert 'if (kind === "invite" && plan.share) text +=' in js
+    assert 'b.append(icon(kind === "invite" ? "send" : "bell")' in js
+
+
+def test_send_buttons_open_the_persons_own_apps_and_nothing_is_sent_by_the_app():
+    js = client.get("/static/app.js").text
+    start = js.index("// ---- invite and remind helpers")
+    block = js[start:js.index("// Status is always a word with an icon", start)]
+    assert "const smsHref = (phone, text) => `sms:${phone}?&body=${encodeURIComponent(text)}`" in block
+    assert "`mailto:" in block and "?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`" in block
+    assert 'if (CAN_TEXT) row.appendChild(sms); else row.appendChild(copyBtn);' in block   # copy where a text link can't open
+    assert "Copy message" in block
+    # The app never sends: no network calls, and the contact never goes over the live connection.
+    assert "fetch(" not in block and "XMLHttpRequest" not in block and "sendBeacon" not in block
+    for line in block.splitlines():
+        if "ws.send(" in line:
+            assert "contact" not in line
+
+
+def test_invited_status_moves_to_helping_when_the_helper_signs_up_then_confirmed():
+    from just_in_case.tools import TASK_STATUS, task_status
+    assert TASK_STATUS["invited"] == "Invited"
+    with client.websocket_connect("/ws") as ws:
+        sid = until(ws, "hello")["session"]
+        ws.send_json({"type": "table", "action": "add", "row": {"task": "Feed Fifi", "date": "Nov 14"}})
+        tid = until(ws, "plan")["plan"]["tasks"][0]["id"]
+        ws.send_json({"type": "share_create", "consent": True, "label": "Ruth"})
+        share_id = until(ws, "plan")["plan"]["share"]["url"].rsplit("/", 1)[1]
+        ws.send_json({"type": "table", "action": "invited", "row": {"id": tid}})     # "Yes, I sent it"
+        act = until(ws, "activity")
+        assert "from your own phone or email" in act["text"]
+        t = until(ws, "plan")["plan"]["tasks"][0]
+        assert task_status(t) == "invited"
+        assert "Feed Fifi,Nov 14,,,Invited" in client.get(f"/table/{sid}.csv").text
+        pub = client.get(f"/api/share/{share_id}").json()
+        assert pub["tasks"][0]["status"] == "open"                                    # the shared page never shows "invited"
+        r = client.post(f"/api/share/{share_id}/claim", json={"task_id": tid, "name": "Doris"})
+        assert r.status_code == 200
+        t = until(ws, "plan")["plan"]["tasks"][0]
+        assert t["person"] == "Doris" and task_status(t) == "helping"                 # signed up: Someone's helping
+        ws.send_json({"type": "table", "action": "confirm", "row": {"id": tid, "confirmed": True}})
+        t = until(ws, "plan")["plan"]["tasks"][0]
+        assert task_status(t) == "confirmed"
+
+
+def test_a_saved_plan_keeps_invited_but_only_as_a_true_boolean():
+    from just_in_case.directory import Directory
+    from just_in_case.state import PlanState
+    from just_in_case.tools import Toolbox, task_status
+    box = Toolbox(PlanState(), Directory())
+    box.restore({"tasks": [{"task": "Feed Fifi", "person": "", "invited": True},
+                           {"task": "Rides", "person": "Leo", "invited": "yes", "confirmed": True},
+                           {"task": "Mail", "person": "", "confirmed": True}]})
+    assert [task_status(t) for t in box.state.helper_tasks] == ["invited", "confirmed", "open"]
+
+
+def test_burden_mode_keeps_invite_buttons_quiet_and_shows_no_nudge():
+    with client.websocket_connect("/ws") as ws:
+        until(ws, "hello")
+        ws.send_json({"type": "say", "text": "I have a procedure next month and need a way home."})
+        approve(ws)
+        until(ws, "agent")
+        ws.send_json({"type": "say", "text": "I really don't want to bother anyone."})
+        plan = until(ws, "plan")["plan"]
+        for _ in range(20):
+            if plan.get("quiet_invites"):
+                break
+            plan = until(ws, "plan")["plan"]
+        assert plan["quiet_invites"] is True
+    page = client.get("/").text
+    assert 'id="invite-hint" class="invite-hint" hidden' in page
+    js = client.get("/static/app.js").text
+    assert '$("invite-hint").hidden = !!plan.quiet_invites ||' in js
+    assert 'el("button", quiet ? "invite-btn invite-quiet" : "invite-btn")' in js
+
+
+def test_live_agent_prepares_the_message_and_the_page_opens_send_buttons():
+    from just_in_case.prompts import SYSTEM_PROMPT
+    assert "explain kindly that you cannot send" not in SYSTEM_PROMPT
+    assert "If asked to text or email someone for them, do not decline." in SYSTEM_PROMPT
+    assert "Never say you sent it: you cannot send anything." in SYSTEM_PROMPT
+    js = client.get("/static/app.js").text
+    assert 'if (ok && kind === "draft_helper_note") li.appendChild(noteSendBox(data.to, data.text));' in js
+    assert "noteSendBox(n.helpers, n.text)" in js            # also on the note in the plan
+    with client.websocket_connect("/ws") as ws:
+        until(ws, "hello")
+        ws.send_json({"type": "note_sent"})
+        assert until(ws, "activity")["text"] == "You sent a note from your own phone or email"
+
+
+def test_ruths_example_and_the_tour_video_include_the_invite_step():
+    import pathlib
+    js = client.get("/static/app.js").text
+    assert "{ text: `Ruth taps Invite. ${AGENT} writes a warm message, and she sends it from her own phone or email.`" in js
+    script = (pathlib.Path(__file__).resolve().parent.parent / "scripts" / "make_tour_video.py").read_text()
+    assert '"Haven writes the invite. You send it."' in script
+    assert 'tour.tap("#helper-rows .invite-btn")' in script and "captions[8]" in script

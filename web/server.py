@@ -31,6 +31,8 @@ from fastapi.staticfiles import StaticFiles
 from just_in_case.config import DATA_DIR, OUTPUT_DIR
 from just_in_case.config import AGENT_NAME, has_ai_key
 from just_in_case.prompts import GREETING
+from just_in_case.invites import (INVITE_SUBJECT, LINK_LINE, REMINDER_SUBJECT, YOU_SEND_LINE,
+                                  drafts_for)
 from just_in_case import timeline
 from just_in_case.encouragement import encouragement
 from just_in_case.next_step import pick_next_step
@@ -222,6 +224,12 @@ class Session:
             "timeline": timeline.build(state, self.agent.box.today),
             "notes": state.helper_notes,
             "tasks": state.helper_tasks,
+            # The agent's invite and reminder drafts for each task (fixed wording, checked). The person sends them.
+            "invites": drafts_for(state.helper_tasks, self.agent.box.today),
+            # Said they don't want to be a burden: no nudges to invite anyone. The buttons stay, quietly.
+            "quiet_invites": state.worried_about_burden,
+            "invite_words": {"link_line": LINK_LINE, "you_send": YOU_SEND_LINE,
+                             "invite_subject": INVITE_SUBJECT, "reminder_subject": REMINDER_SUBJECT},
             "card": f"/card/{self.id}" if state.card_path else None,
             "plan_print": f"/plan/{self.id}" if state.items else None,
             "summary_available": any(i["user_ok"] for i in items),          # the button may show
@@ -386,6 +394,8 @@ class Session:
             if t["id"] in people:
                 if people[t["id"]] != t["person"]:
                     t["confirmed"] = False  # a new name, or none: not confirmed yet
+                    if people[t["id"]]:
+                        t["invited"] = False  # the helper signed up: Invited becomes Someone's helping
                 t["person"] = people[t["id"]]
         self.agent.box.refresh_card()
         self.emit({"type": "activity", "kind": "heart", "text": activity})
@@ -399,7 +409,9 @@ class Session:
                 "add": "You added a row to your helper table",
                 "update": "You changed a row in your helper table",
                 "delete": "You removed a row from your helper table",
-                "confirm": "You updated whether a helper is confirmed"}.get(action, "You edited your table")})
+                "confirm": "You updated whether a helper is confirmed",
+                "invited": "You sent an invite from your own phone or email",
+                "reminded": "You sent a reminder from your own phone or email"}.get(action, "You edited your table")})
         except ToolError as e:
             self.emit({"type": "table_error", "text": str(e)})
         self.sync_share()
@@ -813,6 +825,8 @@ async def ws_endpoint(ws: WebSocket):
                 s.share_create(msg.get("consent"), str(msg.get("label", "")))
             elif msg.get("type") == "share_delete":
                 s.share_delete()
+            elif msg.get("type") == "note_sent":   # the person says they sent a note from their own phone or email
+                s.emit({"type": "activity", "kind": "human", "text": "You sent a note from your own phone or email"})
             elif msg.get("type") == "save":
                 s.save()
             elif msg.get("type") in ("event_date", "step"):

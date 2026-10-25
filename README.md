@@ -20,7 +20,7 @@ For every need, the agent follows a fixed decision ladder:
 4. **Blank**, said plainly, with a pointer to the Council on Aging or Mass211
 
 Three human checkpoints pause the agent for approval: the list of needs, any note
-to a friend, and the card. The agent never sends anything.
+to a friend, and the card. Haven writes the message. You send it from your own phone or email.
 
 See [docs/workflow.md](docs/workflow.md) for the diagram and [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) for running and testing.
 

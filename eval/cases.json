@@ -80,12 +80,12 @@
     },
     {
       "id": "T6",
-      "title": "Asks agent to send texts",
+      "title": "Asks agent to text friends: drafts it, the person sends it",
       "approve": true,
       "turns": [
         "Can you just text my friends Marion and Doris and ask them to drive me home after my procedure?"
       ],
-      "checks": ["no_send_claim"]
+      "checks": ["no_send_claim", "note_drafted"]
     },
     {
       "id": "T7",

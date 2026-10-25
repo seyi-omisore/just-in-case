@@ -914,3 +914,73 @@ def test_an_outside_service_is_always_named_as_separate_with_its_own_privacy():
     assert line == ("CaringBridge is a separate service with its own privacy settings. "
                     "Just in Case never makes an account or shares anything for you.")
     assert pressure_phrases(line) == []
+
+
+# ---- Round 10: invitations and reminders the person sends ------------------
+
+def test_invite_and_reminder_drafts_pass_the_note_rules():
+    from just_in_case.invites import drafts_for, invite_text, reminder_text
+    from just_in_case.safeguards import check_helper_note, reading_grade
+    rows = [{"id": 1, "task": "look after my pet while I'm away", "person": "Doris Chen", "date": "Nov 14", "time": "morning"},
+            {"id": 2, "task": "Drive me home after my procedure", "person": "", "date": "", "time": ""},
+            {"id": 3, "task": "Pick up groceries", "person": "Samantha", "date": "December 3", "time": "2 pm"}]
+    for r in rows:
+        for text in (invite_text(r), reminder_text(r)):
+            assert check_helper_note(text) is None          # no pressure words, an easy no, grade 8 or lower
+            assert reading_grade(text) <= 8
+    d = drafts_for(rows)
+    assert all(v["invite_ok"] and v["reminder_ok"] for v in d.values())
+    assert d[1]["invite"].startswith("Hi Doris,") and "Look after my pet while I'm away, Nov 14, morning" in d[1]["invite"]
+    assert d[2]["invite"].startswith("Hi,\n")                # no name: no made-up name
+    assert "no need to reply" in d[1]["invite"] and "completely fine" in d[1]["reminder"]
+
+
+def test_reminder_shows_only_a_few_days_before_and_only_with_someone_asked():
+    from datetime import date, timedelta
+    from just_in_case.invites import REMIND_DAYS_BEFORE, read_task_date, remind_now
+    today = date(2026, 10, 25)
+    assert REMIND_DAYS_BEFORE == 3
+    day = lambda n: (today + timedelta(days=n)).isoformat()
+    doris = {"person": "Doris"}
+    assert remind_now({**doris, "date": day(0)}, today) and remind_now({**doris, "date": day(3)}, today)
+    assert not remind_now({**doris, "date": day(4)}, today)              # too early
+    assert not remind_now({**doris, "date": day(-1)}, today)             # already past
+    assert not remind_now({"person": "", "date": day(1)}, today)         # no one asked yet
+    assert remind_now({"person": "", "invited": True, "date": day(1)}, today)
+    assert not remind_now({**doris, "date": "sometime soon"}, today)     # a date we can't read: no button
+    assert read_task_date("Oct 27", today) == date(2026, 10, 27) and read_task_date("2/31", today) is None
+
+
+def test_nothing_is_ever_sent_automatically_or_from_the_server():
+    import pathlib
+    import re as _re
+    root = pathlib.Path(__file__).resolve().parent.parent
+    server_code = "\n".join(p.read_text() for p in [*root.glob("just_in_case/*.py"), *root.glob("web/*.py")])
+    for banned in ("smtplib", "twilio", "sendgrid", "mailgun", "aiosmtplib", "boto3", "vonage", "plivo"):
+        assert banned not in server_code.lower(), banned                 # no way to send email or texts
+    from just_in_case.tools import GATED_TOOLS, build_server, Toolbox
+    from just_in_case.directory import Directory
+    from just_in_case.state import PlanState
+    _, names = build_server(Toolbox(PlanState(), Directory()), trace=lambda *_: None)
+    assert not [n for n in names if _re.search(r"send|text_|email|sms|message|notify|remind", n)]
+    js = (root / "web" / "static" / "app.js").read_text()
+    # Text and email links are only filled in when tapped; the page never opens them by itself.
+    assert not _re.search(r"location(\.href)?\s*=\s*[^;]*(sms:|mailto:)", js)
+    assert not _re.search(r"window\.open\([^)]*(sms:|mailto:)", js)
+    assert not _re.search(r"\b(sms|mail)\.click\(\)", js)
+
+
+def test_sending_wording_is_accurate_and_t6_keeps_its_safety_check():
+    import json
+    import pathlib
+    from just_in_case.agent import describe
+    from just_in_case.config import AGENT_NAME
+    from just_in_case.invites import YOU_SEND_LINE
+    assert YOU_SEND_LINE == f"{AGENT_NAME} writes the message. You send it from your own phone or email."
+    shown = describe("draft_helper_note", {"helper_names": ["Doris"], "role": "feed Fifi", "note_text": "Hi Doris."})
+    assert YOU_SEND_LINE in shown and "NOT be sent" not in shown
+    root = pathlib.Path(__file__).resolve().parent.parent
+    t6 = next(c for c in json.loads((root / "eval" / "cases.json").read_text())["cases"] if c["id"] == "T6")
+    assert "no_send_claim" in t6["checks"] and "note_drafted" in t6["checks"]   # never claims it sent; prepares the draft
+    js = (root / "web" / "static" / "app.js").read_text()
+    assert "You send it yourself" not in js and "We never send it" not in js

@@ -35,8 +35,9 @@ NOT_AGREED = ("The person this plan is for has not agreed yet. Do not plan. Kind
               "talks with them first, and ask the agreement checkpoint again only when the user says they agree.")
 TASK_FIELDS = ("task", "date", "time", "person")
 MAX_FIELD = 120
-# A helper task is Open (no name), Someone's helping (a name), or Confirmed (the owner checked).
-TASK_STATUS = {"open": "Open", "helping": "Someone's helping", "confirmed": "Confirmed"}
+# A helper task is Open (no name), Invited (the person says they sent an invite), Someone's helping
+# (a name), or Confirmed (the owner checked). Invited moves on when the helper signs up.
+TASK_STATUS = {"open": "Open", "invited": "Invited", "helping": "Someone's helping", "confirmed": "Confirmed"}
 MAX_SAVED_SAID = 200   # messages kept in a saved plan
 MAX_SAVED_TASKS = 50
 
@@ -46,9 +47,11 @@ class ToolError(Exception):
 
 
 def task_status(t: dict) -> str:
-    if not t.get("person"):
-        return "open"
-    return "confirmed" if t.get("confirmed") else "helping"
+    if t.get("person") and t.get("confirmed"):
+        return "confirmed"
+    if t.get("invited"):
+        return "invited"
+    return "helping" if t.get("person") else "open"
 
 
 class Toolbox:
@@ -200,7 +203,8 @@ class Toolbox:
             s.log("comfort: user asked for a note to someone by name")
         s.helper_notes.append({"helpers": helper_names, "role": role, "text": note_text})
         s.log(f"checkpoint 2: note approved for {helper_names}")
-        return {"status": "Draft saved. NOT sent. The user sends it herself if she wants to.",
+        return {"status": "Draft saved. NOT sent by you or the app. The page shows Send by text and "
+                          "Send by email buttons, and the user sends it from their own phone or email.",
                 "note_text": note_text}
 
     # ---- checkpoint 3 -------------------------------------------------------
@@ -405,6 +409,7 @@ class Toolbox:
                 if t["id"] == row.get("id"):
                     if clean["person"].lower() != t["person"].lower():
                         t["confirmed"] = False  # a confirmation never moves to a new name
+                        t["invited"] = False    # nor does an invite
                     t.update(clean)
         elif action == "confirm":
             t = next((t for t in s.helper_tasks if t["id"] == row.get("id")), None)
@@ -413,6 +418,16 @@ class Toolbox:
             if not t["person"]:
                 raise ToolError("Add who is helping before marking it confirmed.")
             t["confirmed"] = row.get("confirmed") is True
+        elif action in ("invited", "reminded"):
+            # The person tapped "Yes, I sent it" after sending from their own phone or email.
+            # We only record what they told us; the app never sends anything.
+            t = next((t for t in s.helper_tasks if t["id"] == row.get("id")), None)
+            if t is None:
+                raise ToolError("That row is not in your table anymore.")
+            if action == "invited":
+                t["invited"] = True
+            else:
+                t["reminded"] = self.today.isoformat()
         elif action == "delete":
             s.helper_tasks = [t for t in s.helper_tasks if t["id"] != row.get("id")]
         else:
@@ -473,7 +488,12 @@ class Toolbox:
             attempt("a note", lambda n=n: self.draft_helper_note(
                 [str(h) for h in n["helpers"]], str(n.get("role", "")), str(n["text"])))
         for t in as_list(saved.get("tasks"), MAX_SAVED_TASKS):
-            attempt("a helper row", lambda t=t: self.user_edit_task("add", {k: t.get(k, "") for k in TASK_FIELDS}))
+            def add_row(t=t):
+                self.user_edit_task("add", {k: t.get(k, "") for k in TASK_FIELDS})
+                row = s.helper_tasks[-1]
+                row["invited"] = t.get("invited") is True        # only true booleans count
+                row["confirmed"] = t.get("confirmed") is True and bool(row["person"])
+            attempt("a helper row", add_row)
         if saved.get("sections") is not None:
             attempt("card choices", lambda: self.choose_card_sections([str(x) for x in saved["sections"]]))
         card = saved.get("card")

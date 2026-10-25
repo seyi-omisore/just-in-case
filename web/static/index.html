@@ -526,7 +526,7 @@
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg> Only if you choose</h2>
         <p>"Save my progress" keeps your plan on this device. "Share with family" saves your helper list on our server.</p>
-        <details class="more"><summary>Show details</summary><p>Saved progress holds your plan, helper table, card details, review dates, the day you started, and your last 100 chat messages. It stays in this browser. A shared list holds each task, date, time, and name, plus the first name you chose to show.</p><p>A readiness summary is made only when you ask and say yes. It is not saved, it shows helpers by first name only, and Just in Case never sends it. You choose who sees it.</p></details>
+        <details class="more"><summary>Show details</summary><p>Saved progress holds your plan, helper table, card details, review dates, the day you started, and your last 100 chat messages. It stays in this browser. Helpers' phone numbers or emails you type stay in this browser too: they are never sent to our server or shown on a shared list. A shared list holds each task, date, time, and name, plus the first name you chose to show.</p><p>A readiness summary is made only when you ask and say yes. It is not saved, it shows helpers by first name only, and Just in Case never sends it. You choose who sees it.</p></details>
       </div>
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> Who can see it</h2>
@@ -546,6 +546,7 @@
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> Our promise</h2>
         <p>We never sell your data. Just in Case never sends, shares, or books anything without your OK.</p>
+        <details class="more"><summary>Show details</summary><p>Invites and reminders to helpers: {{AGENT_NAME}} writes the message. You send it from your own phone or email.</p></details>
       </div>
     </div>
   </section>
@@ -816,6 +817,7 @@
           <summary>More options <span id="helper-count" class="helper-count"></span></summary>
           <p class="helper-small">Your helper table, a spreadsheet to download, and a page to print.</p>
           <p id="table-empty" class="table-empty"><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> <span>Your helper list shows up here. It's okay to leave it empty.</span></p>
+          <p id="invite-hint" class="invite-hint" hidden><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg> <span>When you're ready, tap Invite on a task. {{AGENT_NAME}} writes the message, and you send it.</span></p>
           <table id="helper-table" class="helper-table" hidden>
             <thead><tr><th scope="col">Task</th><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Who</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Change</span></th></tr></thead>
             <tbody id="helper-rows"></tbody>
@@ -825,6 +827,8 @@
             <p class="task-form-title" id="task-form-title">Add a row</p>
             <label>What do you need help with? <input name="task" required maxlength="120" placeholder="For example: pick up groceries"></label>
             <label>Who is helping <span class="optional">(optional)</span> <input name="person" maxlength="120" placeholder="Leave blank so family can sign up"></label>
+            <label>Their phone or email <span class="optional">(optional)</span> <input name="contact" maxlength="120" autocomplete="off" placeholder="Only for sending your invite"></label>
+            <p class="helper-small contact-note"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> <span>Stays on this device only. It is never sent to our server or shown on a shared list.</span></p>
             <div class="task-form-pair">
               <label>Date <input name="date" maxlength="120" placeholder="Like Nov 14"></label>
               <label>Time <input name="time" maxlength="120" placeholder="Like morning"></label>
@@ -1089,6 +1093,8 @@
       <symbol id="i-card" viewBox="0 0 24 24"><path d="M4 4h16v16H4zm2 2v12h12V6zm2 2h8v2H8zm0 4h8v2H8zm0 4h5v2H8z" fill="currentColor"/></symbol>
       <symbol id="i-note" viewBox="0 0 24 24"><path d="M4 4h16v11l-5 5H4zm2 2v12h8v-4h4V6zm2 2h8v2H8zm0 4h6v2H8z" fill="currentColor"/></symbol>
       <symbol id="i-send" viewBox="0 0 24 24"><path d="M3 20.5 21 12 3 3.5V10l12 2-12 2z" fill="currentColor"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><path d="M8 3h11a1 1 0 0 1 1 1v13h-2V5H8zM4 7h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zm1 2v10h9V9z" fill="currentColor"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 1 6 6v4l2 3v1H4v-1l2-3V9a6 6 0 0 1 6-6zm-2.5 15h5a2.5 2.5 0 0 1-5 0z" fill="currentColor"/></symbol>
       <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z" fill="currentColor"/></symbol>
       <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1 8v7h2v-7zm0-4v2h2V6z" fill="currentColor"/></symbol>
       <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4" fill="currentColor"/><path d="M4 21a8 8 0 0 1 16 0z" fill="currentColor"/></symbol>

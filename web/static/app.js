@@ -175,7 +175,9 @@
     if (!saving) return;
     const at = Date.now();
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ at, state, history: chatHistory.slice(-100) }));
+      // Helpers' phone numbers and emails stay on this device: they ride along in this saved copy only.
+      const contactsSaved = (state.tasks || []).map((t) => contacts.get(t.id) || "");
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ at, state, history: chatHistory.slice(-100), contacts: contactsSaved }));
       $("save-status").textContent = "Saved on this device, " + timeText(at) + ".";
     } catch (_) {
       $("save-status").textContent = "This browser would not save. Your plan is still here while this page is open.";
@@ -203,6 +205,7 @@
       messages.replaceChildren(); pages = []; view = 0;
       for (const m of saved.history || []) addMessage(m.who, m.text, m.cls || undefined);
       $("starters").hidden = true; $("example-open").hidden = true;
+      restoringContacts = { tasks: saved.state.tasks || [], contacts: saved.contacts || [] };
       ws.send(JSON.stringify({ type: "restore", state: saved.state }));
       setSaving(true);
     };
@@ -420,8 +423,8 @@
       for (const n of data.needs) { const i = el("li"); i.append(sitBadge(n.key), document.createTextNode(n.label)); ul.appendChild(i); }
       body.appendChild(ul);
     } else if (kind === "draft_helper_note") {
-      body.appendChild(el("p", null, "This is for " + data.to.join(" and ") + ". You send it yourself."));
-      body.appendChild(moreDetails("We never send it. You can change it, or skip it."));
+      body.appendChild(el("p", null, "This is for " + data.to.join(" and ") + "."));
+      body.appendChild(moreDetails(`${AGENT} writes the message. You send it from your own phone or email. You can change it, or skip it.`));
       const note = el("div", "sticky"); const nh = el("span", "sticky-head"); nh.append(icon("note"), document.createTextNode("Your note"));
       note.append(nh, el("p", null, data.text)); body.appendChild(note);
     } else if (kind === "choose_card_sections") {
@@ -478,6 +481,8 @@
       ws.send(JSON.stringify(msg));
       if (pages[+li.dataset.page]) pages[+li.dataset.page].answered = true;
       actions.remove();
+      // An approved note: the send buttons open right here. The person sends it from their own phone or email.
+      if (ok && kind === "draft_helper_note") li.appendChild(noteSendBox(data.to, data.text));
       if (busy) typing.hidden = false;
       const done = el("p", "slip-done " + (ok ? "yes" : "no"));
       done.append(icon(ok ? "check" : "pencil"), document.createTextNode(doneText));
@@ -670,7 +675,7 @@
     for (const n of plan.notes) {
       const s = el("div", "sticky"); const h = el("span", "sticky-head");
       h.append(icon("note"), document.createTextNode("Note for " + n.helpers.join(" and ")));
-      s.append(h, el("p", null, n.text)); notes.appendChild(s);
+      s.append(h, el("p", null, n.text), noteSendBox(n.helpers, n.text)); notes.appendChild(s);
     }
 
     renderTasks(plan);
@@ -997,7 +1002,18 @@
   // ---- helper table ------------------------------------------------------
   let editingId = null, seenTasks = new Set(), tableUrls = {};
   const form = $("task-form");
+  // Helpers' phone numbers and emails: kept in this page (and the saved copy on this device, if
+  // saving is on). Never sent to the server, never on the shared list. Keyed by task id.
+  const contacts = new Map();
+  let pendingContact = null, restoringContacts = null;
+  function setContact(id, value) {
+    const v = String(value || "").trim().slice(0, 120);
+    if (v) contacts.set(id, v); else contacts.delete(id);
+    requestSave();
+  }
   function renderTasks(plan) {
+    lastPlanForInvites = plan;
+    if (openInvite && !(plan.tasks || []).some((t) => t.id === openInvite.id)) openInvite = null;
     tableUrls = { csv: `/table/${sessionId}.csv`, print: `/table/${sessionId}` };
     $("table-download").href = tableUrls.csv;
     const rows = $("helper-rows"); rows.replaceChildren();
@@ -1005,7 +1021,15 @@
     $("helper-table").hidden = !tasks.length;
     $("table-empty").hidden = !!tasks.length;
     $("helper-count").textContent = tasks.length ? `· ${tasks.length} ${tasks.length === 1 ? "task" : "tasks"}` : "";
+    // A gentle line about inviting, never when the person said they don't want to be a burden.
+    $("invite-hint").hidden = !!plan.quiet_invites || !tasks.some((t) => !t.invited && !t.person);
+    if (restoringContacts && tasks.length) {   // a saved plan reopened: put each contact back on its task
+      tasks.forEach((t, i) => { const was = restoringContacts.tasks[i];
+        if (was && was.task === t.task && restoringContacts.contacts[i]) contacts.set(t.id, restoringContacts.contacts[i]); });
+      restoringContacts = null;
+    }
     for (const t of tasks) {
+      if (pendingContact && !seenTasks.has(t.id) && t.task === pendingContact.task) { setContact(t.id, pendingContact.contact); pendingContact = null; }
       const tr = el("tr", seenTasks.has(t.id) ? "" : "new-row"); seenTasks.add(t.id);
       const td = (v, label, cls) => { const c = el("td", cls || "", v || ""); if (label) c.dataset.label = label; return c; };
       const whoCell = td(t.person, "Who", "who");
@@ -1028,17 +1052,160 @@
       del.append(icon("dash"), document.createTextNode("Remove"));
       del.onclick = () => { if (confirm(`Remove "${t.task}" from your table?`)) sendTable("delete", { id: t.id }); };
       box.append(edit, del);
+      const drafts = (plan.invites || {})[String(t.id)] || {};
+      if (drafts.remind_now) box.prepend(inviteButton(t, "reminder"));   // a few days before the date
+      box.prepend(inviteButton(t, "invite"));
+      if (t.reminded) box.appendChild(el("p", "helper-small reminded-note", "Reminder sent " + dayWords(t.reminded) + "."));
       const iso = readTaskDate(t.date);
       if (iso && isoToLocal(iso) >= new Date(new Date().toDateString()))
         box.appendChild(calendarButton(t.task, iso, `Just in Case helper list: ${t.task}` +
           (t.person ? `, with ${t.person}` : "") + (t.time ? `, ${t.time}` : "") + "."));
-      act.appendChild(box); tr.appendChild(act);
+      act.appendChild(box);
+      if (openInvite && openInvite.id === t.id) act.appendChild(invitePanel(t, plan));
+      tr.appendChild(act);
       rows.appendChild(tr);
     }
+    if (openInvite && openInvite.focus) {   // a panel that just opened: start in its message box
+      openInvite.focus = false;
+      const box = rows.querySelector(".invite-panel textarea");
+      if (box) { box.focus({ preventScroll: true }); box.setSelectionRange(0, 0); box.scrollTop = 0; }   // start at "Hi ..."
+    }
+  }
+
+  // ---- invite and remind helpers ------------------------------------------
+  // The agent writes the message (fixed, checked wording from the server). The person edits it
+  // and sends it from their own phone or email. Nothing is ever sent by the app.
+  let openInvite = null;   // { id, kind: "invite" | "reminder", text (edited), focus }
+  let lastPlanForInvites = null;
+  function inviteButton(t, kind) {
+    const quiet = !!(lastPlanForInvites && lastPlanForInvites.quiet_invites);
+    const b = el("button", quiet ? "invite-btn invite-quiet" : "invite-btn"); b.type = "button";
+    const open = !!openInvite && openInvite.id === t.id && openInvite.kind === kind;
+    b.append(icon(kind === "invite" ? "send" : "bell"), document.createTextNode(kind === "invite" ? "Invite" : "Send a reminder"));
+    b.setAttribute("aria-expanded", String(open));
+    b.setAttribute("aria-label", (kind === "invite" ? "Invite someone to help with: " : "Send a reminder about: ") + t.task);
+    b.onclick = () => {
+      openInvite = open ? null : { id: t.id, kind, text: null, focus: true };
+      if (lastPlanForInvites) renderTasks(lastPlanForInvites);
+    };
+    return b;
+  }
+  // Text and email links open the person's own Messages or email app with the words filled in.
+  // The app itself never sends anything: the person presses send there, or not.
+  const CAN_TEXT = /Android|iPhone|iPad|iPod|Mobile|Macintosh/i.test(navigator.userAgent);  // phones, tablets, and Macs open sms: links
+  function contactParts(value) {
+    const v = String(value || "").trim();
+    if (v.includes("@")) return { email: v.replace(/\s+/g, ""), phone: "" };
+    const digits = v.replace(/[^\d+]/g, "");
+    return { email: "", phone: digits.replace(/\D/g, "").length >= 7 ? digits : "" };
+  }
+  const smsHref = (phone, text) => `sms:${phone}?&body=${encodeURIComponent(text)}`;
+  const mailHref = (email, subject, text) => `mailto:${encodeURIComponent(email).replace(/%40/g, "@")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+  async function copyText(text, fallbackBox) {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch (_) { if (fallbackBox) { fallbackBox.focus(); fallbackBox.select(); try { return document.execCommand("copy"); } catch (e) { return false; } } return false; }
+  }
+  function sendControls(opts) {
+    const wrap = el("div", "send-controls");
+    const row = el("div", "send-row");
+    const sms = el("a", "btn btn-primary send-btn"); sms.append(icon("chat"), document.createTextNode("Send by text"));
+    const mail = el("a", "btn btn-quiet send-btn"); mail.append(icon("mail"), document.createTextNode("Send by email"));
+    const copyBtn = el("button", "btn btn-quiet send-btn"); copyBtn.type = "button";
+    copyBtn.append(icon("copy"), document.createTextNode("Copy message"));
+    const copied = el("p", "helper-small send-copied"); copied.setAttribute("role", "status");
+    // Fill in the links at the moment they are tapped, so they carry the latest edits.
+    sms.href = "sms:"; mail.href = "mailto:";
+    sms.addEventListener("click", () => { sms.href = smsHref(contactParts(opts.contact()).phone, opts.text()); });
+    mail.addEventListener("click", () => { mail.href = mailHref(contactParts(opts.contact()).email, opts.subject, opts.text()); });
+    copyBtn.addEventListener("click", async () => {
+      copied.textContent = (await copyText(opts.text(), wrap.closest(".invite-panel, .sticky")?.querySelector("textarea")))
+        ? "Copied. Paste it into a text or an email." : "Select the message above and copy it.";
+    });
+    if (CAN_TEXT) row.appendChild(sms); else row.appendChild(copyBtn);   // where a text link can't open, copy instead
+    row.appendChild(mail);
+    // After a send button: "Did you send it?" We only record what the person tells us.
+    const ask = el("div", "send-ask"); ask.hidden = true;
+    ask.appendChild(el("p", "send-ask-q", "Did you send it?"));
+    const askRow = el("div", "send-row");
+    const yes = el("button", "btn btn-primary send-btn"); yes.type = "button"; yes.append(icon("check"), document.createTextNode("Yes, I sent it"));
+    const notYet = el("button", "btn btn-quiet send-btn"); notYet.type = "button"; notYet.textContent = "Not yet";
+    askRow.append(yes, notYet); ask.appendChild(askRow);
+    yes.addEventListener("click", () => { ask.hidden = true; opts.onSent(); });
+    notYet.addEventListener("click", () => {
+      ask.hidden = true;
+      if (!copyBtn.isConnected) { row.appendChild(copyBtn); copied.textContent = "If your app didn't open, you can copy the message instead."; }
+      copyBtn.focus();
+    });
+    for (const b of [sms, mail, copyBtn]) b.addEventListener("click", () => setTimeout(() => { ask.hidden = false; }, 400));
+    wrap.append(row, copied, ask);
+    return wrap;
+  }
+  // Send buttons for an approved note. If the note is for someone in the helper table, "Yes, I sent it"
+  // marks their task Invited, and their saved phone or email is used.
+  function noteSendBox(to, text) {
+    const box = el("div", "note-send");
+    box.appendChild(el("p", "helper-small", `${AGENT} writes the message. You send it from your own phone or email.`));
+    const names = (to || []).map((n) => String(n).toLowerCase());
+    const theirTasks = () => ((lastPlanForInvites && lastPlanForInvites.tasks) || [])
+      .filter((t) => t.person && names.includes(t.person.toLowerCase()));
+    box.appendChild(sendControls({
+      text: () => text,
+      subject: (lastPlanForInvites && lastPlanForInvites.invite_words.invite_subject) || "Could you help with something small?",
+      contact: () => { const t = theirTasks().find((x) => contacts.get(x.id)); return t ? contacts.get(t.id) : ""; },
+      onSent: () => {
+        const mine = theirTasks().filter((t) => !t.invited);
+        for (const t of mine) sendTable("invited", { id: t.id });
+        if (!mine.length) ws.send(JSON.stringify({ type: "note_sent" }));
+      },
+    }));
+    return box;
+  }
+  function draftFor(t, plan, kind) {
+    const d = (plan.invites || {})[String(t.id)] || {};
+    let text = kind === "reminder" ? d.reminder : d.invite;
+    if (kind === "invite" && plan.share) text += "\n\n" + plan.invite_words.link_line + " " + location.origin + plan.share.url;
+    return text || "";
+  }
+  function invitePanel(t, plan) {
+    const kind = openInvite.kind;
+    const panel = el("div", "invite-panel");
+    panel.setAttribute("role", "group");
+    const who = t.person ? t.person.split(" ")[0] : "someone";
+    const title = kind === "invite" ? `Invite ${who}` : `Remind ${who}`;
+    panel.setAttribute("aria-label", title);
+    panel.appendChild(el("p", "invite-title", title));
+    const id = "invite-text-" + t.id;
+    const lab = el("label", "invite-label", "Your message (you can change it)"); lab.htmlFor = id;
+    const ta = el("textarea"); ta.id = id; ta.rows = 9; ta.maxLength = 1200;
+    if (openInvite.text == null) openInvite.text = draftFor(t, plan, kind);
+    ta.value = openInvite.text;
+    ta.addEventListener("input", () => { openInvite.text = ta.value; });
+    // Their phone or email: the same field as in the row form. It stays on this device.
+    const cid = "invite-contact-" + t.id;
+    const clab = el("label", "invite-label", "Their phone or email (optional)"); clab.htmlFor = cid;
+    const cin = el("input"); cin.id = cid; cin.maxLength = 120; cin.autocomplete = "off";
+    cin.value = contacts.get(t.id) || "";
+    cin.addEventListener("change", () => setContact(t.id, cin.value));
+    panel.append(lab, ta, clab, cin, el("p", "helper-small", "Stays on this device only."));
+    panel.appendChild(sendControls({
+      text: () => ta.value,
+      subject: kind === "invite" ? plan.invite_words.invite_subject : plan.invite_words.reminder_subject,
+      contact: () => cin.value,
+      onSent: () => {   // "Yes, I sent it": an invite marks the task Invited; a reminder notes the day
+        openInvite = null;
+        sendTable(kind === "invite" ? "invited" : "reminded", { id: t.id });
+      },
+    }));
+    panel.appendChild(el("p", "helper-small invite-you-send", plan.invite_words.you_send));
+    const close = el("button", "btn btn-quiet btn-small"); close.type = "button"; close.textContent = "Close";
+    close.onclick = () => { openInvite = null; renderTasks(lastPlanForInvites); };
+    panel.appendChild(close);
+    return panel;
   }
   // Status is always a word with an icon, never color alone.
-  const STATUS = { open: ["Open", "plus"], helping: ["Someone's helping", "person"], confirmed: ["Confirmed", "check"] };
-  const taskStatus = (t) => (!t.person ? "open" : t.confirmed ? "confirmed" : "helping");
+  const STATUS = { open: ["Open", "plus"], invited: ["Invited", "send"], helping: ["Someone's helping", "person"], confirmed: ["Confirmed", "check"] };
+  // The same order as the server: Confirmed, then Invited (until the helper signs up), then Someone's helping, then Open.
+  const taskStatus = (t) => (t.person && t.confirmed ? "confirmed" : t.invited ? "invited" : t.person ? "helping" : "open");
   function statusLabel(key) {
     const [word, ic] = STATUS[key];
     const s = el("span", "status status-" + key); s.append(icon(ic), document.createTextNode(word));
@@ -1053,6 +1220,7 @@
     editingId = t.id;
     $("helper-more").open = true;
     for (const k of ["task", "person", "date", "time"]) form.elements[k].value = t[k] || "";
+    form.elements.contact.value = contacts.get(t.id) || "";
     $("task-form-title").textContent = "Change this row";
     $("task-save").querySelector("span").textContent = "Save changes";
     $("task-cancel").hidden = false;
@@ -1068,7 +1236,9 @@
     e.preventDefault();
     const row = {}; for (const k of ["task", "person", "date", "time"]) row[k] = form.elements[k].value.trim();
     if (!row.task) { $("task-error").textContent = "Please add a task."; return; }
-    if (editingId != null) { row.id = editingId; sendTable("update", row); } else sendTable("add", row);
+    const contact = form.elements.contact.value.trim();   // stays here: it is not part of the row we send
+    if (editingId != null) { row.id = editingId; setContact(editingId, contact); sendTable("update", row); }
+    else { pendingContact = contact ? { task: row.task, contact } : null; sendTable("add", row); }
     resetForm();
   });
   $("task-cancel").onclick = resetForm;
@@ -1400,6 +1570,9 @@
       target: () => document.querySelector("#steps .cal-btn") || $("getting-ready") },
     { text: "Doris will check in on Ruth. Her row in the helper table says \u201cSomeone's helping.\u201d", next: true,
       show: () => { $("helper-more").open = true; }, target: () => document.querySelector("#helper-rows .status-helping") },
+    { text: `Ruth taps Invite. ${AGENT} writes a warm message, and she sends it from her own phone or email.`, next: true,
+      show: () => { $("helper-more").open = true; },
+      target: () => document.querySelector("#helper-rows .send-row .send-btn") || document.querySelector("#helper-rows .invite-btn") },
     { text: "Her next step card has Call now. When the ride is booked, she taps Done.", target: () => $("next-done"), done: () => story.done },
     { text: "Ruth says yes to the rest of her plan.", target: () => yesOn(), done: () => !planEl.querySelector(".tag-answer") },
     { text: "Every part is covered. A calm picture shows that her plan is ready.", next: true, target: () => $("ready-ill") },

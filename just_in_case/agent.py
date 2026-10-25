@@ -25,6 +25,7 @@ from claude_agent_sdk import (
 )
 
 from .config import AGENT_NAME, MAX_BUDGET_USD, MODEL, runtime_env
+from .invites import YOU_SEND_LINE
 from .directory import Directory
 from .prompts import SYSTEM_PROMPT
 from .safeguards import check_helper_note
@@ -41,7 +42,7 @@ def describe(short: str, data: dict) -> str:
         return "Plan for these needs:\n" + "\n".join(f"  - {NEEDS.get(n, n)}" for n in data["needs"])
     if short == "draft_helper_note":
         return (f"Note for {', '.join(data['helper_names'])} (role: {data['role']}):\n\n"
-                f"{data['note_text']}\n\n(This will NOT be sent. You send it yourself if you like.)")
+                f"{data['note_text']}\n\n({YOU_SEND_LINE})")
     if short == "make_fridge_card":
         return "Create your card with:\n" + json.dumps(data, indent=2)
     return json.dumps(data, indent=2)

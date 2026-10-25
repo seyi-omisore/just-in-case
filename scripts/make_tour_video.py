@@ -40,7 +40,7 @@ SPEED = 0.9                 # about 90% of the voice's usual pace, set with the 
 PAUSE = 0.4                 # seconds of quiet between sentences
 AUDIO_RATE = 48000          # Hz, for the narration file and the video
 CAPTIONS = ["Meet Haven, your planning helper.", "Tell Haven what's coming up.", "Answer one question at a time.",
-            "Your plan builds as you go.", "Do one next step at a time.", "Print your fridge card.",
+            "Your plan builds as you go.", "Haven writes the invite. You send it.", "Do one next step at a time.", "Print your fridge card.",
             "Share a summary, if you choose.", "Plan today. Rest easier tomorrow."]
 # Burned-in captions for tour-captioned.mp4: dark bold words in the caption area under the phone.
 # ffmpeg sizes captions on a 288-pixel-tall canvas, so pixel sizes are scaled to it.
@@ -223,7 +223,16 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
             tour.calm_scroll("#ride-scene")
             tour.hold(3.2)
         tour.story_next(); tour.story_next()       # past the timeline and helper steps
-        with tour.moment(captions[4]):            # the Next step card
+        tour.calm_scroll("#helper-rows .invite-btn")
+        tour.tap("#helper-rows .invite-btn")          # Ruth taps Invite (the soft circle shows the tap)
+        tour.wait("#helper-rows .invite-panel")
+        with tour.moment(captions[4]):            # Invite: Haven drafts it, Ruth sends it from her own phone
+            tour.app.locator("#helper-rows .invite-panel textarea").first.evaluate(
+                "e => { e.scrollIntoView({ block: 'start' }); window.scrollBy({ top: -150, behavior: 'smooth' }); }")
+            tour.hold(3.4)
+        tour.app.locator("#helper-rows .invite-panel .btn-quiet.btn-small").click()   # close it, off camera
+        tour.story_next()
+        with tour.moment(captions[5]):            # the Next step card
             tour.calm_scroll("#next-step")
             tour.hold(1.4)
             tour.tap("#next-done")
@@ -233,7 +242,7 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
             page.wait_for_timeout(600)
         tour.close_tags()
         tour.story_next()
-        with tour.moment(captions[5]):            # the fridge card
+        with tour.moment(captions[6]):            # the fridge card
             tour.tap("#card-link")
             tour.wait("#card-dialog[open]")
             tour.hold(1.4)
@@ -242,7 +251,7 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
             card.evaluate("window.scrollTo({ top: 380, behavior: 'smooth' })")   # down to her allergies and papers
             tour.hold(1.8)
         tour.app.locator("#card-close").click()
-        with tour.moment(captions[6]):            # the readiness summary
+        with tour.moment(captions[7]):            # the readiness summary
             tour.tap("#summary-print")
             tour.wait("#summary-dialog[open]")
             tour.hold(1.2)
@@ -252,7 +261,7 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
         tour.app.locator("#card-close").click()
         tour.app.locator("#review-mark").click()  # her last step, off camera, so the story ends
         tour.wait("#story-own")
-        with tour.moment(captions[7]):            # the end of Ruth's story
+        with tour.moment(captions[8]):            # the end of Ruth's story
             tour.wait("#ready-ill")
             tour.calm_scroll("#ready-ill")
             tour.hold(2.4)

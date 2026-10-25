@@ -279,7 +279,7 @@ class DemoAgent:
                 if sent:
                     for n in names:
                         await self._call("add_helper_task", b.add_helper_task, self.task[0].upper() + self.task[1:], n, "", "")
-                    lines.append(f"- **Note:** I wrote a short note to {who}. You can send it yourself.")
+                    lines.append(f"- **Note:** I wrote a short note to {who}. You send it from your own phone or email.")
             if no_one:
                 lines.append("- " + NO_ONE_LINE)
             await self._call("choose_card_sections", b.choose_card_sections, [])
