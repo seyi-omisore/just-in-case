@@ -1851,3 +1851,11 @@ def test_tour_video_files_ship_with_the_site_and_stream():
     assert client.get("/static/img/tour.vtt").status_code == 200
     page = client.get("/").text
     assert '<source src="/static/img/tour.mp4" type="video/mp4">' in page and 'id="tour-fallback"' in page
+
+
+def test_faq_says_haven_gives_no_medical_advice():
+    page = client.get("/").text
+    faq = page[page.index('class="faq"'):]
+    assert "<summary>Does Haven give medical advice?</summary>" in faq
+    assert "<p>No. Haven helps you plan.</p>" in faq
+    assert "<p>For questions about your health or medications, please ask your care team.</p>" in faq
