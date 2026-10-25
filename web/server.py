@@ -35,7 +35,7 @@ from just_in_case.prompts import GREETING
 from just_in_case.why import why_this
 from just_in_case import attention
 from just_in_case.card import plan_email_text
-from just_in_case.invites import (INVITE_SUBJECT, LINK_LINE, REMINDER_SUBJECT, YOU_SEND_LINE,
+from just_in_case.invites import (INVITE_SUBJECT, LINK_LINE, PEOPLE_TEMPLATE, REMINDER_SUBJECT, YOU_SEND_LINE,
                                   drafts_for)
 from just_in_case import timeline
 from just_in_case.encouragement import encouragement
@@ -943,7 +943,8 @@ async def ws_endpoint(ws: WebSocket):
     tasks: set[asyncio.Task] = set()
     try:
         await s.start()
-        s.emit({"type": "hello", "session": s.id, "demo": s.demo, "mode": s.mode, "greeting": GREETING, "agent_name": AGENT_NAME})
+        s.emit({"type": "hello", "session": s.id, "demo": s.demo, "mode": s.mode, "greeting": GREETING, "agent_name": AGENT_NAME,
+                "people_template": PEOPLE_TEMPLATE})   # blank: the page fills in each name, on the person's device
         while True:
             msg = await ws.receive_json()
             if msg.get("type") == "say" and str(msg.get("text", "")).strip():

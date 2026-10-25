@@ -1067,6 +1067,7 @@
             $("demo-icon").setAttribute("href", "#i-info");
           }
           $("table-download").href = `/table/${sessionId}.csv`;
+          setPeopleTemplate(m.people_template);   // blank wording; names are filled in here, on this device
           setBusy(false);
           if (!messages.children.length) addMessage("agent", m.greeting);
           if (!feed.children.length) feed.appendChild(el("li", "feed-empty", `Each step shows up here while ${AGENT} works.`));
@@ -1435,6 +1436,118 @@
     dialog.showModal();
   });
 
+  // ---- My people ----------------------------------------------------------
+  // The people the person might ask, each with an invite they can keep and reuse.
+  // Kept only in this browser (never sent to our server), and never in Ruth's example.
+  // An invite is just a saved message: nothing here trains or changes the AI.
+  const PEOPLE_KEY = "jic-people", PEOPLE_SKIP_KEY = "jic-people-skipped";
+  let peopleTemplate = "", editingPerson = null;
+  const loadPeople = () => {
+    if (EXAMPLE) return [];
+    try {
+      const v = JSON.parse(localStorage.getItem(PEOPLE_KEY) || "[]");
+      return Array.isArray(v) ? v.filter((p) => p && typeof p.name === "string" && p.name.trim()).slice(0, 40) : [];
+    } catch (_) { return []; }
+  };
+  let people = loadPeople();
+  let peopleSkipped = false; try { peopleSkipped = !EXAMPLE && localStorage.getItem(PEOPLE_SKIP_KEY) === "1"; } catch (_) {}
+  const savePeople = () => { if (EXAMPLE) return; try { localStorage.setItem(PEOPLE_KEY, JSON.stringify(people)); } catch (_) {} };
+  const firstWord = (s) => String(s || "").trim().split(/\s+/)[0] || "";
+  const fillTemplate = (name) => peopleTemplate ? peopleTemplate.split("{name}").join(firstWord(name)) : "";
+  function setPeopleTemplate(t) {
+    peopleTemplate = String(t || "");
+    let changed = false;
+    for (const p of people) if (!p.template && peopleTemplate) { p.template = fillTemplate(p.name); changed = true; }
+    if (changed) savePeople();
+    renderPeople();
+  }
+  const personForm = $("person-form");
+  function renderPeople() {
+    const ul = $("people-list"); ul.replaceChildren();
+    for (const p of people) {
+      const li = el("li", "person-row");
+      const head = el("p", "person-name"); head.append(avatar(p.name), el("strong", null, p.name));
+      if (p.how) head.append(el("span", "person-how", p.how));
+      li.appendChild(head);
+      if (p.contact) { const c = el("p", "helper-small person-contact"); c.append(icon(p.contact.includes("@") ? "mail" : "phone"), document.createTextNode(p.contact)); li.appendChild(c); }
+      if (p.invited) li.appendChild(el("p", "helper-small person-invited", "Invited " + dayWords(p.invited) + "."));
+      const d = el("details", "more person-template"); d.append(el("summary", null, "Their invite"), el("p", "person-template-text", p.template || ""));
+      li.appendChild(d);
+      const row = el("div", "row-actions");
+      const edit = el("button"); edit.type = "button"; edit.append(icon("pencil"), document.createTextNode("Edit"));
+      edit.setAttribute("aria-label", "Edit " + p.name); edit.onclick = () => startPersonEdit(p);
+      const del = el("button"); del.type = "button"; del.append(icon("dash"), document.createTextNode("Delete"));
+      del.setAttribute("aria-label", "Delete " + p.name);
+      del.onclick = () => {
+        if (!confirm(`Delete ${p.name} from My people? Their saved invite is deleted too.`)) return;
+        people = people.filter((x) => x.id !== p.id); savePeople(); resetPersonForm(); renderPeople();
+      };
+      row.append(edit, del); li.appendChild(row);
+      ul.appendChild(li);
+    }
+    const has = people.length > 0;
+    $("people-setup").hidden = has || peopleSkipped;
+    $("people-later").hidden = has || !peopleSkipped;
+    // After skipping, the form waits behind "Add a person", so the step stays out of the way.
+    const formShown = editingPerson != null || !peopleSkipped || personFormOpen;
+    personForm.hidden = !formShown; $("person-add-open").hidden = formShown;
+    $("fold-people-sum").textContent = has ? `${people.length} ${people.length === 1 ? "person" : "people"}` : "Optional";
+    if (typeof renderInvitePeople === "function") renderInvitePeople();
+  }
+  let personFormOpen = false;
+  $("people-skip").addEventListener("click", () => {
+    peopleSkipped = true; try { if (!EXAMPLE) localStorage.setItem(PEOPLE_SKIP_KEY, "1"); } catch (_) {}
+    renderPeople(); $("person-add-open").focus();
+  });
+  $("person-add-open").addEventListener("click", () => { personFormOpen = true; renderPeople(); personForm.elements.name.focus(); });
+  function startPersonEdit(p) {
+    editingPerson = p.id;
+    reveal($("fold-people"));
+    personForm.elements.name.value = p.name; personForm.elements.how.value = p.how || "";
+    personForm.elements.contact.value = p.contact || ""; personForm.elements.template.value = p.template || "";
+    $("person-template-wrap").hidden = false;
+    $("person-form-title").textContent = "Edit " + p.name;
+    $("person-save").querySelector("span").textContent = "Save changes";
+    $("person-cancel").hidden = false;
+    renderPeople();
+    personForm.elements.name.focus();
+  }
+  function resetPersonForm() {
+    editingPerson = null; personFormOpen = false; personForm.reset();
+    $("person-template-wrap").hidden = true;
+    $("person-form-title").textContent = "Add a person";
+    $("person-save").querySelector("span").textContent = "Add person";
+    $("person-cancel").hidden = true; $("person-error").textContent = "";
+  }
+  function addPerson(name, how, contact) {
+    const p = { id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)),
+                name: name.slice(0, 40), how: how.slice(0, 60), contact: contact.slice(0, 120), template: fillTemplate(name) || null };
+    people.push(p); savePeople();
+    return p;
+  }
+  personForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = personForm.elements.name.value.trim(), how = personForm.elements.how.value.trim();
+    const contact = personForm.elements.contact.value.trim();
+    if (!name || !how) { $("person-error").textContent = "Please add their first name and how you know them."; return; }
+    if (editingPerson != null) {
+      const p = people.find((x) => x.id === editingPerson);
+      if (p) {
+        const nameChanged = firstWord(p.name) !== firstWord(name);
+        Object.assign(p, { name: name.slice(0, 40), how: how.slice(0, 60), contact: contact.slice(0, 120) });
+        const t = personForm.elements.template.value.trim();
+        // A new first name gets a fresh invite, unless the person rewrote the message themselves.
+        p.template = t && !(nameChanged && t === (p.template || "").trim()) ? t.slice(0, 1200) : fillTemplate(name);
+        savePeople();
+      }
+    } else addPerson(name, how, contact);
+    resetPersonForm(); renderPeople();
+    personForm.elements.name.focus();
+  });
+  $("person-cancel").addEventListener("click", () => { resetPersonForm(); renderPeople(); });
+  renderPeople();
+  // ---- end My people --------------------------------------------------------
+
   // ---- helper updates: calm, non-urgent notices -------------------------
   // For example, a helper stepped back from a task. Never styled as an emergency.
   function addNotice(text) {
@@ -1538,7 +1651,7 @@
   });
   // "Delete everything": saved progress, helpers' contacts, and every list shared from this browser.
   $("delete-everything").addEventListener("click", async () => {
-    if (!confirm("Delete everything? This removes your saved plan and any helper lists you shared. It can't be undone.")) return;
+    if (!confirm("Delete everything? This removes your saved plan, My people, and any helper lists you shared. It can't be undone.")) return;
     $("delete-status").textContent = "Deleting...";
     for (const s of readShares()) {
       try { await fetch(`/api/share/${encodeURIComponent(s.id)}/delete`, { method: "POST",
@@ -1546,10 +1659,10 @@
     }
     try {
       for (const k of Object.keys(localStorage)) {
-        if (k === SAVE_KEY || k === MY_SHARES || k.startsWith("jic-claims-")) localStorage.removeItem(k);
+        if (k === SAVE_KEY || k === MY_SHARES || k === PEOPLE_KEY || k === PEOPLE_SKIP_KEY || k.startsWith("jic-claims-")) localStorage.removeItem(k);
       }
     } catch (_) {}
-    contacts.clear(); saving = false;
+    contacts.clear(); people = []; saving = false;
     $("delete-status").textContent = "Everything is deleted. Starting fresh.";
     setTimeout(() => { location.href = location.pathname + "#home"; location.reload(); }, 1200);   // a new, empty visit
   });
@@ -1855,6 +1968,12 @@
     { text: `Ruth taps Invite. ${AGENT} writes a warm message, and she sends it from her own phone or email.`, next: true,
       show: () => { reveal($("helper-more")); },
       target: () => document.querySelector("#helper-rows .send-row .send-btn") || document.querySelector("#helper-rows .invite-btn") },
+    { text: `Ruth adds two people she might ask to My people. ${AGENT} writes a short invite for each one.`, next: true,
+      show: () => {
+        if (!people.length) { addPerson("Doris", "neighbor", ""); addPerson("Leo", "friend from church", ""); renderPeople(); }
+        reveal($("fold-people"));
+      },
+      target: () => $("people-list") },
     { text: "Her next step card has Call now. When the ride is booked, she taps Done.", target: () => $("next-done"), done: () => story.done },
     { text: "Ruth says yes to the rest of her plan.", target: () => yesOn(), done: () => !planEl.querySelector(".tag-answer") },
     { text: "Every part is covered. A calm picture shows that her plan is ready.", next: true, target: () => $("ready-ill") },

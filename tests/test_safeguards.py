@@ -1135,3 +1135,16 @@ def test_lockbox_safety_line_appears_wherever_a_lockbox_does():
     assert LOCKBOX_LINE in render_plan_html(st, box.dir, box.today)
     assert LOCKBOX_LINE in render_summary_html(st, box.dir, box.today)
     assert "Never ask for, repeat, or write down a lockbox code" in SYSTEM_PROMPT
+
+
+def test_my_people_invite_template_passes_the_note_checks():
+    """Round 13: the reusable invite in My people is fixed wording with a name slot, checked like every note."""
+    from just_in_case.invites import PEOPLE_TEMPLATE, NAME_SLOT, people_invite_text
+    from just_in_case.safeguards import check_helper_note
+    for name in ("Leo", "Doris Chen", "Marion", ""):
+        text = people_invite_text(name)
+        assert check_helper_note(text) is None, text
+        assert NAME_SLOT not in text
+    assert people_invite_text("Doris Chen").startswith("Hi Doris,")      # first name only
+    assert people_invite_text("").startswith("Hi,")
+    assert PEOPLE_TEMPLATE.count(NAME_SLOT) == 1

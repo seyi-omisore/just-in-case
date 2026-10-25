@@ -915,7 +915,8 @@ def test_your_plan_waits_for_its_first_item_and_988_never_hides():
     side = page[page.index('<aside id="side"'):page.index("</aside>")]
     assert "Your plan will appear here as we talk." in side
     css = client.get("/static/style.css").text
-    assert ".side.plan-empty > :not(#plan-section):not(#support):not(#family-loop):not(.tour-tip) { display: none; }" in css
+    assert ".side.plan-empty > :not(#plan-section):not(#support):not(#family-loop):not(.tour-tip):not(.helpers) { display: none; }" in css
+    assert ".side.plan-empty > .helpers > :not(#fold-people) { display: none; }" in css   # only My people, a setup step
     assert ".side.plan-empty #plan-section > :not(#fridge-empty) { display: none; }" in css
     js = client.get("/static/app.js").text
     assert '$("side").classList.toggle("plan-empty", !plan.items.length && !(plan.tasks || []).length)' in js
@@ -1718,7 +1719,8 @@ def test_delete_everything_removes_saved_plan_contacts_and_shared_lists():
     block = block[:block.index("let walletUrl")]
     assert block.index('confirm("Delete everything?') < block.index("fetch(")                  # asks first
     assert "/delete`" in block and "body: JSON.stringify({ owner: s.owner })" in block
-    assert 'k === SAVE_KEY || k === MY_SHARES || k.startsWith("jic-claims-")' in block
+    assert 'k === SAVE_KEY || k === MY_SHARES || k === PEOPLE_KEY || k === PEOPLE_SKIP_KEY || k.startsWith("jic-claims-")' in block
+    assert "people = [];" in block                                                     # My people goes too (Round 13)
     assert "contacts.clear();" in block
     # The delete call it uses really deletes a shared list with the owner's token.
     with client.websocket_connect("/ws") as ws:
@@ -1939,15 +1941,15 @@ def test_plan_side_uses_labeled_drop_downs_and_keeps_every_feature():
     page = client.get("/").text
     side = page[page.index('<aside id="side"'):page.index("</aside>")]
     assert '<details id="fold-plan" class="fold" open>' in side                     # My plan starts open
-    for fold_id in ("fold-ready", "fold-print", "fold-helpers", "fold-activity"):
+    for fold_id in ("fold-ready", "fold-print", "fold-people", "fold-helpers", "fold-activity"):
         assert f'<details id="{fold_id}" class="fold">' in side                        # the rest start closed
     order = [side.index(f'id="{i}"') for i in ("attention", "quick-bar", "fold-plan", "plan", "notes", "fold-ready",
                                                 "getting-ready", "fold-print", "card-link", "wallet-print", "plan-print",
                                                 "plan-email", "summary-print", "feedback", "save-zone",
-                                                "notices-wrap", "fold-helpers", "helper-table", "share-open",
+                                                "notices-wrap", "fold-people", "people-list", "fold-helpers", "helper-table", "share-open",
                                                 "fold-activity", "feed")]
     assert order == sorted(order)                                                     # each feature sits in its section
-    assert side.count('<span class="fold-word" aria-hidden="true"></span>') == 5        # "Show" / "Hide" on every heading
+    assert side.count('<span class="fold-word" aria-hidden="true"></span>') == 6        # "Show" / "Hide" on every heading (My people added)
     css = client.get("/static/style.css").text
     assert '.fold-word::before { content: "Show"; }' in css and '.fold[open] > summary .fold-word::before { content: "Hide"; }' in css
     assert "min-height: 56px;" in css                                                # big headings to tap
@@ -1955,3 +1957,49 @@ def test_plan_side_uses_labeled_drop_downs_and_keeps_every_feature():
     assert "if (t) { reveal(t); t.classList.add(\"story-next\");" in js               # the story opens the right section
     assert "if (plan.items.length > foldItems) $(\"fold-plan\").open = true;" in js     # a new part is never hidden
     assert '$("qb-card").addEventListener("click", () => $("card-link").click());' in js
+
+
+# ---- Round 13, Part 1: My people ------------------------------------------------
+
+def _people_block():
+    js = client.get("/static/app.js").text
+    return js[js.index("// ---- My people ----"):js.index("// ---- end My people")]
+
+
+def test_my_people_is_an_optional_step_that_can_be_skipped():
+    page = client.get("/").text
+    fold = page[page.index('id="fold-people"'):page.index('id="fold-helpers"')]
+    assert 'id="people-skip"' in fold and "Skip for now" in fold and "Optional" in fold
+    for field in ('name="name" required', 'name="how" required', 'name="contact"'):
+        assert field in fold
+    assert '(optional)' in fold[fold.index('name="how"'):fold.index('name="contact"')]   # only the phone or email is optional
+    assert "Saved on this device only. It is never sent to our server." in fold
+    assert "never used to train or change the AI" in fold
+    block = _people_block()
+    assert 'localStorage.setItem(PEOPLE_SKIP_KEY, "1")' in block       # skipping is remembered, and the form waits behind "Add a person"
+    assert 'id="person-add-open"' in fold
+
+
+def test_my_people_stays_in_this_browser_and_never_goes_to_the_server():
+    block = _people_block()
+    assert "ws.send" not in block and "fetch(" not in block              # nothing about a person ever leaves the page
+    assert "localStorage.setItem(PEOPLE_KEY" in block
+    assert "if (EXAMPLE) return;" in block and "if (EXAMPLE) return [];" in block   # Ruth's example saves nothing
+    js = client.get("/static/app.js").text
+    assert "setPeopleTemplate(m.people_template)" in js
+
+
+def test_each_person_gets_an_invite_they_can_edit_or_delete():
+    from just_in_case.invites import PEOPLE_TEMPLATE, NAME_SLOT
+    with client.websocket_connect("/ws") as ws:
+        hello = until(ws, "hello")
+    assert hello["people_template"] == PEOPLE_TEMPLATE and NAME_SLOT in PEOPLE_TEMPLATE   # blank: names are filled in on the device
+    block = _people_block()
+    assert '"Edit"' in block and '"Delete"' in block and 'confirm(`Delete ${p.name} from My people?' in block
+    assert 'name="template"' in client.get("/").text                      # the saved invite can be changed
+
+
+def test_ruths_example_adds_two_people():
+    js = client.get("/static/app.js").text
+    story = js[js.index("const STORY = ["):js.index("function storyTick")]
+    assert 'addPerson("Doris", "neighbor", "")' in story and 'addPerson("Leo", "friend from church", "")' in story

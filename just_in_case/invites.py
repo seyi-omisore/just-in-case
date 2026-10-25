@@ -23,6 +23,20 @@ YOU_SEND_LINE = f"{AGENT_NAME} writes the message. You send it from your own pho
 # A reminder button shows up this many days before a task's date (and on the day).
 REMIND_DAYS_BEFORE = 3
 
+# "My people": one invitation the person can keep and reuse for each person they add.
+# It is fixed wording with a slot for the first name, which the page fills in. The server
+# never sees the person's people: it only hands out this blank template.
+NAME_SLOT = "{name}"
+PEOPLE_TEMPLATE = (f"Hi {NAME_SLOT},\n\n"
+                   "I'm making a small backup plan, just in case. I made a short list of things I'd like "
+                   "help with, so you can pick what fits your schedule.\n\n"
+                   "No pressure at all. It's completely fine if you can't, and there's no need to reply.")
+
+
+def people_invite_text(name: str) -> str:
+    first = name.strip().split(" ")[0] if name.strip() else ""
+    return PEOPLE_TEMPLATE.replace(NAME_SLOT, first) if first else PEOPLE_TEMPLATE.replace(f" {NAME_SLOT}", "")
+
 
 def _when(row: dict) -> str:
     parts = [p for p in (row.get("date", "").strip(), row.get("time", "").strip()) if p]
