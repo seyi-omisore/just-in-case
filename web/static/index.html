@@ -541,7 +541,7 @@
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> How to delete it</h2>
         <p>Close the page to clear your visit. Use the delete buttons on "Make my plan" for the rest.</p>
-        <details class="more"><summary>Show details</summary><p>Saved progress: tap "Stop saving and delete". It appears once saving is on.</p><p>A shared list: tap "Stop sharing and delete", or open your private link and tap "Stop sharing". The list is deleted for everyone, and the link stops working.</p><p>A helper can remove their own name from a shared list. Files you download or print are yours, so delete them from your computer. Clearing your browser data also removes saved progress and your choices.</p></details>
+        <details class="more"><summary>Show details</summary><p>Saved progress: tap "Stop saving and delete". It appears once saving is on.</p><p>A shared list: tap "Stop sharing and delete", or open your private link and tap "Stop sharing". The list is deleted for everyone, and the link stops working.</p><p>Delete everything (in Settings) removes your saved plan, helpers' phone numbers and emails, and every list you shared from this browser. To make that possible, this browser remembers the private link of each list you share.</p><p>A helper can remove their own name from a shared list. Files you download or print are yours, so delete them from your computer. Clearing your browser data also removes saved progress and your choices.</p></details>
       </div>
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> Our promise</h2>
@@ -1040,6 +1040,13 @@
       </details>
       </div>
       <p class="helper-small">These choices are saved only in this browser.</p>
+      <div class="delete-zone">
+        <button type="button" id="delete-everything" class="btn btn-quiet btn-block btn-stop">
+          <svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Delete everything
+        </button>
+        <p class="helper-small">Removes your saved plan and any helper list you shared. Your display choices stay.</p>
+        <p id="delete-status" class="helper-small" role="status"></p>
+      </div>
     </div>
   </dialog>
 

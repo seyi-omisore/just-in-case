@@ -1313,8 +1313,18 @@
   // ---- sharing (only after the consent box) -----------------------------
   const consent = $("consent-dialog");
   let shareState = null;
+  // Lists shared from this browser, so "Delete everything" can remove them. Kept only on this device.
+  const MY_SHARES = "jic-my-shares";
+  const readShares = () => { try { return JSON.parse(localStorage.getItem(MY_SHARES) || "[]"); } catch (_) { return []; } };
+  function rememberShare(share) {
+    const owner = new URLSearchParams(share.owner_url.split("?")[1] || "").get("owner");
+    const id = share.url.split("/").pop();
+    if (!owner || readShares().some((x) => x.id === id)) return;
+    try { localStorage.setItem(MY_SHARES, JSON.stringify([...readShares(), { id, owner }].slice(-20))); } catch (_) {}
+  }
   function renderShare(plan) {
     shareState = plan.share;
+    if (plan.share && !EXAMPLE) rememberShare(plan.share);
     const has = (plan.tasks || []).length > 0;
     $("share-open").hidden = !!plan.share;
     $("share-open").disabled = !has;
@@ -1382,6 +1392,23 @@
       $("fb-status").textContent = "That didn't go through. You can try again.";
       $("fb-send").disabled = false;
     }
+  });
+  // "Delete everything": saved progress, helpers' contacts, and every list shared from this browser.
+  $("delete-everything").addEventListener("click", async () => {
+    if (!confirm("Delete everything? This removes your saved plan and any helper lists you shared. It can't be undone.")) return;
+    $("delete-status").textContent = "Deleting...";
+    for (const s of readShares()) {
+      try { await fetch(`/api/share/${encodeURIComponent(s.id)}/delete`, { method: "POST",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ owner: s.owner }) }); } catch (_) {}
+    }
+    try {
+      for (const k of Object.keys(localStorage)) {
+        if (k === SAVE_KEY || k === MY_SHARES || k.startsWith("jic-claims-")) localStorage.removeItem(k);
+      }
+    } catch (_) {}
+    contacts.clear(); saving = false;
+    $("delete-status").textContent = "Everything is deleted. Starting fresh.";
+    setTimeout(() => { location.href = location.pathname + "#home"; location.reload(); }, 1200);   // a new, empty visit
   });
   let walletUrl = null;
   $("wallet-print").addEventListener("click", () => {

@@ -1702,3 +1702,28 @@ def test_report_a_problem_opens_email_to_a_clearly_marked_placeholder():
     assert 'if (item.route === "service" && plan.report_email) {' in js
     assert 'encodeURIComponent("Problem with a service: " + item.name)' in js
     assert "Report a problem with this service" in js
+
+
+def test_delete_everything_removes_saved_plan_contacts_and_shared_lists():
+    page = client.get("/").text
+    settings = page[page.index('id="settings-dialog"'):]
+    settings = settings[:settings.index("</dialog>")]
+    assert 'id="delete-everything" class="btn btn-quiet btn-block btn-stop"' in settings
+    assert "this browser remembers the private link of each list you share" in page         # privacy page says so
+    js = client.get("/static/app.js").text
+    block = js[js.index('$("delete-everything").addEventListener'):]
+    block = block[:block.index("let walletUrl")]
+    assert block.index('confirm("Delete everything?') < block.index("fetch(")                  # asks first
+    assert "/delete`" in block and "body: JSON.stringify({ owner: s.owner })" in block
+    assert 'k === SAVE_KEY || k === MY_SHARES || k.startsWith("jic-claims-")' in block
+    assert "contacts.clear();" in block
+    # The delete call it uses really deletes a shared list with the owner's token.
+    with client.websocket_connect("/ws") as ws:
+        until(ws, "hello")
+        ws.send_json({"type": "table", "action": "add", "row": {"task": "Feed Fifi"}})
+        until(ws, "plan")
+        ws.send_json({"type": "share_create", "consent": True, "label": ""})
+        share = until(ws, "plan")["plan"]["share"]
+    sid, owner = share["url"].rsplit("/", 1)[1], share["owner_url"].split("owner=")[1]
+    assert client.post(f"/api/share/{sid}/delete", json={"owner": owner}).json() == {"deleted": True}
+    assert client.get(f"/api/share/{sid}").status_code == 404
