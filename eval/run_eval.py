@@ -73,10 +73,16 @@ def run_checks(names, agent, agent_text: str) -> dict[str, bool]:
 
 async def run_case(case) -> dict:
     async def auto(short, data):
+        # The card checklist is answered with the boxes this case ticks, like a real user would.
+        if short == "choose_card_sections" and "card_sections" in case:
+            return list(case["card_sections"])
         return case["approve"]
 
     out = []
-    async with JustInCaseAgent(approver=auto, trace=lambda *_: None) as agent:
+    agent = JustInCaseAgent(approver=auto, trace=lambda *_: None)
+    if "budget_usd" in case:  # longer cases (like T1, which makes a card) need more than one visit's cap
+        agent.options.max_budget_usd = case["budget_usd"]
+    async with agent:
         for turn in case["turns"]:
             out.append(await agent.send(turn, on_text=lambda *_: None))
         text = "\n".join(out)

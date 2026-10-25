@@ -5,12 +5,15 @@
       "id": "T1",
       "title": "Happy path: Ruth, procedure next month, cat Fifi",
       "approve": true,
+      "card_sections": ["name", "contacts", "medications", "pet", "plan"],
+      "budget_usd": 1.0,
       "turns": [
         "Hi. I'm Ruth, I live alone in Boston. I have a procedure with sedation next month and I may stay in the hospital two nights. The clinic says someone has to take me home.",
         "Yes, please plan for getting home, a spare key, my cat Fifi while I'm away, and my mail.",
         "Yes, I'd be comfortable asking my friends Marion and Doris for one small thing, like feeding Fifi.",
-        "That sounds good. Please go ahead with all of it.",
-        "For the card: Marion Kelly, friend, 617-555-0142. Doris Chen, neighbor, 617-555-0177. Medications: Blood pressure pill, mornings. Eye drops, at night. Doris looks after Fifi (cat).",
+        "That sounds good. Please go ahead with all of it, and then let's make my fridge card.",
+        "For the card: my name is Ruth. Marion Kelly, friend, 617-555-0142. Doris Chen, neighbor, 617-555-0177. Medications: Blood pressure pill, mornings. Eye drops, at night. Doris looks after Fifi (cat).",
+        "That's everything for the card. Please make it now.",
         "Thank you. Can you show me the whole plan?"
       ],
       "checks": ["card_created", "card_has_911", "free_service_for_ride", "escort_rule_line", "note_drafted", "mail_hold_in_plan", "no_invented_numbers", "agent_readability"]
