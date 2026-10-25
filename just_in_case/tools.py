@@ -389,6 +389,43 @@ class Toolbox:
         self.state.event_date = str(value or "")
         self.state.log("user set the date for their timeline" if value else "user cleared the timeline date")
 
+    def user_plans_changed(self, new_date: str, new_time: str = "") -> dict:
+        """ "My plans changed": move the timeline and same-day helper tasks to the new date,
+        and draft one short update for each helper affected. Nothing is sent."""
+        from .invites import read_task_date, update_text
+        s = self.state
+        new = timeline.parse_day(new_date, self.today)
+        if new is None:
+            raise ToolError("Please pick the new date, within the next year.")
+        old = timeline.parse_day(s.event_date, self.today) if s.event_date else None
+        s.event_date = new.isoformat()
+        s.event_time = str(new_time or "").replace("\n", " ").strip()[:40]
+        moved = []
+        for t in s.helper_tasks:
+            if old and read_task_date(t.get("date", ""), self.today) == old:
+                t["date"] = f"{new:%b} {new.day}"
+                moved.append(t["id"])
+        label = timeline.event_label(s)
+        event_words = {"procedure": "procedure", "time away": "time away"}.get(label, "plans")
+        when_words = f"{new:%A}, {new:%B} {new.day}" + (f", at {s.event_time}" if s.event_time else "")
+        drafts, seen = [], set()
+        for t in s.helper_tasks:
+            if not (t.get("person") or t.get("invited")):
+                continue
+            key = (t.get("person") or "").lower() or f"task-{t['id']}"
+            if key in seen:
+                continue
+            seen.add(key)
+            drafts.append({"to": t.get("person") or "", "task_id": t["id"], "text": update_text(t.get("person", ""), event_words, when_words)})
+        for n in s.helper_notes:
+            for h in n["helpers"]:
+                if h.lower() not in seen:
+                    seen.add(h.lower())
+                    drafts.append({"to": h, "task_id": None, "text": update_text(h, event_words, when_words)})
+        s.log(f"user changed plans: new date {s.event_date}; moved tasks {moved}; {len(drafts)} update drafts")
+        self.refresh_card()
+        return {"date": s.event_date, "when": when_words, "moved": moved, "drafts": drafts}
+
     def user_tick_step(self, step_id: str, done: bool) -> None:
         ids = {s["id"] for s in timeline.build(self.state, self.today)["steps"]}
         if step_id not in ids:
@@ -446,7 +483,7 @@ class Toolbox:
                 "items": [{"need": i.need, "route": i.route, "ref_id": i.ref_id, "user_ok": i.user_ok}
                           for i in s.items],
                 "notes": s.helper_notes, "tasks": s.helper_tasks, "sections": s.card_sections,
-                "event_date": s.event_date, "steps_done": sorted(s.steps_done),
+                "event_date": s.event_date, "event_time": s.event_time, "steps_done": sorted(s.steps_done),
                 "actions_done": sorted(s.actions_done), "actions_later": list(s.actions_later),
                 "reviews": list(s.reviews), "started": s.started,
                 "card": getattr(self, "card", None)}
@@ -507,6 +544,7 @@ class Toolbox:
                     [str(a) for a in as_list(card.get("allergies"), 20)], str(card.get("papers", "")))
             attempt("the card", remake)
         attempt("the timeline date", lambda: self.user_set_event_date(str(saved.get("event_date") or "")))
+        s.event_time = str(saved.get("event_time") or "")[:40]
         s.steps_done = {str(x)[:80] for x in as_list(saved.get("steps_done"), 100)}
         planned = {i.need for i in s.items if i.user_ok}  # only for parts the user said yes to
         s.actions_done = {str(x) for x in as_list(saved.get("actions_done"), len(NEEDS))} & planned

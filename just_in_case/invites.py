@@ -98,6 +98,14 @@ def remind_now(row: dict, today: date) -> bool:
     return 0 <= (when - today).days <= REMIND_DAYS_BEFORE
 
 
+def update_text(name: str, event_words: str, when_words: str) -> str:
+    """ "My plans changed": one short update for a helper. Same rules as every note."""
+    first = name.strip().split(" ")[0] if name.strip() else ""
+    return (f"{'Hi ' + first + ',' if first else 'Hi,'}\n\n"
+            f"A quick update: my {event_words} has moved. It's now {when_words}.\n\n"
+            f"If that changes things for you, that's completely fine. Just let me know.")
+
+
 def drafts_for(tasks: list[dict], today: date | None = None) -> dict[int, dict]:
     """The invite and reminder drafts for each task, keyed by task id. Each one is checked."""
     today = today or date.today()

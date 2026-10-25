@@ -412,6 +412,18 @@ class Session:
         self.emit({"type": "activity", "kind": "heart", "text": activity})
         self.emit({"type": "plan", "plan": self.plan()})
 
+    def plans_changed(self, new_date: str, new_time: str) -> None:
+        from just_in_case.tools import ToolError
+        try:
+            out = self.agent.box.user_plans_changed(new_date, new_time)
+        except ToolError as e:
+            self.emit({"type": "timeline_error", "text": str(e)})
+            return
+        self.emit({"type": "activity", "kind": "human", "text": f"You changed your plans to {out['when']}"})
+        self.sync_share()
+        self.emit({"type": "plans_changed", **out})
+        self.emit({"type": "plan", "plan": self.plan()})
+
     def edit_table(self, action: str, row: dict) -> None:
         from just_in_case.tools import ToolError
         try:
@@ -869,6 +881,8 @@ async def ws_endpoint(ws: WebSocket):
                 s.share_create(msg.get("consent"), str(msg.get("label", "")))
             elif msg.get("type") == "share_delete":
                 s.share_delete()
+            elif msg.get("type") == "plans_changed":
+                s.plans_changed(str(msg.get("date", "")), str(msg.get("time", "")))
             elif msg.get("type") == "note_sent":   # the person says they sent a note from their own phone or email
                 s.emit({"type": "activity", "kind": "human", "text": "You sent a note from your own phone or email"})
             elif msg.get("type") == "save":

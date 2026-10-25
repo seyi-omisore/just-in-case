@@ -744,6 +744,7 @@
     const box = $("getting-ready");
     box.hidden = !tl || !tl.steps.length;
     if (box.hidden) return;
+    $("pc-open").hidden = !tl.date;   // "My plans changed" once there is a date to change
     $("event-label").textContent = tl.label;
     const ride = $("ride-scene"), procedure = /procedure/i.test(tl.label);
     ride.toggleAttribute("hidden", !procedure);
@@ -778,6 +779,44 @@
       $("day-before-cal").replaceChildren();
       if (!db.past) $("day-before-cal").appendChild(calendarButton("The day before: my checklist", db.date, db.items.join("\n")));
     }
+  }
+  // ---- My plans changed ------------------------------------------------------
+  $("pc-open").addEventListener("click", () => {
+    const open = $("plans-changed").hidden;
+    $("plans-changed").hidden = !open; $("pc-open").setAttribute("aria-expanded", String(open));
+    if (open) { $("pc-date").value = $("event-date").value; $("pc-date").focus(); }
+  });
+  $("pc-cancel").addEventListener("click", () => { $("plans-changed").hidden = true; $("pc-open").setAttribute("aria-expanded", "false"); $("pc-open").focus(); });
+  $("pc-save").addEventListener("click", () => {
+    $("timeline-error").textContent = "";
+    if (!$("pc-date").value) { $("timeline-error").textContent = "Please pick the new date."; return; }
+    ws.send(JSON.stringify({ type: "plans_changed", date: $("pc-date").value, time: $("pc-time").value.trim() }));
+  });
+  // The agent's update drafts, one per helper. The person sends each one from their own phone or email.
+  function showPlanUpdates(m) {
+    $("plans-changed").hidden = true; $("pc-open").setAttribute("aria-expanded", "false");
+    const box = $("pc-drafts"); box.replaceChildren(); box.hidden = false;
+    box.appendChild(el("p", "pc-done", `Your plan now uses ${m.when}.`));
+    box.appendChild(el("p", "helper-small", "Calendar buttons now use the new dates. If you added the old ones to your calendar, you can delete them there."));
+    if (!m.drafts.length) box.appendChild(el("p", "helper-small", "No helpers to tell."));
+    for (const d of m.drafts) {
+      const card = el("div", "invite-panel");
+      card.appendChild(el("p", "invite-title", d.to ? `Update for ${d.to.split(" ")[0]}` : "Update for your helper"));
+      const ta = el("textarea"); ta.rows = 6; ta.value = d.text; ta.setAttribute("aria-label", "Update message (you can change it)");
+      card.appendChild(ta);
+      const sent = el("p", "helper-small"); sent.setAttribute("role", "status");
+      card.appendChild(sendControls({
+        text: () => ta.value, subject: "A quick update",
+        contact: () => (d.task_id != null && contacts.get(d.task_id)) || "",
+        onSent: () => { sent.textContent = "Thank you. Marked as sent."; },
+      }));
+      card.append(sent, el("p", "helper-small invite-you-send", `${AGENT} writes the message. You send it from your own phone or email.`));
+      box.appendChild(card);
+    }
+    const close = el("button", "btn btn-quiet btn-small"); close.type = "button"; close.textContent = "Done";
+    close.onclick = () => { box.hidden = true; box.replaceChildren(); };
+    box.appendChild(close);
+    box.scrollIntoView({ block: "start" });
   }
   // A standard .ics file, made here in the browser. No calendar account is touched,
   // nothing goes to our server, and there is no alarm: the user's calendar decides.
@@ -953,6 +992,7 @@
         case "notice": addNotice(m.text); break;
         case "suggest": addSuggestion(m); break;
         case "timeline_error": $("timeline-error").textContent = m.text; break;
+        case "plans_changed": showPlanUpdates(m); break;
         case "error": addMessage("agent", m.text, "msg-error"); setBusy(false); break;
       }
     };

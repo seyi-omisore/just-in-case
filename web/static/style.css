@@ -1628,3 +1628,10 @@ a.menu-home:is(:link, :visited), a.demo-exit:is(:link, :visited), .footer-help a
 .attention-btn { grid-column: 2; justify-self: start; min-height: 48px; display: inline-flex; align-items: center; gap: .35rem; text-decoration: none; }
 .attention-ok { display: flex; gap: .45rem; align-items: flex-start; margin: 0; }
 .attention-ok .icon { color: var(--success); margin-top: .2rem; }
+.pc-open { margin: .3rem 0 .6rem; min-height: 48px; }
+.plans-changed { display: grid; gap: .4rem; margin: .4rem 0 .8rem; padding: .8rem; border: 2px solid var(--line); border-radius: 14px; background: var(--enamel); }
+.plans-changed label { font-weight: 700; font-size: .92rem; }
+.plans-changed input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 48px; font: inherit; padding: 0 .6rem; border: 2px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); }
+.plans-changed .helper-small, .pc-drafts .helper-small { margin: 0; }
+.pc-drafts { display: grid; gap: .6rem; margin: .4rem 0 .8rem; }
+.pc-done { margin: 0; font-weight: 700; }

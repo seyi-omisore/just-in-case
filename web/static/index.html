@@ -768,6 +768,21 @@
           <label class="event-date" for="event-date">When is your <span id="event-label">day</span>?</label>
           <input type="date" id="event-date" class="event-date-input">
           <p id="countdown" class="countdown" role="status"></p>
+          <button type="button" id="pc-open" class="btn btn-quiet btn-small pc-open" aria-expanded="false" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> My plans changed
+          </button>
+          <div id="plans-changed" class="plans-changed" hidden>
+            <label for="pc-date">New date</label>
+            <input type="date" id="pc-date" class="event-date-input">
+            <label for="pc-time">Time <span class="optional">(optional)</span></label>
+            <input id="pc-time" maxlength="40" placeholder="Like 9 am">
+            <div class="send-row">
+              <button type="button" id="pc-save" class="btn btn-primary send-btn"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Update my plan</button>
+              <button type="button" id="pc-cancel" class="btn btn-quiet send-btn">Cancel</button>
+            </div>
+            <p class="helper-small">{{AGENT_NAME}} moves your timeline and drafts an update for each helper. Nothing is sent unless you tap.</p>
+          </div>
+          <div id="pc-drafts" class="pc-drafts" hidden></div>
           <p class="task-error-row"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span id="timeline-error" class="task-error" role="alert"></span></p>
           <p id="steps-hint" class="helper-small">Pick the date to see when to do each step.</p>
           <ol id="steps" class="steps"></ol>

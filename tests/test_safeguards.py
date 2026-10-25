@@ -1053,3 +1053,33 @@ def test_what_needs_attention_lists_only_real_gaps():
     clean.items = [PlanItem("ride_home_after_procedure", "service", "svc_fw_escort", "FW", user_ok=True)]
     assert attention.check(clean, d, today) == []
     assert attention.ALL_SET == "You're all set. Nothing needs your attention right now."
+
+
+def test_my_plans_changed_moves_dates_and_drafts_kind_updates():
+    from datetime import date
+    from just_in_case.directory import Directory
+    from just_in_case.invites import update_text
+    from just_in_case.safeguards import check_helper_note, reading_grade
+    from just_in_case.state import PlanItem, PlanState
+    from just_in_case.tools import Toolbox, ToolError
+    import pytest
+    st = PlanState()
+    st.confirmed_needs = ["ride_home_after_procedure"]
+    st.items = [PlanItem("ride_home_after_procedure", "service", "svc_fw_escort", "FW", user_ok=True)]
+    st.event_date = "2026-11-14"
+    st.helper_tasks = [{"id": 1, "task": "Drive me home", "person": "Leo Park", "date": "Nov 14", "time": "3 pm"},
+                       {"id": 2, "task": "Feed Fifi", "person": "", "invited": True, "date": "Nov 10", "time": ""},
+                       {"id": 3, "task": "Groceries", "person": "", "date": "Nov 14", "time": ""}]
+    st.helper_notes = [{"helpers": ["Doris"], "role": "", "text": ""}]
+    box = Toolbox(st, Directory(), today=date(2026, 10, 25))
+    with pytest.raises(ToolError):
+        box.user_plans_changed("someday")
+    out = box.user_plans_changed("2026-11-20", "9 am")
+    assert st.event_date == "2026-11-20" and st.event_time == "9 am"
+    assert [t["date"] for t in st.helper_tasks] == ["Nov 20", "Nov 10", "Nov 20"]   # only tasks on the old day move
+    assert out["when"] == "Friday, November 20, at 9 am"
+    assert [d["to"] for d in out["drafts"]] == ["Leo Park", "", "Doris"]           # each helper once; open tasks skipped
+    assert out["drafts"][0]["text"].startswith("Hi Leo,") and "my procedure has moved" in out["drafts"][0]["text"]
+    for d in out["drafts"]:
+        assert check_helper_note(d["text"]) is None and reading_grade(d["text"]) <= 8
+    assert check_helper_note(update_text("", "plans", "Monday, May 4")) is None

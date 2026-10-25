@@ -1744,3 +1744,21 @@ def test_plan_carries_what_needs_attention_and_the_page_shows_one_button_each():
     js = client.get("/static/app.js").text
     assert 'openInvite = { id: a.task_id, kind: "reminder", text: null, focus: true };' in js   # Send a reminder
     assert 'b.href = "tel:" + a.phone.replace(/[^0-9]/g, "");' in js                             # Call to apply / confirm
+
+
+def test_plans_changed_over_the_live_connection_sends_drafts_not_messages():
+    with client.websocket_connect("/ws") as ws:
+        *_, plan = ruth_flow(ws)
+        ws.send_json({"type": "item", "need": "ride_home_after_procedure", "ok": True})
+        until(ws, "plan")
+        ws.send_json({"type": "plans_changed", "date": "not a date"})
+        assert "new date" in until(ws, "timeline_error")["text"]
+        from datetime import date, timedelta
+        new = (date.today() + timedelta(days=20)).isoformat()
+        ws.send_json({"type": "plans_changed", "date": new, "time": "9 am"})
+        m = until(ws, "plans_changed")
+        assert m["date"] == new and m["drafts"] and m["drafts"][0]["to"] == "Samantha"
+        assert until(ws, "plan")["plan"]["timeline"]["date"] == new
+    js = client.get("/static/app.js").text
+    assert 'case "plans_changed": showPlanUpdates(m); break;' in js
+    assert '$("pc-open").hidden = !tl.date;' in js

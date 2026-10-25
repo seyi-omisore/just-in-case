@@ -92,6 +92,7 @@ class PlanState:
     next_task_id: int = 1
     # "Getting ready" timeline: the date the user picked, and the steps they ticked.
     event_date: str = ""
+    event_time: str = ""   # optional, typed by the user ("9 am"); set with "My plans changed"
     steps_done: set = field(default_factory=set)
     # "Your next step" card: parts the user marked Done, and parts they moved to later.
     actions_done: set = field(default_factory=set)
