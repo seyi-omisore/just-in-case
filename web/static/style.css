@@ -1524,3 +1524,15 @@ a:where(:link, :visited) { color: var(--link); }
 @keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes grow { from { transform: scale(.6); } to { transform: none; } }
 .ride-scene { max-width: 100%; margin-bottom: .2rem; }
+
+/* ---- The 911 and 988 bar stays at the top while you scroll, on every screen ---------- */
+.safety-strip { position: sticky; top: 0; z-index: 30; }
+html { scroll-padding-top: 6rem; }   /* a link or focus never lands hidden under the bar */
+
+/* ---- About: the 1-minute tour --------------------------------------------------------- */
+.tour-video { display: grid; gap: .8rem; justify-items: center; text-align: center; padding: 1.4rem; border-radius: 24px; background: var(--paper); }
+.tour-player, .tour-fallback img { width: min(20rem, 100%); height: auto; border-radius: 22px; background: var(--soft); }
+.tour-play { min-width: 12rem; }
+.tour-fallback { display: grid; gap: 1rem; justify-items: center; }
+.tour-steps { margin: 0; padding-left: 1.4rem; display: grid; gap: .35rem; text-align: left; }
+[data-theme="contrast"] .tour-video { border: 2px solid var(--line); }

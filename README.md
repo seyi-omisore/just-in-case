@@ -63,6 +63,21 @@ python eval/run_eval.py          # scripted test cases, writes eval/results.md
 
 Cards are saved in `output/` as printable HTML.
 
+## Remake the tour video
+
+The About tab shows a 1-minute tour of Ruth's made-up example. After the app changes, remake it:
+
+```bash
+pip install -r requirements-video.txt    # once: Playwright and an ffmpeg program, inside .venv
+python -m playwright install ffmpeg      # once: the small helper Playwright records with
+python scripts/make_tour_video.py        # about a minute; add --no-voice to leave out narration
+```
+
+It starts the app in demo mode (Light theme, phone size), plays Ruth's guided story, keeps the main
+moments, and saves `tour.mp4`, `tour.vtt` (captions), and `tour-poster.jpg` in `web/static/img/`.
+It records with your Google Chrome, or Playwright's Chromium if Chrome is missing. On a Mac, the
+built-in voice reads each caption quietly. Only Ruth's made-up details appear in the video.
+
 ## Built with
 
 - [Claude Agent SDK (Python)](https://platform.claude.com/docs/en/agent-sdk/overview): agent loop, custom tools, permission callback

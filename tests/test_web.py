@@ -1166,3 +1166,42 @@ def test_motion_is_slow_never_flashes_and_stops_for_reduce_motion():
         if m:
             total = float(m.group(1)) * int(m.group(2) or 1)
             assert total <= 5.5 or "playing" in sel, (sel.strip(), total)
+
+
+def test_the_911_and_988_bar_stays_in_sight_while_scrolling():
+    css = client.get("/static/style.css").text
+    assert ".safety-strip { position: sticky; top: 0; z-index: 30; }" in css
+    assert "scroll-padding-top" in css
+
+
+# ---- Round 7, part 5: the tour video ---------------------------------------------------
+
+def test_about_has_a_one_minute_tour_with_captions_on_and_no_autoplay():
+    import re, pathlib
+    page = client.get("/").text
+    about = page[page.index('id="panel-about"'):page.index('id="panel-features"')]
+    tour = about[about.index('id="tour-video"'):about.index("</section>", about.index('id="tour-video"'))]
+    assert "Watch a 1-minute tour" in tour
+    video = re.search(r"<video[^>]*>", tour).group(0)
+    assert "controls" in video and "autoplay" not in video and 'poster="/static/img/tour-poster.jpg"' in video
+    assert '<source src="/static/img/tour.mp4" type="video/mp4">' in tour
+    assert '<track kind="captions" src="/static/img/tour.vtt" srclang="en" label="English" default>' in tour
+    assert 'id="tour-play"' in tour and 'id="tour-fallback"' in tour and tour.count("<li>") >= 6   # steps if the video is missing
+    js = client.get("/static/app.js").text
+    assert 'tr.mode = "showing"' in js and "tourMissing" in js and '"Pause"' in js and ".play()" in js
+    img = pathlib.Path(__file__).resolve().parent.parent / "web" / "static" / "img"
+    for name in ("tour.mp4", "tour.vtt", "tour-poster.jpg"):
+        assert (img / name).exists(), name
+    assert (img / "tour.mp4").stat().st_size < 10 * 1024 * 1024
+    vtt = (img / "tour.vtt").read_text()
+    assert vtt.startswith("WEBVTT") and "Tell Haven what's coming up." in vtt and "Print your fridge card." in vtt
+    assert client.get("/static/img/tour.vtt").headers["content-type"].startswith("text/vtt")
+
+def test_the_tour_script_records_ruths_example_at_phone_size_in_light():
+    import pathlib
+    src = (pathlib.Path(__file__).resolve().parent.parent / "scripts" / "make_tour_video.py").read_text()
+    for part in ('"--demo"', "PHONE_W, PHONE_H = 390, 844", "record_video_dir", '"jic-theme-v2", "light"',
+                 "?example=1", "tour.vtt", "tour-poster.jpg", "MAX_MB = 10", "showTap"):
+        assert part in src, part
+    readme = (pathlib.Path(__file__).resolve().parent.parent / "README.md").read_text()
+    assert "python scripts/make_tour_video.py" in readme

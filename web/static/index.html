@@ -238,6 +238,30 @@
       </div>
     </div>
 
+    <section id="tour-video" class="tour-video" aria-labelledby="tour-video-title">
+      <h2 id="tour-video-title" class="section-title">Watch a 1-minute tour</h2>
+      <p class="hero-lead">Ruth's made-up example, from hello to her fridge card.</p>
+      <video id="tour-player" class="tour-player" controls preload="metadata" playsinline width="480" height="1040"
+             poster="/static/img/tour-poster.jpg" aria-describedby="tour-video-title">
+        <source src="/static/img/tour.mp4" type="video/mp4">
+        <track kind="captions" src="/static/img/tour.vtt" srclang="en" label="English" default>
+      </video>
+      <button type="button" id="tour-play" class="btn btn-primary tour-play"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> <span>Play tour</span></button>
+      <div id="tour-fallback" class="tour-fallback" hidden>
+        <img src="/static/img/tour-poster.jpg" width="480" height="1040" alt="The tour's first screen: {{AGENT_NAME}} says hello on a phone and asks what's coming up.">
+        <ol class="tour-steps">
+          <li>Meet {{AGENT_NAME}}, your planning helper.</li>
+          <li>Tell {{AGENT_NAME}} what's coming up.</li>
+          <li>Answer one question at a time.</li>
+          <li>Your plan builds as you go.</li>
+          <li>Do one next step at a time.</li>
+          <li>Print your fridge card.</li>
+          <li>Share a summary, if you choose.</li>
+          <li>Plan today. Rest easier tomorrow.</li>
+        </ol>
+      </div>
+    </section>
+
     <p class="tagline-three" aria-label="Prepared. Independent. Supported.">
       <span><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Prepared.</span>
       <span><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Independent.</span>
