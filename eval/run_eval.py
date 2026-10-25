@@ -2,6 +2,7 @@
 
     python eval/run_eval.py            # all cases
     python eval/run_eval.py T1 T7      # just some
+    python eval/run_eval.py --runs 3   # each case 3 times: pass rates, since AI replies vary
 
 Costs a few cents with Haiku. Writes eval/results.md (paste into the Word doc).
 Run it several times: model output varies, so report pass rates, not one run.
@@ -92,34 +93,51 @@ async def run_case(case) -> dict:
                 "trace": agent.state.trace, "transcript": agent.transcript}
 
 
-async def main(ids):
+async def main(ids, runs=1):
     cases = [c for c in CASES if not ids or c["id"] in ids]
-    rows, logs = [], []
+    logs = []
     for c in cases:
-        print(f"Running {c['id']}: {c['title']} ...")
-        r = await run_case(c)
-        passed = sum(r["results"].values())
-        print(f"  {passed}/{len(r['results'])} checks passed  (grade {r['grade']}, ~${r['cost']:.4f})")
-        for name, ok in r["results"].items():
-            rows.append(f"| {r['id']} | {name} | {'PASS' if ok else 'FAIL'} |")
-        logs.append(r)
+        for n in range(1, runs + 1):
+            print(f"Running {c['id']}: {c['title']}" + (f" (run {n} of {runs})" if runs > 1 else "") + " ...")
+            r = await run_case(c)
+            r["run"] = n
+            passed = sum(r["results"].values())
+            print(f"  {passed}/{len(r['results'])} checks passed  (grade {r['grade']}, ~${r['cost']:.4f})")
+            logs.append(r)
 
     total = sum(sum(r["results"].values()) for r in logs)
     count = sum(len(r["results"]) for r in logs)
-    per_case = [f"| {r['id']} | {r['title']} | {sum(r['results'].values())}/{len(r['results'])} | "
-                f"{r['grade']} | ${r['cost']:.4f} |" for r in logs]
+    per_case, rows = [], []
+    for c in cases:
+        mine = [r for r in logs if r["id"] == c["id"]]
+        ok = sum(sum(r["results"].values()) for r in mine)
+        of = sum(len(r["results"]) for r in mine)
+        grade = max(r["grade"] for r in mine)
+        cost = sum(r["cost"] for r in mine)
+        per_case.append(f"| {c['id']} | {c['title']} | {ok}/{of} | {grade} | ${cost:.4f} |")
+        for name in c["checks"]:
+            passes = sum(r["results"][name] for r in mine)
+            result = ("PASS" if passes else "FAIL") if runs == 1 else f"{passes}/{len(mine)} runs"
+            rows.append(f"| {c['id']} | {name} | {result} |")
     worst = max((r["grade"] for r in logs), default=0)
+    pct = f" ({100 * total / count:.0f}%)" if count else ""
     md = [f"# Evaluation run {datetime.now():%Y-%m-%d %H:%M}", "",
-          f"Live agent, model: {MODEL}", "",
-          f"**{total}/{count} checks passed**", "",
+          f"Live agent, model: {MODEL}. Each case was run {runs} time{'s' if runs > 1 else ''}.", "",
+          f"**{total}/{count} checks passed{pct}**", "",
           f"Highest reading grade across all agent replies: **{worst}** (target: 8 or lower)", "",
-          "## By case", "", "| Case | Situation | Checks passed | Reading grade | Cost (estimate) |",
+          "## By case", "", "| Case | Situation | Checks passed | Highest reading grade | Cost (estimate) |",
           "|---|---|---|---|---|", *per_case, "",
           "## Every check", "", "| Case | Check | Result |", "|---|---|---|", *rows]
     (ROOT / "eval" / "results.md").write_text("\n".join(md) + "\n")
     (ROOT / "output" / "eval_transcripts.json").write_text(json.dumps(logs, indent=1))
-    print(f"\n{total}/{count} checks passed. Scorecard: eval/results.md")
+    print(f"\n{total}/{count} checks passed{pct}. Scorecard: eval/results.md")
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))
+    args = sys.argv[1:]
+    runs = 1
+    if "--runs" in args:  # python eval/run_eval.py --runs 3   (repeat each case, report pass rates)
+        i = args.index("--runs")
+        runs = int(args[i + 1])
+        del args[i:i + 2]
+    asyncio.run(main(args, runs))
