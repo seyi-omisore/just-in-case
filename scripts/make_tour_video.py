@@ -34,8 +34,9 @@ W, H = 480, 1040            # the recording page: the phone, with a caption area
 PHONE_W, PHONE_H = 390, 844
 HOLD = 2.6                  # seconds on each main moment
 MAX_MB = 10
+BRIDGE = 1.3                # seconds on each step between the main moments, so no step is skipped
 # Calm and warm, like the app's Read aloud: the most natural voice first.
-VOICES = ("Ava (Premium)", "Zoe (Premium)", "(Premium)", "(Enhanced)", "Samantha", "Daniel")
+VOICES = ("Ava (Premium)", "Zoe (Premium)", "(Premium)", "(Enhanced)", "Moira", "Tessa", "Samantha", "Daniel")
 SPEED = 0.9                 # about 90% of the voice's usual pace, set with the voice's own rate (never stretched after)
 PAUSE = 0.4                 # seconds of quiet between sentences
 AUDIO_RATE = 48000          # Hz, for the narration file and the video
@@ -91,12 +92,12 @@ def ffmpeg_exe() -> str:
         return found
 
 
-def pick_voice() -> str | None:
+def pick_voice(wanted: str | None = None) -> str | None:
     if not shutil.which("say"):
         return None
     names = subprocess.run(["say", "-v", "?"], capture_output=True, text=True).stdout.splitlines()
     english = [line.split("  ")[0].strip() for line in names if " en_" in line]
-    for want in VOICES:
+    for want in ((wanted,) if wanted else VOICES):
         for name in english:
             if want in name:
                 return name
@@ -114,6 +115,7 @@ class Tour:
         self.page, self.steps, self.t0 = page, steps, time.monotonic()
         self.speech = speech        # how long each caption takes to say, so no moment ends mid-sentence
         self.segments: list[tuple[float, float, str]] = []
+        self.seen: list[str] = []   # the story steps already on camera, in order
         self.app = page.frame_locator("#app")
 
     def now(self) -> float:
@@ -124,15 +126,41 @@ class Tour:
 
         class Moment:
             def __enter__(self):
-                tour.page.evaluate("([n, on]) => dots(n, on)", [tour.steps, len(tour.segments)])
+                tour.page.evaluate("([n, on]) => dots(n, on)", [tour.steps, sum(1 for s in tour.segments if s[2])])
                 self.start = tour.now()
+                tour.mark_seen()
 
             def __exit__(self, *exc):
                 left = tour.speech.get(caption, 0) + 0.9 - (tour.now() - self.start)
                 if left > 0:
                     tour.hold(left)
                 tour.segments.append((self.start, tour.now(), caption))
+                tour.mark_seen()
         return Moment()
+
+    def mark_seen(self) -> str | None:
+        """Note which story step is showing. Returns it if it is new, else None."""
+        try:
+            label = self.story_step()
+        except Exception:
+            return None
+        if "step" not in label or label in self.seen:
+            return None
+        self.seen.append(label)
+        return label
+
+    def snap(self, seconds: float = BRIDGE, wait: float = 0):
+        """If the story moved to a step the video has not shown yet, keep it on screen for a moment (no narration).
+        `wait`: how long to give the story to move on first (after a dialog closes, it takes a moment)."""
+        end = time.monotonic() + wait
+        new = self.mark_seen()
+        while not new and time.monotonic() < end:
+            self.page.wait_for_timeout(150)
+            new = self.mark_seen()
+        if new:
+            start = self.now()
+            self.hold(seconds)
+            self.segments.append((start, self.now(), ""))
 
     def hold(self, seconds: float = HOLD):
         self.page.wait_for_timeout(int(seconds * 1000))
@@ -165,6 +193,8 @@ class Tour:
             ring = self.app.locator(".slip-actions .btn-primary.story-next")
             if ring.count() and ring.first.is_visible():
                 ring.first.click()
+                self.page.wait_for_timeout(500)
+                self.snap()
             self.page.wait_for_timeout(300)
         raise TimeoutError(f"the story never showed {done}")
 
@@ -172,6 +202,7 @@ class Tour:
         self.app.locator("#story-next").wait_for(state="visible", timeout=30000)
         self.app.locator("#story-next").click()
         self.page.wait_for_timeout(300)
+        self.snap()
 
     def story_step(self) -> str:
         return self.app.locator("#story-count").inner_text().lower()
@@ -217,6 +248,8 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
         while "step 4 of" not in tour.story_step():
             tour.story_next()
         tour.app.locator(".story-next").first.click()   # her yes to the ride home
+        tour.page.wait_for_timeout(400)
+        tour.snap()
         tour.wait("#ride-scene")
         tour.close_tags()
         with tour.moment(captions[3]):            # the plan and its timeline: the car drives to the house
@@ -240,8 +273,9 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
         while tour.app.locator(".tag-answer .btn-primary").count():   # yes to the rest, off camera
             tour.app.locator(".story-next").first.click()
             page.wait_for_timeout(600)
+            tour.snap()
         tour.close_tags()
-        tour.story_next()
+        tour.story_next(); tour.story_next(); tour.story_next()   # "Why this?", "What needs attention", then the fridge card step
         with tour.moment(captions[6]):            # the fridge card
             tour.tap("#card-link")
             tour.wait("#card-dialog[open]")
@@ -251,6 +285,8 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
             card.evaluate("window.scrollTo({ top: 380, behavior: 'smooth' })")   # down to her allergies and papers
             tour.hold(1.8)
         tour.app.locator("#card-close").click()
+        tour.snap(wait=2)                          # the wallet card step
+        tour.story_next(); tour.story_next()       # the night-before preview, then the readiness summary step
         with tour.moment(captions[7]):            # the readiness summary
             tour.tap("#summary-print")
             tour.wait("#summary-dialog[open]")
@@ -259,12 +295,20 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
             tour.wait("#card-dialog[open]")
             tour.hold(2.2)
         tour.app.locator("#card-close").click()
-        tour.app.locator("#review-mark").click()  # her last step, off camera, so the story ends
+        tour.snap(wait=2)                          # "My plans changed"
+        tour.story_next()                          # her last step: marking the plan reviewed
+        tour.app.locator("#review-mark").click()
         tour.wait("#story-own")
         with tour.moment(captions[8]):            # the end of Ruth's story
             tour.wait("#ready-ill")
             tour.calm_scroll("#ready-ill")
             tour.hold(2.4)
+        shown = [int(re.search(r"step (\d+) of", label).group(1)) for label in tour.seen]
+        total = int(re.search(r"of (\d+)", tour.seen[0]).group(1))
+        if shown != list(range(1, total + 1)):
+            missing = sorted(set(range(1, total + 1)) - set(shown))
+            sys.exit(f"The video would skip Ruth's example steps {missing} (it shows {shown}). Not saved.")
+        print(f"Every step of Ruth's example is shown, in order: 1 to {total}.")
         video = Path(page.video.path())
         context.close()
         browser.close()
@@ -329,13 +373,23 @@ def narrate(clips, total: float, ffmpeg: str, out: Path) -> None:
 
 
 def make(segments, video: Path, narration: Path | None, ffmpeg: str, crf: int, out: Path) -> None:
-    """Keep only the main moments, with a soft fade between them, and add the narration track as it is."""
+    """Keep only the main moments, with a quick cross-dissolve between them (no blank flash), and add the narration track as it is."""
     parts, inputs = [], ["-i", str(video)]
+    lead = 0.3          # each clip starts this much earlier and melts over the one before, so the total length stays the same
+    leads = []
     for i, (a, b, _) in enumerate(segments):
-        d = b - a
-        parts.append(f"[0:v]trim=start={a:.3f}:end={b:.3f},setpts=PTS-STARTPTS,"
-                     f"fade=t=in:st=0:d=0.3:color=0xEDE8E1,fade=t=out:st={max(d - 0.3, 0):.3f}:d=0.3:color=0xEDE8E1[v{i}]")
-    graph = ";".join(parts) + ";" + "".join(f"[v{i}]" for i in range(len(segments))) + f"concat=n={len(segments)}:v=1:a=0[v]"
+        lead_i = 0.0 if i == 0 else min(lead, a)
+        leads.append(lead_i)
+        parts.append(f"[0:v]trim=start={a - lead_i:.3f}:end={b:.3f},setpts=PTS-STARTPTS,fps=30,format=yuv420p[c{i}]")
+    shown, last = 0.0, "c0"
+    for i in range(1, len(segments)):
+        shown += segments[i - 1][1] - segments[i - 1][0]
+        out_label = "v" if i == len(segments) - 1 else f"x{i}"
+        parts.append(f"[{last}][c{i}]xfade=transition=fade:duration={leads[i]:.3f}:offset={shown - leads[i]:.3f}[{out_label}]")
+        last = out_label
+    if len(segments) == 1:
+        parts.append("[c0]null[v]")
+    graph = ";".join(parts)
     maps = ["-map", "[v]"]
     total = sum(b - a for a, b, _ in segments)
     if narration:
@@ -355,10 +409,13 @@ def make(segments, video: Path, narration: Path | None, ffmpeg: str, crf: int, o
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--voice", help='narrator, for example --voice "Shelley (English (US))" (see: say -v ?)')
     ap.add_argument("--no-voice", action="store_true", help="leave out the spoken narration")
     args = ap.parse_args()
     ffmpeg = ffmpeg_exe()
-    voice = None if args.no_voice else pick_voice()
+    voice = None if args.no_voice else pick_voice(args.voice)
+    if args.voice and not args.no_voice and not voice:
+        sys.exit(f"No English voice matches \"{args.voice}\". See the list with: say -v ?")
     port = free_port()
     base = f"http://127.0.0.1:{port}"
     server = subprocess.Popen([sys.executable, "serve.py", "--demo", "--port", str(port), "--no-browser"], cwd=ROOT,
@@ -394,7 +451,7 @@ def main() -> None:
                 if mp4.stat().st_size <= MAX_MB * 1024 * 1024:
                     break
             cues = [f"{i + 1}\n{vtt_time(s)} --> {vtt_time(s + (b - a) - 0.2)}\n{text}\n"
-                    for i, (s, (a, b, text)) in enumerate(zip(starts, segments))]
+                    for i, (s, (a, b, text)) in enumerate((s, seg) for s, seg in zip(starts, segments) if seg[2])]
             (OUT / "tour.vtt").write_text("WEBVTT\n\n" + "\n".join(cues))
             subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-ss", "1.2", "-i", str(mp4), "-frames:v", "1", "-q:v", "3",
                             str(OUT / "tour-poster.jpg")], check=True)
