@@ -716,6 +716,7 @@
     $("plan-print").hidden = !plan.plan_print;
     planEmail = plan.plan_email; $("plan-email").hidden = !plan.plan_email;
     renderAttention(plan);
+    renderNight(plan);
     $("feedback").hidden = EXAMPLE || !plan.plan_email;   // at the end, once something is in the plan (not in Ruth's example)
     summaryUrl = plan.summary_print;
     $("summary-print").hidden = !plan.summary_available;   // only after something is in the plan, and only if you ask
@@ -791,6 +792,37 @@
       $("day-before-list").replaceChildren(...db.items.map((t) => { const li = el("li"); li.append(icon("check"), document.createTextNode(t)); return li; }));
       $("day-before-cal").replaceChildren();
       if (!db.past) $("day-before-cal").appendChild(calendarButton("The day before: my checklist", db.date, db.items.join("\n")));
+    }
+  }
+  // ---- The night before: who is doing what (built by the server from the plan) ----
+  function nightActions(plan, nb) {
+    const text = [nb.title, ...nb.lines].join(" ");
+    const box = [];
+    if ("speechSynthesis" in window) box.push(readAloudButton(text));
+    const pr = el("button", "btn btn-quiet btn-small send-btn"); pr.type = "button";
+    pr.append(icon("note"), document.createTextNode("Print"));
+    pr.onclick = () => {
+      $("card-dialog-title").textContent = "The night before"; frame.title = "The night before"; $("card-print-label").textContent = "Print";
+      frame.src = plan.night_print + "?t=" + Date.now(); dialog.showModal();
+    };
+    box.push(pr);
+    if (!isoToLocal(nb.date) || isoToLocal(nb.date) >= new Date(new Date().toDateString()))
+      box.push(calendarButton("The night before: my summary", nb.date, [nb.title, ...nb.lines].join("\n")));
+    return box;
+  }
+  function renderNight(plan) {
+    const nb = plan.night_before;
+    $("night-now").hidden = !(nb && nb.show_now);
+    $("night-preview").hidden = !nb || nb.show_now;
+    if (!nb) return;
+    const items = () => nb.lines.map((t) => el("li", null, t));
+    if (nb.show_now) {
+      $("night-now-text").textContent = nb.title;
+      $("night-now-list").replaceChildren(...items());
+      $("night-now-actions").replaceChildren(...nightActions(plan, nb));
+    } else {
+      $("night-preview-list").replaceChildren(...items());
+      $("night-preview-actions").replaceChildren(...nightActions(plan, nb));
     }
   }
   // ---- My plans changed ------------------------------------------------------

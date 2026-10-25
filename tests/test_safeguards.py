@@ -1083,3 +1083,25 @@ def test_my_plans_changed_moves_dates_and_drafts_kind_updates():
     for d in out["drafts"]:
         assert check_helper_note(d["text"]) is None and reading_grade(d["text"]) <= 8
     assert check_helper_note(update_text("", "plans", "Monday, May 4")) is None
+
+
+def test_night_before_summary_is_built_from_the_plan_and_shows_on_the_day_before():
+    from datetime import date
+    from just_in_case import timeline
+    from just_in_case.directory import Directory
+    from just_in_case.state import PlanItem, PlanState
+    d = Directory()
+    st = PlanState()
+    st.confirmed_needs = ["ride_home_after_procedure", "spare_key_access", "pet_care_during_stay"]
+    st.items = [PlanItem("ride_home_after_procedure", "service", "svc_fw_escort", "FW", user_ok=True),
+                PlanItem("spare_key_access", "preparation", "prep_key_lockbox", "Lockbox", user_ok=True),
+                PlanItem("pet_care_during_stay", "person", None, "Doris", user_ok=False)]   # not said yes: left out
+    st.helper_tasks = [{"id": 1, "task": "Feed Fifi", "person": "Doris Chen", "time": "morning", "date": ""}]
+    assert timeline.night_before(st, d, date(2026, 10, 25)) is None              # no date yet
+    st.event_date = "2026-11-14"
+    early = timeline.night_before(st, d, date(2026, 10, 25))
+    assert early["show_now"] is False and early["date"] == "2026-11-13"            # a preview until then
+    nb = timeline.night_before(st, d, date(2026, 11, 13))
+    assert nb["show_now"] is True and nb["title"] == "Tomorrow is your procedure."
+    assert nb["lines"] == ["Getting home: FriendshipWorks Medical Escort, 617-482-1510.", "Your key: in the lockbox.",
+                           "Doris: Feed Fifi, morning.", "In an emergency, call 911."]

@@ -109,3 +109,44 @@ def build(state: PlanState, today: date) -> dict:
             "past": bool(on and on < today),
         })
     return out
+
+
+# ---- The night before: who is doing what, built from the plan --------------
+
+NIGHT_SHORT = {"ride_home_after_procedure": "Getting home", "check_in_after_procedure": "Evening check-in",
+               "spare_key_access": "Your key", "pet_care_during_stay": "Your pet", "mail_while_away": "Your mail",
+               "transportation": "Your ride", "help_at_home": "Help at home", "power_outage": "Power outage",
+               "fall_at_home": "Falls", "home_repair": "Home repairs", "family_updates": "Family updates"}
+
+
+def night_before(state: PlanState, directory, today: date) -> dict | None:
+    """A short, calm summary for the night before a dated event. Only parts the person said yes to,
+    and their helper table. Shown on the day before; a preview before that."""
+    event = parse_day(state.event_date, today) if state.event_date else None
+    planned = [i for i in state.items if i.user_ok and i.route != "blank"]
+    if not event or not planned:
+        return None
+    label = event_label(state)
+    title = {"procedure": "Tomorrow is your procedure.", "time away": "Tomorrow you head out."}.get(label, "Tomorrow is the day.")
+    lines = []
+    names = [h for n in state.helper_notes for h in n["helpers"]]
+    for i in planned:
+        what = NIGHT_SHORT.get(i.need, i.need.replace("_", " ").capitalize())
+        if i.route == "person":
+            lines.append(f"{what}: {' and '.join(names) if names else 'the person you asked'}.")
+        elif i.ref_id == "prep_key_lockbox":
+            lines.append(f"{what}: in the lockbox.")
+        else:
+            ref = directory.by_id.get(i.ref_id or "", {})
+            phone = ref.get("phone", "")
+            lines.append(f"{what}: {ref.get('name', i.label)}" + (f", {phone}." if phone else "."))
+    for t in state.helper_tasks:
+        if t.get("person"):
+            when = f", {t['time']}" if t.get("time") else ""
+            lines.append(f"{t['person'].split(' ')[0]}: {t['task']}{when}.")
+    if state.card_path:
+        lines.append("Your fridge card: on the fridge, where it's easy to see.")
+    lines.append("In an emergency, call 911.")
+    on = event - timedelta(days=1)
+    return {"date": on.isoformat(), "show_now": today == on, "title": title,
+            "time": state.event_time, "lines": lines}

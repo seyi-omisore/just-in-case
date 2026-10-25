@@ -1776,3 +1776,24 @@ def test_plan_b_keeps_a_checked_service_ready_when_a_friend_gives_the_ride():
     assert plan_b(PlanItem("pet_care_during_stay", "person", None, "Doris"), st, d) is None              # rides only
     js = client.get("/static/app.js").text
     assert "If your helper can't make it, call ${item.plan_b.name}." in js
+
+
+def test_night_before_print_page_and_buttons():
+    from datetime import date, timedelta
+    with client.websocket_connect("/ws") as ws:
+        *_, plan = ruth_flow(ws)
+        ws.send_json({"type": "item", "need": "ride_home_after_procedure", "ok": True})
+        until(ws, "plan")
+        ws.send_json({"type": "event_date", "date": (date.today() + timedelta(days=1)).isoformat()})
+        plan = until(ws, "plan")["plan"]
+        for _ in range(5):
+            if plan["night_before"]:
+                break
+            plan = until(ws, "plan")["plan"]
+        nb = plan["night_before"]
+        assert nb["show_now"] is True and nb["lines"][-1] == "In an emergency, call 911."
+        page = client.get(plan["night_print"]).text
+        assert "Tomorrow is your procedure." in page and "FriendshipWorks Medical Escort" in page
+    js = client.get("/static/app.js").text
+    assert 'if ("speechSynthesis" in window) box.push(readAloudButton(text));' in js
+    assert 'calendarButton("The night before: my summary", nb.date' in js

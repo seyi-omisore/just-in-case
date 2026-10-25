@@ -670,6 +670,11 @@
           </svg>
           <h2 id="fridge-title">Your plan<span id="plan-progress"></span></h2>
         </div>
+        <section id="night-now" class="night" aria-labelledby="night-now-title" hidden>
+          <h3 id="night-now-title" class="night-title"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> <span id="night-now-text"></span></h3>
+          <ul id="night-now-list" class="night-list"></ul>
+          <div id="night-now-actions" class="send-row"></div>
+        </section>
         <section id="attention" class="attention" aria-labelledby="attention-title" hidden>
           <h3 id="attention-title" class="attention-title"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> <span>What needs attention</span></h3>
           <ul id="attention-list" class="attention-list"></ul>
@@ -786,6 +791,11 @@
           <p class="task-error-row"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span id="timeline-error" class="task-error" role="alert"></span></p>
           <p id="steps-hint" class="helper-small">Pick the date to see when to do each step.</p>
           <ol id="steps" class="steps"></ol>
+          <details id="night-preview" class="more night-preview" hidden>
+            <summary>Preview the night-before summary</summary>
+            <ul id="night-preview-list" class="night-list"></ul>
+            <div id="night-preview-actions" class="send-row"></div>
+          </details>
           <div id="day-before" class="day-before" hidden>
             <h4 class="day-before-title"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> The day before</h4>
             <p id="day-before-date" class="helper-small"></p>

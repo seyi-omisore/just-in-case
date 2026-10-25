@@ -241,6 +241,8 @@ class Session:
                          "total": len(state.confirmed_needs)},
             "ready": self.is_ready(),
             "timeline": timeline.build(state, self.agent.box.today),
+            "night_before": timeline.night_before(state, d, self.agent.box.today),
+            "night_print": f"/night/{self.id}",
             "notes": state.helper_notes,
             "tasks": state.helper_tasks,
             # The agent's invite and reminder drafts for each task (fixed wording, checked). The person sends them.
@@ -688,6 +690,24 @@ async def feedback(request: Request):
     lines = (lines + [json.dumps({"helpful": helpful, "comment": comment})])[-FEEDBACK_MAX_LINES:]
     FEEDBACK_FILE.write_text("\n".join(lines) + "\n")
     return JSONResponse({"saved": True})
+
+
+@app.get("/night/{sid}")
+async def night_print(sid: str):
+    """The night-before summary, large print. Made on request from the plan, never saved."""
+    s = SESSIONS.get(sid)
+    nb = timeline.night_before(s.agent.state, s.agent.box.dir, s.agent.box.today) if s and s.agent else None
+    if not nb:
+        return JSONResponse({"error": "No summary yet"}, status_code=404)
+    e = htmlmod.escape
+    items = "".join(f"<li>{e(x)}</li>" for x in nb["lines"])
+    return HTMLResponse(f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="light only">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>The night before</title>
+<style> body {{ font-family: "Atkinson Hyperlegible", Verdana, Arial, sans-serif; font-size: 20pt; color: #000; background: #fff; max-width: 8in; margin: .4in auto; padding: 0 16px; }}
+ h1 {{ font-size: 28pt; }} li {{ margin: .12in 0; }} .print {{ font: inherit; font-weight: 700; padding: .1in .35in; min-height: 48px; border: 0; border-radius: 10px; background: #1F6F78; color: #fff; }}
+ @media print {{ .print {{ display: none; }} }}</style></head><body>
+<h1>{e(nb["title"])}</h1><ul>{items}</ul>
+<button class="print" onclick="window.print()">Print</button></body></html>""")
 
 
 @app.get("/wallet/{sid}")
