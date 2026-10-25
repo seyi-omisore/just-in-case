@@ -504,7 +504,7 @@ EXACT_LINES = {
     "Just in Case will never ask for money, bank details, or your Social Security number.",
     "In an emergency, call 911. Feeling alone or unsafe? Call or text 988.",   # safety wording is never shortened
     "Leya Jacob Kurzhiparambil, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae",   # the sign-off: names are not simplified
-    "Just in Case was built by a team at the University of Massachusetts Boston for the Applied AI Microcredential, hosted by the Paul English Applied Artificial Intelligence Institute.",  # Who we are: the team's exact words
+    "Just in Case was built by a team at the University of Massachusetts Boston, hosted by the Paul English Applied Artificial Intelligence Institute.",  # Who we are: the team's exact words
     "Professor Emerita, College of Education and Human Development",    # a title, not simplified
     "PhD Student in Exercise and Health Sciences",                       # a title, not simplified
     "Haven is the app's AI planning helper. It suggests options, but you make every decision, and it never sends, shares, or books anything without your OK.",  # exact wording the team chose
@@ -989,8 +989,9 @@ def test_who_we_are_page_lists_the_team_and_is_linked_from_the_menu_and_footer()
     who = who[:who.index("</section>")]
     assert " hidden" in who.split(">", 1)[0]                                       # not shown until asked for
     assert '<h1 id="who-title" class="page-title">Who we are</h1>' in who
-    assert ("Just in Case was built by a team at the University of Massachusetts Boston for the Applied AI "
-            "Microcredential, hosted by the Paul English Applied Artificial Intelligence Institute.") in who
+    assert ("Just in Case was built by a team at the University of Massachusetts Boston, "
+            "hosted by the Paul English Applied Artificial Intelligence Institute.") in who
+    assert "Microcredential" not in who
     names = re.findall(r'<h2 class="team-name">([^<]+)</h2>\s*<p class="team-program">([^<]+)</p>', who)
     assert names == [("Leya Jacob Kurzhiparambil", "PhD Student in Gerontology"),
                      ("Oluwaseyi Omisore", "Undergraduate in Computer Science"),
@@ -1431,3 +1432,12 @@ def test_keep_family_in_the_loop_sits_below_support_and_comes_from_the_services_
     assert len(re.findall(r"[.!?](?:\s|$)", cb[0]["how_to_use"])) == 1          # one sentence
     js = client.get("/static/app.js").text
     assert "if (familyOpened) return;" in js and '`Open ${s.name} (new tab)`' in js and 'a.rel = "noopener noreferrer"' in js
+
+
+def test_home_points_new_visitors_to_the_about_page():
+    page = client.get("/").text
+    home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
+    assert ('<p class="about-pointer">New here? The <a href="#about">About page</a> has a 1-minute video, '
+            "answers to common questions, and Ruth's example.</p>") in home
+    css = client.get("/static/style.css").text
+    assert ".about-pointer a { display: inline-block; min-height: 48px;" in css   # tap target floor

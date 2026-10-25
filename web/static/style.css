@@ -1271,6 +1271,8 @@ html:not([data-theme="contrast"]) details.more-options :is(.task-form, .helper-t
 .tour-target { box-shadow: 0 0 0 4px var(--wall), 0 0 0 7px var(--primary); }
 [data-theme="contrast"] .tour-tip, [data-theme="contrast"] .tour-tip::before { border: 2px solid #FFFF00; }
 .home-links { text-align: center; }
+.about-pointer { text-align: center; color: var(--ink-soft); margin: 1rem auto 0; max-width: 36rem; }
+.about-pointer a { display: inline-block; min-height: 48px; line-height: 48px; font-weight: 700; }
 .tour-link { font-weight: 700; }
 
 /* ---- Thinking: the agent's heart beats gently. Still when the device asks for less motion. ---- */
