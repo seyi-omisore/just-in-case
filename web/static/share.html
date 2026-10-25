@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- "only light": browsers may not darken Light by themselves. The Dark and High contrast themes set their own colors. -->
+  <meta name="color-scheme" content="light only"><meta name="darkreader-lock">
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
   <title>Helper list</title>
@@ -13,8 +15,10 @@
   <script>
     (function () {
       var t = null;
-      try { t = localStorage.getItem("jic-theme"); } catch (e) {}
-      if (t !== "light" && t !== "dark" && t !== "contrast") t = "light";  // Light is the default
+      try { t = localStorage.getItem("jic-theme-v2"); } catch (e) {}
+      // Light is the default. "-v2": choices saved by older versions (which could follow the
+      // computer's dark setting) are ignored, so everyone starts in Light once.
+      if (t !== "light" && t !== "dark" && t !== "contrast") t = "light";
       document.documentElement.dataset.theme = t;
     })();
   </script>
@@ -32,8 +36,8 @@
   <header class="site-header">
     <span class="brand">
       <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M6 22 24 6l18 16v20H6z" fill="#1F6F78"/>
-        <path d="M24 37s-9-5.4-9-11.4a5 5 0 0 1 9-2.9 5 5 0 0 1 9 2.9c0 6-9 11.4-9 11.4z" fill="#E07A5F"/>
+        <path d="M6 22 24 6l18 16v20H6z" style="fill:var(--primary)"/>
+        <path d="M24 37s-9-5.4-9-11.4a5 5 0 0 1 9-2.9 5 5 0 0 1 9 2.9c0 6-9 11.4-9 11.4z" style="fill:var(--brand-heart)"/>
       </svg>
       <span class="brand-name">Just in Case</span>
     </span>

@@ -35,6 +35,12 @@ MAX_HELPERS = 3
 REVIEW_AFTER_MONTHS = 4
 
 
+def has_ai_key() -> bool:
+    """True when an OpenRouter key is set up. Without one, the website runs the guided planner (no AI)."""
+    key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    return bool(key) and "paste-your-key" not in key
+
+
 def runtime_env() -> dict[str, str]:
     """Environment variables handed to the Claude Code process the SDK starts."""
     key = os.getenv("OPENROUTER_API_KEY", "").strip()

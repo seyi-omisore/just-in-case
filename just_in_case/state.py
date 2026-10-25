@@ -20,6 +20,7 @@ NEEDS: dict[str, str] = {
     "transportation": "Rides to regular appointments",
     "help_at_home": "Help with meals or chores at home while recovering",
     "mail_while_away": "Keeping your mail safe while you are away or in the hospital",
+    "family_updates": "Keeping family and friends updated, and letting many people sign up to help",
 }
 
 # "Why this matters" tips on the page. Fixed wording, never from the model.
@@ -39,6 +40,7 @@ NEED_WHY: dict[str, str] = {
     "transportation": "Steady rides mean you don't miss checkups when driving is hard.",
     "help_at_home": "Meals and chores can be hard while you heal. Help lets you rest.",
     "mail_while_away": "A full mailbox shows that no one is home. Holding your mail keeps it safe.",
+    "family_updates": "One place for news means fewer calls to make. Friends can see how to help.",
 }
 
 ROUTES = ("service", "preparation", "person", "blank")

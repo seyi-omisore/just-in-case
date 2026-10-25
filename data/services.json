@@ -149,6 +149,24 @@
       "url": "https://www.arlboston.org",
       "how_to_use": "Call to ask about help with pet care while you are in the hospital, or for a referral. Costs vary.",
       "sample": false
+    },
+    {
+      "id": "svc_caringbridge",
+      "name": "CaringBridge",
+      "needs": [
+        "family_updates"
+      ],
+      "areas": [
+        "*"
+      ],
+      "cost": "free",
+      "waitlist": false,
+      "waitlist_note": "",
+      "last_verified": "2026-10-24",
+      "phone": "",
+      "url": "https://www.caringbridge.org",
+      "how_to_use": "A free, donor-supported nonprofit where you make a private site to share health updates with family and friends, and use its Planner so people can sign up to help with rides, meals, errands, and pet care.",
+      "sample": false
     }
   ]
 }

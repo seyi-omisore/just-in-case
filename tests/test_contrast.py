@@ -99,3 +99,23 @@ def test_coral_accent_is_never_used_for_text():
                  if re.search(r"(^|[;\s])color:\s*var\(--(accent|orange|vermillion)\)", body)
                  and ".icon" not in sel]  # a small decorative icon beside words is allowed
     assert not offenders, offenders
+
+
+def test_soft_tiles_and_the_red_phone_icon_are_readable():
+    for theme in THEMES:
+        for fg in ("ink", "ink-soft", "link", "ok"):
+            assert ratio(color(theme, fg), color(theme, "soft")) >= 4.5, (theme, fg)
+        for bg in ("soft", "paper"):
+            assert ratio(color(theme, "alert-icon"), color(theme, bg)) >= 3, (theme, bg)
+
+
+def test_the_seasonal_tip_icon_shows_on_its_note():
+    for theme in THEMES:
+        assert ratio(color(theme, "season-icon"), color(theme, "note")) >= 3, theme
+
+
+def test_settings_section_tiles_show_their_icons():
+    for theme in THEMES:
+        assert ratio(color(theme, "on-season"), color(theme, "season-icon")) >= 3, theme
+        assert ratio(color(theme, "ink"), color(theme, "blue-tint")) >= 4.5, theme
+        assert ratio(color(theme, "ink-soft"), color(theme, "blue-tint")) >= 4.5, theme

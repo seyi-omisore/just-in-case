@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- "only light": browsers may not darken Light by themselves. The Dark and High contrast themes set their own colors. -->
+  <meta name="color-scheme" content="light only"><meta name="darkreader-lock">
   <title>Just in Case</title>
   <meta name="description" content="A friendly helper that makes a small backup plan for people who live alone.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,8 +16,10 @@
     // Pick the theme before the page draws: the saved choice, or Light.
     (function () {
       var t = null;
-      try { t = localStorage.getItem("jic-theme"); } catch (e) {}
-      if (t !== "light" && t !== "dark" && t !== "contrast") t = "light";  // Light is the default
+      try { t = localStorage.getItem("jic-theme-v2"); } catch (e) {}
+      // Light is the default. "-v2": choices saved by older versions (which could follow the
+      // computer's dark setting) are ignored, so everyone starts in Light once.
+      if (t !== "light" && t !== "dark" && t !== "contrast") t = "light";
       document.documentElement.dataset.theme = t;
     })();
   </script>
@@ -35,62 +39,124 @@
   <header class="site-header">
     <a class="brand" href="#home" aria-label="Just in Case, home">
       <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M6 22 24 6l18 16v20H6z" fill="#1F6F78"/>
-        <path d="M24 37s-9-5.4-9-11.4a5 5 0 0 1 9-2.9 5 5 0 0 1 9 2.9c0 6-9 11.4-9 11.4z" fill="#E07A5F"/>
+        <path d="M6 22 24 6l18 16v20H6z" style="fill:var(--primary)"/>
+        <path d="M24 37s-9-5.4-9-11.4a5 5 0 0 1 9-2.9 5 5 0 0 1 9 2.9c0 6-9 11.4-9 11.4z" style="fill:var(--brand-heart)"/>
       </svg>
       <span class="brand-name">Just in Case</span>
     </a>
-    <p class="tagline">A little planning now means less worry later.</p>
-    <div class="theme-switch" role="group" aria-label="Color theme">
-      <button type="button" id="theme-light" aria-label="Light mode">
-        <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg> <span aria-hidden="true">Light</span>
+    <div class="header-actions">
+      <details id="display-menu" class="display-menu">
+        <summary><span class="aa" aria-hidden="true">Aa</span> Display</summary>
+        <div class="display-panel">
+          <div class="settings-group" role="group" aria-labelledby="display-size-label">
+            <p id="display-size-label" class="settings-label">Text size</p>
+            <div class="text-size">
+              <button type="button" data-size="smaller" aria-label="Make text smaller">A<span aria-hidden="true">−</span></button>
+              <button type="button" data-size="bigger" aria-label="Make text bigger">A<span aria-hidden="true">+</span></button>
+            </div>
+          </div>
+          <div class="settings-group" role="group" aria-labelledby="display-theme-label">
+            <p id="display-theme-label" class="settings-label">Colors</p>
+            <div class="theme-switch">
+              <button type="button" data-theme-pick="light" aria-label="Light mode"><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg> <span aria-hidden="true">Light</span></button>
+              <button type="button" data-theme-pick="dark" aria-label="Dark mode"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> <span aria-hidden="true">Dark</span></button>
+              <button type="button" data-theme-pick="contrast" aria-label="High contrast"><svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg> <span aria-hidden="true">High contrast</span></button>
+            </div>
+          </div>
+        </div>
+      </details>
+      <button type="button" id="settings-open" class="settings-btn" aria-haspopup="dialog">
+        <svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg> <span>Settings</span>
       </button>
-      <button type="button" id="theme-dark" aria-label="Dark mode">
-        <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> <span aria-hidden="true">Dark</span>
-      </button>
-      <button type="button" id="theme-contrast" aria-label="High contrast"><svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg> <span aria-hidden="true">High contrast</span></button>
-    </div>
-    <div class="text-size" role="group" aria-label="Text size">
-      <button type="button" id="smaller" aria-label="Make text smaller">A<span aria-hidden="true">−</span></button>
-      <button type="button" id="bigger" aria-label="Make text bigger">A<span aria-hidden="true">+</span></button>
+      <nav aria-label="Menu">
+        <details id="more-menu" class="more-menu">
+          <summary>Menu <span id="tab-updates" class="tab-updates" hidden></span></summary>
+          <ul>
+            <li><a href="#home" data-tab="home">Home</a></li>
+            <li><a href="#about" data-tab="about">About</a></li>
+            <li><a href="#features" data-tab="features">Features</a></li>
+            <li><a href="#privacy" data-tab="privacy">Your privacy</a></li>
+            <li><a href="#who" data-tab="who">Who we are</a></li>
+            <li><a href="#tour">Show me how</a></li>
+          </ul>
+        </details>
+      </nav>
     </div>
   </header>
 
   <div id="restart-banner" class="restart-banner" role="alert" hidden>
     <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
-    <p><strong>Just in Case was updated.</strong> In the terminal, press Control+C, then run <code>python serve.py</code> again, then reload this page.</p>
+    <p><strong>Just in Case was updated.</strong> In the terminal, press Control+C, then run <code id="restart-cmd">python serve.py</code> again, then reload this page.</p>
   </div>
 
   <div id="demo-banner" class="demo-row" role="note" hidden>
     <p class="demo-label">
-      <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
-      <strong>Demo mode</strong>
-      <span>A set story about Ruth. No AI is used.</span>
+      <svg class="icon" aria-hidden="true"><use id="demo-icon" href="#i-play"/></svg>
+      <strong id="demo-title">Ruth's example.</strong>
+      <span id="demo-text">A made-up story.</span>
     </p>
     <a id="example-exit" class="demo-exit" href="/#plan" hidden>
       <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Start my own plan
     </a>
   </div>
 
-  <nav class="menu-bar" aria-label="Menu">
+  <nav class="menu-bar" aria-label="Back to home">
     <a id="menu-home" class="menu-home" href="#home" hidden>
       <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Home
     </a>
-    <details id="more-menu" class="more-menu">
-      <summary>Menu <span id="tab-updates" class="tab-updates" hidden></span></summary>
-      <ul>
-        <li><a href="#home" data-tab="home">Home</a></li>
-        <li><a href="#about" data-tab="about">About</a></li>
-        <li><a href="#features" data-tab="features">Features</a></li>
-        <li><a href="#privacy" data-tab="privacy">Your privacy</a></li>
-      </ul>
-    </details>
+  </nav>
+
+  <nav id="tabs" class="tabs" aria-label="Pages" hidden>
+    <a href="#about" data-tab="about">About</a>
+    <a href="#features" data-tab="features">Features</a>
+    <a href="#who" data-tab="who">Who we are</a>
+    <a href="#plan" data-tab="plan">Make my plan</a>
   </nav>
 
   <main id="main">
   <section id="panel-home" class="panel home" data-panel="home" tabindex="-1" aria-labelledby="home-title">
-    <svg class="ill ill-hero" viewBox="0 0 120 96" role="img" aria-label="Line drawing of a small house with a heart on its front, a chimney, a door, and a tree beside it."><use href="#ill-home"/></svg>
-    <h1 id="home-title" class="home-title">What would you like to do?</h1>
+    <div class="hero-wrap">
+      <svg id="hero-scene" class="ill ill-hero scene" viewBox="0 0 320 130" role="img" aria-label="Illustration: an older woman with gray hair and a cane waves outside her teal house on a sunny day. Her cat sits beside her, and a heart is on the roof.">
+        <g id="ill-home">
+          <rect width="320" height="130" rx="20" style="fill:var(--ill-sky)"/>
+          <path d="M0 100 Q160 84 320 100 V110 A20 20 0 0 1 300 130 H20 A20 20 0 0 1 0 110Z" style="fill:var(--ill-ground)"/>
+          <g class="a-sun"><circle cx="284" cy="30" r="18" style="fill:var(--ill-sun)"/></g>
+          <g class="a-cloud1"><path d="M30 26a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H32a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/></g>
+          <g class="a-cloud2"><path d="M196 20a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H198a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/></g>
+          <g class="a-birds"><path d="M214 42q4-4 8 0q4-4 8 0" style="fill:none;stroke:var(--ill-leg);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"/><path d="M236 52q3-3 6 0q3-3 6 0" style="fill:none;stroke:var(--ill-leg);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"/></g>
+          <path d="M150 100 L170 100 L186 130 L134 130Z" style="fill:var(--ill-path)"/>
+          <path d="M104 62 L160.0 25 L216 62Z" style="fill:var(--ill-house)"/>
+          <path d="M102 62 L160.0 23 L218 62" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+          <rect x="112" y="58" width="96" height="44" style="fill:var(--ill-house)"/>
+          <rect x="121.6" y="67.68" width="21.12" height="15.4" rx="3" style="fill:var(--ill-window)"/>
+          <rect x="177.28" y="67.68" width="21.12" height="15.4" rx="3" style="fill:var(--ill-window)"/>
+          <rect x="150.4" y="71.2" width="19.2" height="30.8" rx="3" style="fill:var(--ill-door)"/>
+          <path d="M160 42s-8-4.6-8-10a4.4 4.4 0 0 1 8-2.4 4.4 4.4 0 0 1 8 2.4c0 5.4-8 10-8 10z" style="fill:var(--ill-heart)"/>
+          <circle cx="166" cy="88" r="1.6" style="fill:var(--ill-house)"/>
+          <rect x="228" y="88" width="14" height="14" rx="2" style="fill:var(--ill-pot)"/>
+          <ellipse cx="235" cy="77" rx="5" ry="12" style="fill:var(--ill-plant)"/>
+          <path d="M235 87V70" style="fill:none;stroke:var(--ill-pot);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"/>
+          <g class="tree"><rect x="289" y="78" width="6" height="26" rx="2" style="fill:var(--ill-cane)"/><circle cx="292" cy="68" r="13" style="fill:var(--ill-plant)"/><circle cx="282" cy="78" r="9" style="fill:var(--ill-plant)"/><circle cx="302" cy="78" r="9" style="fill:var(--ill-plant)"/></g>
+          <g class="a-leaf a-leaf1"><ellipse cx="276" cy="110" rx="3.4" ry="1.8" style="fill:var(--ill-pot)"/></g>
+          <g class="a-leaf a-leaf2"><ellipse cx="300" cy="114" rx="3.4" ry="1.8" style="fill:var(--ill-sun)"/></g>
+          <g class="a-leaf a-leaf3"><ellipse cx="311" cy="107" rx="3.4" ry="1.8" style="fill:var(--ill-pot)"/></g>
+          <g transform="translate(-40 9)"><g class="a-cat"><g class="a-cat-step"><g class="a-cat-pose"><g class="flip" transform="translate(278 0) scale(-1 1)"><path d="M146 99q9-2 7-11" style="fill:none;stroke:var(--ill-cat);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/><ellipse cx="138" cy="96" rx="9" ry="7" style="fill:var(--ill-cat)"/><circle cx="131" cy="88" r="5.5" style="fill:var(--ill-cat)"/><path d="M126.5 86l1-6.5 4 4zM131.5 83.5l4-4.5 .5 6.5z" style="fill:var(--ill-cat)"/></g></g></g></g></g>
+          <path d="M62 74 56 92" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
+          <path d="M54 90 51 113" style="fill:none;stroke:var(--ill-cane);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/>
+          <rect x="63" y="98" width="5" height="15" rx="2" style="fill:var(--ill-leg)"/>
+          <rect x="72" y="98" width="5" height="15" rx="2" style="fill:var(--ill-leg)"/>
+          <g class="a-dress"><path d="M62 70h16l6 31H56z" style="fill:var(--ill-dress)"/></g>
+          <path d="M78 72 90 56" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
+          <circle cx="69" cy="57" r="9.5" style="fill:var(--ill-hair)"/>
+          <circle cx="71" cy="61" r="8" style="fill:var(--ill-skin)"/>
+        </g>
+      </svg>
+      <button type="button" id="scene-btn" class="scene-btn"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> <span>Play scene</span></button>
+    </div>
+    <div class="home-greeting">
+      <h1 id="home-title" class="home-title">Hi, I'm {{AGENT_NAME}}.</h1>
+      <p class="tagline">A little planning now means less worry later.</p>
+    </div>
     <div class="home-buttons">
       <a class="btn btn-primary home-btn" href="#plan">
         <svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg> <span>Make my plan</span>
@@ -99,8 +165,25 @@
         <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> <span>See my plan</span>
       </a>
       <a class="btn home-btn home-help" href="#help">
-        <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg> <span>Get help now</span>
+        <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg> <span>Get help now<small>911, 988, and Mass 211</small></span>
       </a>
+    </div>
+    <section class="how-home" aria-labelledby="how-home-title">
+      <h2 id="how-home-title" class="how-home-title">How it works</h2>
+      <ol class="how-row">
+        <li><svg class="ill scene how-ill" viewBox="0 0 120 80" role="img" aria-label="Illustration: a speech bubble with three dots next to a small house."><use href="#ill-chat"/></svg><span>Tell {{AGENT_NAME}} what's coming up</span></li>
+        <li><svg class="ill scene how-ill" viewBox="0 0 120 80" role="img" aria-label="Illustration: a clipboard with three checked lines and a pencil beside it."><use href="#ill-cat-plan"/></svg><span>Get a simple plan</span></li>
+        <li><svg class="ill scene how-ill" viewBox="0 0 120 80" role="img" aria-label="Illustration: a printer with a card coming out of it, with a heart on the card."><use href="#ill-print"/></svg><span>Print your fridge card</span></li>
+      </ol>
+    </section>
+    <p id="season-tip" class="season-tip">
+      <svg class="icon" aria-hidden="true"><use href="#i-snow"/></svg>
+      <span><strong id="season-lead">Winter is coming.</strong> <span id="season-ask">Is your power outage plan ready?</span>
+        <a id="season-link" href="#plan-power_outage">Check it</a></span>
+    </p>
+    <div class="home-links">
+      <a href="#tour" class="btn btn-quiet home-link"><svg class="icon" aria-hidden="true"><use href="#i-help"/></svg> Show me how</a>
+      <a href="/?example=1#plan" class="btn btn-quiet home-link"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See Ruth's example</a>
     </div>
   </section>
 
@@ -128,7 +211,7 @@
             <svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg> Make my plan
           </a>
           <a id="example-open" class="btn btn-quiet btn-big" href="/?example=1#plan">
-            <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See an example
+            <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See Ruth's example
           </a>
         </div>
         <ul class="trust-checks" aria-label="Our promises">
@@ -157,6 +240,30 @@
         </figure>
       </div>
     </div>
+
+    <section id="tour-video" class="tour-video" aria-labelledby="tour-video-title">
+      <h2 id="tour-video-title" class="section-title">Watch a 1-minute tour</h2>
+      <p class="hero-lead">Ruth's made-up example, from hello to her fridge card.</p>
+      <video id="tour-player" class="tour-player" controls preload="metadata" playsinline width="480" height="1040"
+             poster="/static/img/tour-poster.jpg" aria-describedby="tour-video-title">
+        <source src="/static/img/tour.mp4" type="video/mp4">
+        <track kind="captions" src="/static/img/tour.vtt" srclang="en" label="English" default>
+      </video>
+      <button type="button" id="tour-play" class="btn btn-primary tour-play"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> <span>Play tour</span></button>
+      <div id="tour-fallback" class="tour-fallback" hidden>
+        <img src="/static/img/tour-poster.jpg" width="480" height="1040" alt="The tour's first screen: {{AGENT_NAME}} says hello on a phone and asks what's coming up.">
+        <ol class="tour-steps">
+          <li>Meet {{AGENT_NAME}}, your planning helper.</li>
+          <li>Tell {{AGENT_NAME}} what's coming up.</li>
+          <li>Answer one question at a time.</li>
+          <li>Your plan builds as you go.</li>
+          <li>Do one next step at a time.</li>
+          <li>Print your fridge card.</li>
+          <li>Share a summary, if you choose.</li>
+          <li>Plan today. Rest easier tomorrow.</li>
+        </ol>
+      </div>
+    </section>
 
     <p class="tagline-three" aria-label="Prepared. Independent. Supported.">
       <span><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Prepared.</span>
@@ -207,37 +314,23 @@
       <p>{{AGENT_NAME}} finds her a free ride home and helps with her mail and her cat. Ruth says yes or no to each step.</p>
       <details class="more"><summary>Show details</summary><p>In the example, {{AGENT_NAME}} finds a free volunteer escort, suggests a key lockbox and USPS Hold Mail, and helps her write a gentle note to her friend Doris about feeding Fifi. Ruth says yes or no to each step.</p></details>
       <a class="btn btn-quiet" href="/?example=1#plan">
-        <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Watch Ruth's example
+        <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See Ruth's example
       </a>
     </article>
-
-    <section id="facts" class="facts" aria-labelledby="facts-title" hidden>
-      <h2 id="facts-title" class="section-title">By the numbers</h2>
-      <p class="facts-note">Counted from the app itself, so they stay true.</p>
-      <ul class="facts-list">
-        <li><strong data-fact="services"></strong><span>Boston services we checked on their own sites</span></li>
-        <li><strong data-fact="free_services"></strong><span>of those are free, and free ones always come first</span></li>
-        <li><strong data-fact="support_lines"></strong><span>support lines you can call, like 988</span></li>
-        <li><strong data-fact="checkpoints"></strong><span>kinds of steps that wait for your OK</span></li>
-        <li><strong data-fact="safeguard_tests"></strong><span>tests that check our safety rules</span></li>
-        <li><strong>0</strong><span>messages sent for you. You send anything yourself.</span></li>
-        <li><strong>0</strong><span>data sold. Ever.</span></li>
-      </ul>
-    </section>
 
     <section class="why-built" aria-labelledby="why-title">
       <h2 id="why-title" class="section-title">Why we built this</h2>
       <p>Many people who live alone worry about needing a hand. Small things, like a ride home, are hard to plan alone.</p>
       <p>We make that planning calm and simple. You stay in charge of your plan.</p>
       <details class="more"><summary>Show details</summary><p>Many people who live alone have a quiet worry: what happens if I need a hand? A ride home after a procedure, someone to feed the cat, a way for help to get in. These are small things, but they are hard to plan for alone.</p><p>We built Just in Case to make that planning calm and simple. It leans on free local services first, asks before every step, and never pressures anyone. You stay in charge of your own plan.</p></details>
-      <p class="why-sign">Leya Jacob, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae</p>
+      <p class="why-sign">Leya Jacob Kurzhiparambil, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae</p>
     </section>
 
     <section class="faq" aria-labelledby="faq-title">
       <h2 id="faq-title" class="section-title">Questions</h2>
       <details>
         <summary>Who is {{AGENT_NAME}}?</summary>
-        <p>{{AGENT_NAME}} is the app's AI planning helper. It suggests options, but you make every decision, and it never sends, shares, or books anything without your OK.</p>
+        <p id="faq-who">{{AGENT_NAME}} is the app's AI planning helper. It suggests options, but you make every decision, and it never sends, shares, or books anything without your OK.</p>
       </details>
       <details>
         <summary>Is it free?</summary>
@@ -272,51 +365,147 @@
     </p>
   </section>
 
-  <section id="panel-features" class="panel intro" data-panel="features" tabindex="-1" aria-labelledby="features-title" hidden>
+  <section id="panel-features" class="panel intro features" data-panel="features" tabindex="-1" aria-labelledby="features-title" hidden>
     <h1 id="features-title" class="page-title">What Just in Case can do</h1>
-    <p class="hero-lead">Everything here works today.</p>
-    <ul class="feature-grid">
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-chat"/></svg></span><div><h3>{{AGENT_NAME}}, your planning helper</h3><p>A digital helper that gives ideas. You choose every step.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-search"/></svg></span><div><h3>Free services first</h3><p>Boston services, free ones first, each with the month it was checked.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-shield"/></svg></span><div><h3>Private by design</h3><p>Nothing is kept after your visit unless you choose to save or share.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span><div><h3>You stay in control</h3><p>Nothing goes into your plan until you say yes.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-hand"/></svg></span><div><h3>Help only if you want it</h3><p>Friends and family come in only if you choose. No pressure, ever.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-card"/></svg></span><div><h3>A printable fridge card</h3><p>One page with 911 at the top, and only the details you pick.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-chat"/></svg></span><div><h3>Plain, simple language</h3><p>Short sentences and everyday words. Ask anything, in your own words.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-mic"/></svg></span><div><h3>Speak or type</h3><p>Tap Speak to talk instead of typing. You check the words before you send.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-speaker"/></svg></span><div><h3>Read aloud</h3><p>Any answer can be read to you, in the voice you pick.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-note"/></svg></span><div><h3>Print my plan</h3><p>Your whole plan on one clean page, to keep or hand to someone.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-bookmark"/></svg></span><div><h3>Save and come back</h3><p>Only if you choose. Saved in this browser, on this device.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-person"/></svg></span><div><h3>Helper table</h3><p>List things you'd like help with. Family can sign up for open tasks.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-heart"/></svg></span><div><h3>Share with family</h3><p>Only if you agree. First names only, and you can stop sharing any time.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-info"/></svg></span><div><h3>Helper updates</h3><p>In an emergency, call 911 first. These are calm, non-urgent updates, like when a helper signs up or steps back.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-hand"/></svg></span><div><h3>Planning for someone else</h3><p>For a parent, relative, or friend, once they agree. They decide what goes in it.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-home"/></svg></span><div><h3>No one to ask? That's okay.</h3><p>A plan with services only. Boston's Council on Aging can help.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-mail"/></svg></span><div><h3>Hold your mail</h3><p>Step-by-step help with free USPS Hold Mail.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-phone"/></svg></span><div><h3>People you can talk to</h3><p>988 and other free support lines. 988 is there any time, day or night.</p></div></li>
-      <li><span class="feature-icon" aria-hidden="true"><svg class="icon"><use href="#i-contrast"/></svg></span><div><h3>Easy to see</h3><p>Bigger text, and light, dark, or high contrast.</p></div></li>
-    </ul>
+    <p class="hero-lead">Meet {{AGENT_NAME}}, your planning helper. Tap a bubble to learn more.</p>
+    <section class="fcat fcat-plan" aria-labelledby="fcat-plan">
+      <div class="fcat-head">
+        <svg class="ill scene fcat-ill" viewBox="0 0 120 80" role="img" aria-label="Illustration: a clipboard with three checked lines and a pencil beside it."><use href="#ill-cat-plan"/></svg>
+        <h2 id="fcat-plan" class="fcat-title">Make a plan</h2>
+      </div>
+      <ul class="bubbles">
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-1">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
+          <span class="bubble-name">One question per screen</span>
+        </button></li>
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-2">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-bolt"/></svg></span>
+          <span class="bubble-name">Next step card</span>
+        </button></li>
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-3">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-print"/></svg></span>
+          <span class="bubble-name">Fridge card</span>
+        </button></li>
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-4">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-bookmark"/></svg></span>
+          <span class="bubble-name">Save and come back</span>
+        </button></li>
+      </ul>
+      <p id="fb-1" class="bubble-panel" hidden>{{AGENT_NAME}} asks one short question per screen, so nothing feels rushed.</p>
+      <p id="fb-2" class="bubble-panel" hidden>You see one clear thing to do now, with Call now and Done.</p>
+      <p id="fb-3" class="bubble-panel" hidden>One page for your fridge with only the details you pick.</p>
+      <p id="fb-4" class="bubble-panel" hidden>It is saved in this browser on this device, and only if you choose.</p>
+    </section>
+    <section class="fcat fcat-safe" aria-labelledby="fcat-safe">
+      <div class="fcat-head">
+        <svg class="ill scene fcat-ill" viewBox="0 0 120 80" role="img" aria-label="Illustration: a green shield with a white heart in the middle."><use href="#ill-cat-safe"/></svg>
+        <h2 id="fcat-safe" class="fcat-title">Stay safe</h2>
+      </div>
+      <ul class="bubbles">
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-5">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-shield"/></svg></span>
+          <span class="bubble-name">Never asks for money</span>
+        </button></li>
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-6">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
+          <span class="bubble-name">You approve everything</span>
+        </button></li>
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-7">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-phone"/></svg></span>
+          <span class="bubble-name">911 always visible</span>
+        </button></li>
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-8">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-note"/></svg></span>
+          <span class="bubble-name">Private by design</span>
+        </button></li>
+      </ul>
+      <p id="fb-5" class="bubble-panel" hidden>Just in Case will never ask for money, bank details, or your Social Security number.</p>
+      <p id="fb-6" class="bubble-panel" hidden>Nothing goes into your plan until you say yes.</p>
+      <p id="fb-7" class="bubble-panel" hidden>The help bar sits at the top of every screen, so it is always in sight.</p>
+      <p id="fb-8" class="bubble-panel" hidden>Nothing is kept after your visit unless you choose to save or share.</p>
+    </section>
+    <section class="fcat fcat-help" aria-labelledby="fcat-help">
+      <div class="fcat-head">
+        <svg class="ill scene fcat-ill" viewBox="0 0 120 80" role="img" aria-label="Illustration: a phone next to a speech bubble with a small heart in it."><use href="#ill-cat-help"/></svg>
+        <h2 id="fcat-help" class="fcat-title">Get help</h2>
+      </div>
+      <ul class="bubbles">
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-9">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-heart"/></svg></span>
+          <span class="bubble-name">Free services first</span>
+        </button></li>
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-10">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-speaker"/></svg></span>
+          <span class="bubble-name">Read aloud</span>
+        </button></li>
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-11">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-mic"/></svg></span>
+          <span class="bubble-name">Speak instead of type</span>
+        </button></li>
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-12">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-chat"/></svg></span>
+          <span class="bubble-name">People to talk to</span>
+        </button></li>
+      </ul>
+      <p id="fb-9" class="bubble-panel" hidden>Boston services come first when they are free, each with the month it was checked.</p>
+      <p id="fb-10" class="bubble-panel" hidden>Any answer can be read to you, in the voice you pick.</p>
+      <p id="fb-11" class="bubble-panel" hidden>Tap Speak to talk, then check the words before you send them.</p>
+      <p id="fb-12" class="bubble-panel" hidden>Free support lines you can call any time, day or night.</p>
+    </section>
+    <section class="fcat fcat-share" aria-labelledby="fcat-share">
+      <div class="fcat-head">
+        <svg class="ill scene fcat-ill" viewBox="0 0 120 80" role="img" aria-label="Illustration: two people side by side with a small heart between them."><use href="#ill-cat-share"/></svg>
+        <h2 id="fcat-share" class="fcat-title">Share with people you trust</h2>
+      </div>
+      <ul class="bubbles">
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-13">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-people"/></svg></span>
+          <span class="bubble-name">Helper list</span>
+        </button></li>
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-14">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-card"/></svg></span>
+          <span class="bubble-name">Readiness summary</span>
+        </button></li>
+        <li><button type="button" class="bubble" aria-expanded="false" aria-controls="fb-15">
+          <span class="bubble-icon" aria-hidden="true"><svg class="icon"><use href="#i-unlink"/></svg></span>
+          <span class="bubble-name">Stop sharing any time</span>
+        </button></li>
+      </ul>
+      <p id="fb-13" class="bubble-panel" hidden>List things you would like help with, and family can sign up.</p>
+      <p id="fb-14" class="bubble-panel" hidden>A short summary of your plan, made only when you ask.</p>
+      <p id="fb-15" class="bubble-panel" hidden>One tap deletes the shared list, and the link stops working.</p>
+    </section>
 
     <section class="compare" aria-labelledby="compare-title">
-      <h2 id="compare-title" class="section-title">Why Just in Case</h2>
-      <p class="hero-lead">How it compares with other ways people plan. Each one does something well.</p>
+      <h2 id="compare-title" class="section-title">How it compares</h2>
       <div class="compare-wrap">
-        <table class="compare-table">
+        <table class="compare-chart">
           <caption class="sr-only">Just in Case compared with group texts, sticky notes, and medical alert pendants</caption>
-          <thead><tr><td></td><th scope="col">Just in Case</th><th scope="col">Group text</th><th scope="col">Sticky notes</th><th scope="col">Medical alert pendant</th></tr></thead>
+          <thead><tr><td></td><th scope="col">Just in Case</th><th scope="col">Group texts</th><th scope="col">Sticky notes</th><th scope="col">Alert pendant</th></tr></thead>
           <tbody>
-          <tr><th scope="row">Calls for help in an emergency</th><td data-label="Just in Case"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> No. Always call 911</span></td><td data-label="Group text"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> No</span></td><td data-label="Sticky notes"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> No</span></td><td data-label="Medical alert pendant"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Yes, that is what it is for</span></td></tr>
-          <tr><th scope="row">Finds local services, free ones first</th><td data-label="Just in Case"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Yes, in Boston</span></td><td data-label="Group text"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> No</span></td><td data-label="Sticky notes"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> No</span></td><td data-label="Medical alert pendant"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> Not usually</span></td></tr>
-          <tr><th scope="row">A one-page card for the fridge</th><td data-label="Just in Case"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Yes, printed for you</span></td><td data-label="Group text"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> No</span></td><td data-label="Sticky notes"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> Yes, if you write it out</span></td><td data-label="Medical alert pendant"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> No</span></td></tr>
-          <tr><th scope="row">Helpers can sign up for tasks</th><td data-label="Just in Case"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Yes, if you share</span></td><td data-label="Group text"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> By replying in the thread</span></td><td data-label="Sticky notes"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> No</span></td><td data-label="Medical alert pendant"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> No</span></td></tr>
-          <tr><th scope="row">Asks you before each step</th><td data-label="Just in Case"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Yes</span></td><td data-label="Group text"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> You choose what to send</span></td><td data-label="Sticky notes"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> You write it yourself</span></td><td data-label="Medical alert pendant"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> Not for planning</span></td></tr>
-          <tr><th scope="row">Works without the internet</th><td data-label="Just in Case"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> The printed card does</span></td><td data-label="Group text"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg> No</span></td><td data-label="Sticky notes"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Yes</span></td><td data-label="Medical alert pendant"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> Needs its base or a cell signal</span></td></tr>
-          <tr><th scope="row">Cost</th><td data-label="Just in Case"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Free</span></td><td data-label="Group text"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Usually free</span></td><td data-label="Sticky notes"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Free</span></td><td data-label="Medical alert pendant"><span class="cmp"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> Usually a monthly fee</span></td></tr>
+          <tr><th scope="row">Finds free local services</th><td><span class="mark mark-yes"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Yes</span></td><td><span class="mark mark-no"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>No</span></td><td><span class="mark mark-no"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>No</span></td><td><span class="mark mark-some"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg>Not usually</span></td></tr>
+          <tr><th scope="row">Works on paper</th><td><span class="mark mark-yes"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Yes</span></td><td><span class="mark mark-no"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>No</span></td><td><span class="mark mark-yes"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Yes</span></td><td><span class="mark mark-no"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>No</span></td></tr>
+          <tr><th scope="row">Calls for help in an emergency</th><td><span class="mark mark-no"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>No</span></td><td><span class="mark mark-no"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>No</span></td><td><span class="mark mark-no"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>No</span></td><td><span class="mark mark-yes"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Yes</span></td></tr>
           </tbody>
         </table>
       </div>
-      <p class="helper-small compare-note"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> A medical alert pendant can call for help. Just in Case cannot.</p>
-      <details class="more"><summary>Show details</summary><p class="helper-small">A medical alert pendant does something Just in Case does not: it can call for help. The two can work well together. Pendant features and prices vary by company.</p></details>
+      <p class="compare-note"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> <span>Just in Case is a planning tool. In an emergency, always call 911.</span></p>
+    </section>
+
+    <section id="facts" class="facts" aria-labelledby="facts-title" hidden>
+      <h2 id="facts-title" class="section-title">By the numbers</h2>
+      <p class="facts-note">Counted from the app itself, so they stay true.</p>
+      <ul class="facts-list fact-tiles">
+        <li><span class="fact-icon" aria-hidden="true"><svg class="icon"><use href="#i-search"/></svg></span><strong data-fact="services"></strong><span>Boston services we checked on their own sites</span></li>
+        <li><span class="fact-icon" aria-hidden="true"><svg class="icon"><use href="#i-heart"/></svg></span><strong data-fact="free_services"></strong><span>of those are free, and free ones come first</span></li>
+        <li><span class="fact-icon" aria-hidden="true"><svg class="icon"><use href="#i-phone"/></svg></span><strong data-fact="support_lines"></strong><span>support lines you can call, like 988</span></li>
+        <li><span class="fact-icon" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span><strong data-fact="checkpoints"></strong><span>kinds of steps that wait for your OK</span></li>
+        <li><span class="fact-icon" aria-hidden="true"><svg class="icon"><use href="#i-shield"/></svg></span><strong data-fact="safeguard_tests"></strong><span>tests that check our safety rules</span></li>
+        <li><span class="fact-icon" aria-hidden="true"><svg class="icon"><use href="#i-send"/></svg></span><strong>0</strong><span>messages sent for you</span></li>
+        <li><span class="fact-icon" aria-hidden="true"><svg class="icon"><use href="#i-bookmark"/></svg></span><strong>0</strong><span>pieces of your data sold</span></li>
+        <li><span class="fact-icon" aria-hidden="true"><svg class="icon"><use href="#i-print"/></svg></span><strong>1 page</strong><span>fridge card to print</span></li>
+        <li><span class="fact-icon" aria-hidden="true"><svg class="icon"><use href="#i-alert"/></svg></span><strong>911</strong><span>shown on every screen</span></li>
+      </ul>
     </section>
 
     <a class="btn btn-primary btn-big" href="#plan">
@@ -341,7 +530,7 @@
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> Who can see it</h2>
         <p>Only you, unless you share a list. People with your link see first names and tasks only.</p>
-        <details class="more"><summary>Show details</summary><p>What you type is sent to an AI service so it can reply. That service is OpenRouter, which passes your words to an AI model, and their own privacy rules apply. Please do not type bank details or account numbers.</p><p>Anyone who has your share link can open it, so send it only to people you trust. Your private link, which can remove names or stop sharing, is separate.</p><p>If you use Speak, your browser may send your voice to its maker to turn it into text. This site also loads a font from Google, so Google can see that your browser visited.</p></details>
+        <details class="more"><summary>Show details</summary><p>What you type is sent to an AI service so it can reply. That service is OpenRouter, which passes your words to an AI model, and their own privacy rules apply. Please do not type bank details or account numbers.</p><p>The guided planner and Ruth's example use no AI, so nothing you type there goes to an AI service.</p><p>Anyone who has your share link can open it, so send it only to people you trust. Your private link, which can remove names or stop sharing, is separate.</p><p>If you use Speak, your browser may send your voice to its maker to turn it into text. This site also loads a font from Google, so Google can see that your browser visited.</p></details>
       </div>
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> How long we keep it</h2>
@@ -360,6 +549,54 @@
     </div>
   </section>
 
+  <section id="panel-who" class="panel intro who" data-panel="who" tabindex="-1" aria-labelledby="who-title" hidden>
+    <h1 id="who-title" class="page-title">Who we are</h1>
+    <p class="hero-lead">Just in Case was built by a team at the University of Massachusetts Boston for the Applied AI Microcredential, hosted by the Paul English Applied Artificial Intelligence Institute.</p>
+    <ul class="team-list" aria-label="Our team">
+      <li class="team-teal">
+        <span class="team-initials" aria-hidden="true">LK</span>
+        <div class="team-text">
+          <h2 class="team-name">Leya Jacob Kurzhiparambil</h2>
+          <p class="team-program">PhD Student in Gerontology</p>
+          <ul class="team-roles" aria-label="Roles">
+          <li class="team-role">Services and safeguards lead</li>
+          <li class="team-role">Technical lead</li>
+          </ul>
+        </div>
+      </li>
+      <li class="team-coral">
+        <span class="team-initials" aria-hidden="true">OO</span>
+        <div class="team-text">
+          <h2 class="team-name">Oluwaseyi Omisore</h2>
+          <p class="team-program">Undergraduate in Computer Science</p>
+          <ul class="team-roles" aria-label="Roles">
+          <li class="team-role">Technical lead</li>
+          </ul>
+        </div>
+      </li>
+      <li class="team-green">
+        <span class="team-initials" aria-hidden="true">JA</span>
+        <div class="team-text">
+          <h2 class="team-name">Joan Arches</h2>
+          <p class="team-program">Professor Emerita, College of Education and Human Development</p>
+          <ul class="team-roles" aria-label="Roles">
+          <li class="team-role">Evaluation and documentation lead</li>
+          </ul>
+        </div>
+      </li>
+      <li class="team-yellow">
+        <span class="team-initials" aria-hidden="true">SN</span>
+        <div class="team-text">
+          <h2 class="team-name">Satoshi Nagae</h2>
+          <p class="team-program">PhD Student in Exercise and Health Sciences</p>
+          <ul class="team-roles" aria-label="Roles">
+          <li class="team-role">Story, design, and presentation lead</li>
+          </ul>
+        </div>
+      </li>
+    </ul>
+  </section>
+
   <div id="panel-plan" class="panel layout" data-panel="plan" tabindex="-1" hidden>
     <p class="promise" role="note">
       <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
@@ -369,7 +606,11 @@
       <ol id="messages" class="messages" aria-live="polite"></ol>
 
       <div id="typing" class="typing" hidden>
-        <span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span>
+        <svg class="thinking-mark" viewBox="0 0 48 48" aria-hidden="true">
+          <circle cx="24" cy="24" r="24" style="fill:var(--primary-tint)"/>
+          <path d="M11 24 24 12l13 12v14H11z" style="fill:var(--primary)"/>
+          <path class="thinking-heart" d="M24 34s-6-3.6-6-7.6a3.3 3.3 0 0 1 6-1.9 3.3 3.3 0 0 1 6 1.9c0 4-6 7.6-6 7.6z" style="fill:var(--accent)"/>
+        </svg>
         <span class="typing-text">{{AGENT_NAME}} is thinking…</span>
       </div>
 
@@ -396,22 +637,6 @@
       </form>
       <p id="mic-status" class="mic-status" role="status"></p>
       <p id="mic-note" class="helper-small mic-note" hidden>In some browsers, your voice may be sent to the browser's maker to turn it into text.</p>
-      <fieldset id="voice-row" class="voice-row" hidden>
-        <legend><svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg> Reading voice</legend>
-        <label class="voice-field">Accent <select id="voice-accent"></select></label>
-        <div id="voice-kind" class="voice-kind view-switch" role="group" aria-label="Female or male voice"></div>
-        <label class="voice-field voice-full-only">All voices <select id="voice"></select></label>
-        <div class="voice-actions">
-          <button type="button" id="voice-sample" class="btn btn-quiet">
-            <svg class="icon" aria-hidden="true"><use href="#i-speaker"/></svg> Play sample
-          </button>
-          <span class="voice-speed" role="group" aria-label="Reading speed">
-            <button type="button" id="voice-slower" class="btn btn-quiet">Slower</button>
-            <span id="voice-speed" class="voice-speed-text" role="status"></span>
-            <button type="button" id="voice-faster" class="btn btn-quiet">Faster</button>
-          </span>
-        </div>
-      </fieldset>
       <div class="step-nav" role="group" aria-label="Steps">
         <button type="button" id="step-back" class="btn btn-quiet" disabled><span aria-hidden="true">&larr;</span> Back</button>
         <div class="step-progress">
@@ -433,7 +658,7 @@
       </div>
     </section>
 
-    <aside class="side" aria-label="Your plan">
+    <aside id="side" class="side plan-empty" aria-label="Your plan">
       <section id="plan-section" class="fridge" aria-labelledby="fridge-title" tabindex="-1">
         <div class="fridge-handle" aria-hidden="true"></div>
         <div class="fridge-head">
@@ -445,7 +670,7 @@
         </div>
         <section id="next-step" class="next-step" aria-labelledby="next-step-title" hidden>
           <h3 id="next-step-title" class="next-step-title"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg> Your next step</h3>
-          <svg id="next-ill" class="ill next-ill" viewBox="0 0 120 96" role="img" aria-label="" hidden><use href="#ill-clinic"/></svg>
+          <svg id="next-ill" class="ill scene next-ill" viewBox="0 0 240 120" role="img" aria-label="" hidden><use href="#ill-clinic"/></svg>
           <p id="next-step-text" class="next-step-text"></p>
           <div class="next-step-actions">
             <a id="next-call" class="btn btn-primary next-btn" href="#" hidden>
@@ -463,6 +688,34 @@
             <p>"Remind me later" moves this step to the end of your list. Just in Case never sends alerts, so open this page to see it again.</p>
           </details>
         </section>
+        <svg id="ready-ill" class="ill scene ready-ill" viewBox="0 0 240 120" role="img" aria-label="Illustration: an older woman rests on a bench outside her teal house with a cup of tea, beside a green check mark, because her plan is ready." hidden>
+          <g id="ill-ready">
+            <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+            <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+            <circle cx="28" cy="26" r="12" style="fill:var(--ill-sun)"/>
+            <path d="M120 18a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H122a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
+            <path d="M34 60 L75.0 29 L116 60Z" style="fill:var(--ill-house)"/>
+            <path d="M32 60 L75.0 27 L118 60" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+            <rect x="42" y="56" width="66" height="36" style="fill:var(--ill-house)"/>
+            <rect x="48.6" y="63.92" width="14.52" height="12.6" rx="3" style="fill:var(--ill-window)"/>
+            <rect x="86.88" y="63.92" width="14.52" height="12.6" rx="3" style="fill:var(--ill-window)"/>
+            <rect x="68.4" y="66.8" width="13.2" height="25.2" rx="3" style="fill:var(--ill-door)"/>
+            <path d="M75 44.4s-6.4-3.68-6.4-8.0a3.52 3.52 0 0 1 6.4-1.92 3.52 3.52 0 0 1 6.4 1.92c0 4.32-6.4 8.0-6.4 8.0z" style="fill:var(--ill-heart)"/>
+            <rect x="140" y="70" width="52" height="5" rx="2" style="fill:var(--ill-cane)"/>
+            <rect x="140" y="84" width="52" height="5" rx="2" style="fill:var(--ill-cane)"/>
+            <rect x="144" y="89" width="4" height="12" style="fill:var(--ill-cane)"/>
+            <rect x="184" y="89" width="4" height="12" style="fill:var(--ill-cane)"/>
+            <rect x="150" y="80" width="26" height="7" rx="3" style="fill:var(--ill-leg)"/>
+            <rect x="170" y="84" width="6" height="16" rx="2" style="fill:var(--ill-leg)"/>
+            <path d="M153 61h17l4 24h-25z" style="fill:var(--ill-dress)"/>
+            <path d="M168 67l9 8" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
+            <rect x="176" y="71" width="8" height="9" rx="1.5" style="fill:var(--ill-door)"/>
+            <circle cx="160" cy="49" r="9.5" style="fill:var(--ill-hair)"/>
+            <circle cx="162" cy="53" r="8" style="fill:var(--ill-skin)"/>
+            <circle class="a-check-dot" cx="212" cy="30" r="15" style="fill:var(--ill-plant)"/>
+            <path class="a-check" pathLength="1" d="M205 30l5 5 9-10" style="stroke-dasharray:1;fill:none;stroke:var(--ill-door);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round"/>
+          </g>
+        </svg>
         <p id="plan-ready" class="plan-ready" hidden>
           <svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> <span id="plan-ready-text"></span>
         </p>
@@ -483,6 +736,24 @@
         </section>
         <section id="getting-ready" class="getting-ready" aria-labelledby="getting-ready-title" hidden>
           <h3 id="getting-ready-title"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Getting ready</h3>
+          <svg id="ride-scene" class="ill scene ride-scene" viewBox="0 0 240 120" role="img" aria-label="Illustration: a blue car drives along a road toward a small teal house, with a calendar marked with a check, for getting home after a procedure." hidden>
+            <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+            <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+            <g class="a-sun"><circle cx="150" cy="30" r="12" style="fill:var(--ill-sun)"/></g>
+            <path d="M0 101 Q120 84 240 96" style="fill:none;stroke:var(--ill-road);stroke-width:11;stroke-linecap:round;stroke-linejoin:round"/>
+            <path d="M6 101 Q120 84 234 96" style="fill:none;stroke:var(--ill-dash);stroke-width:2;stroke-dasharray:7 7"/>
+            <rect x="18" y="14" width="34" height="30" rx="5" style="fill:var(--ill-door)"/>
+            <path d="M18 23v-4a5 5 0 0 1 5-5h24a5 5 0 0 1 5 5v4z" style="fill:var(--ill-dress)"/>
+            <path d="M27 32l5 5 9-10" style="fill:none;stroke:var(--ill-plant);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round"/>
+            <path d="M180 64 L205.0 39 L230 64Z" style="fill:var(--ill-house)"/>
+            <path d="M178 64 L205.0 37 L232 64" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+            <rect x="188" y="60" width="34" height="28" style="fill:var(--ill-house)"/>
+            <rect x="191.4" y="66.16" width="7.48" height="9.8" rx="3" style="fill:var(--ill-window)"/>
+            <rect x="211.12" y="66.16" width="7.48" height="9.8" rx="3" style="fill:var(--ill-window)"/>
+            <path d="M205 51.6s-5.6-3.22-5.6-7.0a3.08 3.08 0 0 1 5.6-1.68 3.08 3.08 0 0 1 5.6 1.68c0 3.78-5.6 7.0-5.6 7.0z" style="fill:var(--ill-heart)"/>
+            <rect x="200" y="72" width="10" height="16" rx="1.5" style="fill:var(--ill-door)"/>
+            <g transform="translate(42 0)"><g class="a-car"><path d="M78 88v-11a4 4 0 0 1 4-4h6l7-11h22l8 11h6a4 4 0 0 1 4 4v11z" style="fill:var(--ill-car)"/><rect x="97" y="65" width="9" height="7" rx="1.5" style="fill:var(--ill-door)"/><rect x="110" y="65" width="9" height="7" rx="1.5" style="fill:var(--ill-door)"/><circle cx="94" cy="89" r="6" style="fill:var(--ill-leg)"/><circle cx="122" cy="89" r="6" style="fill:var(--ill-leg)"/><circle cx="94" cy="89" r="2" style="fill:var(--ill-door)"/><circle cx="122" cy="89" r="2" style="fill:var(--ill-door)"/></g></g>
+          </svg>
           <label class="event-date" for="event-date">When is your <span id="event-label">day</span>?</label>
           <input type="date" id="event-date" class="event-date-input">
           <p id="countdown" class="countdown" role="status"></p>
@@ -540,38 +811,42 @@
         </div>
         <div id="helper-body">
         <p class="helper-intro">Things you'd like help with. Leave the name blank and family can sign up.</p>
-        <p id="table-empty" class="table-empty"><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> <span>Your helper list shows up here. It's okay to leave it empty.</span></p>
-        <table id="helper-table" class="helper-table" hidden>
-          <thead><tr><th scope="col">Task</th><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Who</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Change</span></th></tr></thead>
-          <tbody id="helper-rows"></tbody>
-        </table>
+        <details id="helper-more" class="more-options">
+          <summary>More options <span id="helper-count" class="helper-count"></span></summary>
+          <p class="helper-small">Your helper table, a spreadsheet to download, and a page to print.</p>
+          <p id="table-empty" class="table-empty"><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> <span>Your helper list shows up here. It's okay to leave it empty.</span></p>
+          <table id="helper-table" class="helper-table" hidden>
+            <thead><tr><th scope="col">Task</th><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Who</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Change</span></th></tr></thead>
+            <tbody id="helper-rows"></tbody>
+          </table>
 
-        <form id="task-form" class="task-form">
-          <p class="task-form-title" id="task-form-title">Add a row</p>
-          <label>What do you need help with? <input name="task" required maxlength="120" placeholder="For example: pick up groceries"></label>
-          <label>Who is helping <span class="optional">(optional)</span> <input name="person" maxlength="120" placeholder="Leave blank so family can sign up"></label>
-          <div class="task-form-pair">
-            <label>Date <input name="date" maxlength="120" placeholder="Like Nov 14"></label>
-            <label>Time <input name="time" maxlength="120" placeholder="Like morning"></label>
-          </div>
-          <p class="task-error-row"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span id="task-error" class="task-error" role="alert"></span></p>
-          <div class="task-form-actions">
-            <button type="submit" id="task-save" class="btn btn-primary">
-              <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> <span>Add row</span>
+          <form id="task-form" class="task-form">
+            <p class="task-form-title" id="task-form-title">Add a row</p>
+            <label>What do you need help with? <input name="task" required maxlength="120" placeholder="For example: pick up groceries"></label>
+            <label>Who is helping <span class="optional">(optional)</span> <input name="person" maxlength="120" placeholder="Leave blank so family can sign up"></label>
+            <div class="task-form-pair">
+              <label>Date <input name="date" maxlength="120" placeholder="Like Nov 14"></label>
+              <label>Time <input name="time" maxlength="120" placeholder="Like morning"></label>
+            </div>
+            <p class="task-error-row"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span id="task-error" class="task-error" role="alert"></span></p>
+            <div class="task-form-actions">
+              <button type="submit" id="task-save" class="btn btn-primary">
+                <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> <span>Add row</span>
+              </button>
+              <button type="button" id="task-cancel" class="btn btn-quiet" hidden>Cancel</button>
+            </div>
+          </form>
+
+          <div class="table-actions">
+            <a id="table-download" class="btn btn-quiet" href="#" download="who-is-helping.csv">
+              <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> Download spreadsheet
+            </a>
+            <button type="button" id="table-print" class="btn btn-quiet">
+              <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg> Print table
             </button>
-            <button type="button" id="task-cancel" class="btn btn-quiet" hidden>Cancel</button>
           </div>
-        </form>
-
-        <div class="table-actions">
-          <a id="table-download" class="btn btn-quiet" href="#" download="who-is-helping.csv">
-            <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> Download spreadsheet
-          </a>
-          <button type="button" id="table-print" class="btn btn-quiet">
-            <svg class="icon" aria-hidden="true"><use href="#i-note"/></svg> Print table
-          </button>
-        </div>
-        <p class="helper-small">The spreadsheet opens in Excel, Numbers, or Google Sheets. You choose who gets it.</p>
+          <p class="helper-small">The spreadsheet opens in Excel, Numbers, or Google Sheets. You choose who gets it.</p>
+        </details>
 
         <div class="share-zone">
           <button type="button" id="share-open" class="btn btn-primary btn-block">
@@ -618,6 +893,16 @@
         <ul id="support-lines" class="support-lines"></ul>
       </details>
 
+      <details id="family-loop" class="helper-box family-box">
+        <summary>
+          <svg class="icon" aria-hidden="true"><use href="#i-people"/></svg>
+          Keep family in the loop
+        </summary>
+        <p class="helper-intro">A place to share updates, where many people can sign up to help over time.</p>
+        <ul id="family-services" class="support-lines family-services"></ul>
+        <p class="helper-small">For one or two small tasks, the helper list in your plan is simpler.</p>
+      </details>
+
       <details id="usps" class="helper-box usps-box">
         <summary>
           <svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>
@@ -642,8 +927,88 @@
         <ol id="feed" class="feed" aria-live="polite"></ol>
       </section>
     </aside>
+    <section id="story-guide" class="story-guide" aria-labelledby="story-count" aria-live="polite" hidden>
+      <p id="story-count" class="story-count"></p>
+      <p id="story-text" class="story-text"></p>
+      <div class="story-actions">
+        <button type="button" id="story-next" class="btn tour-next" hidden>Next</button>
+        <a id="story-own" class="btn tour-next" href="/#plan" hidden>Start my own plan</a>
+      </div>
+    </section>
   </div>
   </main>
+
+  <dialog id="settings-dialog" class="consent-dialog settings-dialog" aria-labelledby="settings-title">
+    <div class="consent-form">
+      <div class="settings-head">
+        <h2 id="settings-title"><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg> Settings</h2>
+        <button type="button" id="settings-close" class="btn btn-quiet">Close</button>
+      </div>
+      <p class="notice-911"><svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg><span><strong>In an emergency, call 911.</strong> Feeling alone or unsafe? Call or text <strong>988</strong>.</span></p>
+      <div class="set-sections">
+      <details id="set-voice" class="set-sec set-voice" open>
+        <summary>
+          <span class="set-tile" aria-hidden="true"><svg class="icon"><use href="#i-speaker"/></svg></span>
+          <span class="set-heading"><span class="set-title">Reading voice</span><span class="sr-only">: </span><span id="now-voice" class="set-now">Not available in this browser</span></span>
+          <span class="set-chevron" aria-hidden="true"></span>
+        </summary>
+        <fieldset id="voice-row" class="voice-row set-body" hidden>
+          <legend class="sr-only">Reading voice</legend>
+          <label class="voice-field">Accent <select id="voice-accent"></select></label>
+          <div class="set-field"><span class="settings-label" id="voice-kind-label">Voice</span>
+            <div id="voice-kind" class="voice-kind view-switch" role="group" aria-labelledby="voice-kind-label"></div></div>
+          <label class="voice-field voice-full-only">All voices <select id="voice"></select></label>
+          <div class="set-field"><span class="settings-label" id="speed-label">Speed</span>
+            <span class="voice-speed" role="group" aria-labelledby="speed-label">
+              <button type="button" id="voice-slower" class="btn btn-quiet">Slower</button>
+              <span id="voice-speed" class="voice-speed-text" role="status"></span>
+              <button type="button" id="voice-faster" class="btn btn-quiet">Faster</button>
+            </span></div>
+          <button type="button" id="voice-sample" class="btn btn-primary btn-block">
+            <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Play sample
+          </button>
+        </fieldset>
+        <p id="voice-none" class="helper-small set-body">Read aloud is not available in this browser.</p>
+      </details>
+      <details id="set-size" class="set-sec set-size">
+        <summary>
+          <span class="set-tile" aria-hidden="true">Aa</span>
+          <span class="set-heading"><span class="set-title">Text size</span><span class="sr-only">: </span><span id="now-size" class="set-now">Normal</span></span>
+          <span class="set-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="set-body size-body" role="group" aria-labelledby="size-now">
+          <p id="size-now" class="size-now">Current size: <strong id="size-word">Normal</strong></p>
+          <div class="text-size">
+            <button type="button" id="smaller" data-size="smaller" aria-label="Make text smaller">A<span aria-hidden="true">−</span></button>
+            <button type="button" id="bigger" data-size="bigger" aria-label="Make text bigger">A<span aria-hidden="true">+</span></button>
+          </div>
+        </div>
+      </details>
+      <details id="set-colors" class="set-sec set-colors">
+        <summary>
+          <span class="set-tile" aria-hidden="true"><svg class="icon"><use href="#i-contrast"/></svg></span>
+          <span class="set-heading"><span class="set-title">Colors</span><span class="sr-only">: </span><span id="now-colors" class="set-now">Light</span></span>
+          <span class="set-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="set-body theme-choices" role="group" aria-label="Color theme">
+          <button type="button" id="theme-light" data-theme-pick="light" class="theme-choice">
+            <span class="theme-preview preview-light" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="theme-choice-name"><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg> Light</span>
+          </button>
+          <button type="button" id="theme-dark" data-theme-pick="dark" class="theme-choice">
+            <span class="theme-preview preview-dark" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="theme-choice-name"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> Dark</span>
+          </button>
+          <button type="button" id="theme-contrast" data-theme-pick="contrast" class="theme-choice">
+            <span class="theme-preview preview-contrast" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="theme-choice-name"><svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg> High contrast</span>
+          </button>
+        </div>
+      </details>
+      </div>
+      <p class="helper-small">These choices are saved only in this browser.</p>
+    </div>
+  </dialog>
 
   <dialog id="consent-dialog" class="consent-dialog" aria-labelledby="consent-title">
     <form method="dialog" class="consent-form">
@@ -694,7 +1059,7 @@
       <h2 id="card-dialog-title">Your fridge card</h2>
       <div class="card-dialog-actions">
         <button type="button" id="card-print" class="btn btn-primary">
-          <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> Print card
+          <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> <span id="card-print-label">Print card</span>
         </button>
         <button type="button" id="card-close" class="btn btn-quiet">Close</button>
       </div>
@@ -739,55 +1104,147 @@
       <symbol id="i-pill"viewBox="0 0 24 24"><path d="M8.5 3a5.5 5.5 0 0 1 3.9 1.6l7 7a5.5 5.5 0 0 1-7.8 7.8l-7-7A5.5 5.5 0 0 1 8.5 3zm0 2a3.5 3.5 0 0 0-2.5 6l3.1 3.1 5-5L11 6a3.5 3.5 0 0 0-2.5-1z" fill="currentColor"/></symbol>
       <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 2 1 21h22zm-1 7h2v6h-2zm0 8h2v2h-2z" fill="currentColor"/></symbol>
       <symbol id="i-folder" viewBox="0 0 24 24"><path d="M2 5a1 1 0 0 1 1-1h6l2 2h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" fill="currentColor"/></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><path d="M10.3 2h3.4l.5 2.6 1.8.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.8 2.6.5v3.4l-2.6.5-.8 1.8 1.5 2.2-2.4 2.4-2.2-1.5-1.8.8-.5 2.6h-3.4l-.5-2.6-1.8-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.8L2 13.7v-3.4l2.6-.5.8-1.8-1.5-2.2 2.4-2.4 2.2 1.5 1.8-.8zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor" fill-rule="evenodd"/></symbol>
+      <symbol id="i-snow" viewBox="0 0 24 24"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 3.5l3 2.5 3-2.5M9 20.5l3-2.5 3 2.5M3 10.5l3.6-.9-1-3.6M21 13.5l-3.6.9 1 3.6M3 13.5l3.6.9-1 3.6M21 10.5l-3.6-.9 1-3.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-print" viewBox="0 0 24 24"><path d="M6 3h12v5H6zM4 9h16a2 2 0 0 1 2 2v6h-4v4H6v-4H2v-6a2 2 0 0 1 2-2zm4 7v3h8v-3zm9-5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" fill="currentColor"/></symbol>
+      <symbol id="i-people" viewBox="0 0 24 24"><circle cx="8" cy="7" r="3.5" fill="currentColor"/><circle cx="17" cy="8" r="3" fill="currentColor"/><path d="M1.5 20a6.5 6.5 0 0 1 13 0zM14.5 20a6.5 6.5 0 0 0-1.6-4.3A5 5 0 0 1 22.5 20z" fill="currentColor"/></symbol>
+      <symbol id="i-unlink" viewBox="0 0 24 24"><path d="M10 7H7a5 5 0 0 0 0 10h3v-2H7a3 3 0 0 1 0-6h3zm4 0v2h3a3 3 0 0 1 0 6h-3v2h3a5 5 0 0 0 0-10zM3.7 2.3 2.3 3.7l18 18 1.4-1.4z" fill="currentColor"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z" fill="currentColor"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z" fill="currentColor"/></symbol>
+      <symbol id="i-help" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm-1 11h2v2h-2zm1-9a3.5 3.5 0 0 1 1.6 6.6c-.4.2-.6.5-.6.9V14h-2v-.5a3 3 0 0 1 1.7-2.7A1.5 1.5 0 1 0 10.5 9.5h-2A3.5 3.5 0 0 1 12 6z" fill="currentColor"/></symbol>
       <symbol id="i-dash" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zM7 11v2h10v-2z" fill="currentColor"/></symbol>
-      <!-- Line illustrations: original drawings, one stroke color, a light tint inside. Used with <use href="#ill-...">. -->
-      <symbol id="ill-home" viewBox="0 0 120 96">
-        <path d="M24 84V48M96 84V48M14 52 60 16l46 36" />
-        <path d="M24 84h72" />
-        <path d="M80 30V18h10v22" />
-        <path d="M60 60s-12-6.6-12-14.6a6.4 6.4 0 0 1 12-3 6.4 6.4 0 0 1 12 3C72 53.4 60 60 60 60z" style="fill:var(--primary-tint)"/>
-        <path d="M52 84V70a8 8 0 0 1 16 0v14" />
-        <path d="M30 70h12v-8H30z" /><path d="M36 62v8" />
-        <path d="M6 88h108" />
-        <path d="M108 88V74" /><circle cx="108" cy="64" r="9" style="fill:var(--primary-tint)"/>
+      <!-- Illustrations: original flat drawings in the app's colors (the --ill-* tokens). Used with <use href="#ill-...">. -->
+      <symbol id="ill-clinic" viewBox="0 0 240 120">
+        <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+        <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+        <circle cx="150" cy="30" r="12" style="fill:var(--ill-sun)"/>
+        <path d="M0 101 Q120 84 240 96" style="fill:none;stroke:var(--ill-road);stroke-width:11;stroke-linecap:round;stroke-linejoin:round"/>
+        <path d="M6 101 Q120 84 234 96" style="fill:none;stroke:var(--ill-dash);stroke-width:2;stroke-dasharray:7 7"/>
+        <rect x="18" y="14" width="34" height="30" rx="5" style="fill:var(--ill-door)"/>
+        <path d="M18 23v-4a5 5 0 0 1 5-5h24a5 5 0 0 1 5 5v4z" style="fill:var(--ill-dress)"/>
+        <path d="M27 32l5 5 9-10" style="fill:none;stroke:var(--ill-plant);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round"/>
+        <path d="M78 88v-11a4 4 0 0 1 4-4h6l7-11h22l8 11h6a4 4 0 0 1 4 4v11z" style="fill:var(--ill-car)"/>
+        <rect x="97" y="65" width="9" height="7" rx="1.5" style="fill:var(--ill-door)"/>
+        <rect x="110" y="65" width="9" height="7" rx="1.5" style="fill:var(--ill-door)"/>
+        <circle cx="94" cy="89" r="6" style="fill:var(--ill-leg)"/>
+        <circle cx="122" cy="89" r="6" style="fill:var(--ill-leg)"/>
+        <circle cx="94" cy="89" r="2" style="fill:var(--ill-door)"/>
+        <circle cx="122" cy="89" r="2" style="fill:var(--ill-door)"/>
+        <path d="M180 64 L205.0 39 L230 64Z" style="fill:var(--ill-house)"/>
+        <path d="M178 64 L205.0 37 L232 64" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="188" y="60" width="34" height="28" style="fill:var(--ill-house)"/>
+        <rect x="191.4" y="66.16" width="7.48" height="9.8" rx="3" style="fill:var(--ill-window)"/>
+        <rect x="211.12" y="66.16" width="7.48" height="9.8" rx="3" style="fill:var(--ill-window)"/>
+        <path d="M205 51.6s-5.6-3.22-5.6-7.0a3.08 3.08 0 0 1 5.6-1.68 3.08 3.08 0 0 1 5.6 1.68c0 3.78-5.6 7.0-5.6 7.0z" style="fill:var(--ill-heart)"/>
+        <rect x="200" y="72" width="10" height="16" rx="1.5" style="fill:var(--ill-door)"/>
       </symbol>
-      <symbol id="ill-clinic" viewBox="0 0 120 96">
-        <rect x="12" y="28" width="58" height="56" rx="4" />
-        <path d="M41 36v14M34 43h14" />
-        <rect x="34" y="62" width="14" height="22" rx="2" />
-        <rect x="18" y="56" width="10" height="10" rx="1" /><rect x="54" y="56" width="10" height="10" rx="1" />
-        <path d="M76 76v-9a4 4 0 0 1 4-4h2l5-9h15l5 9h2a4 4 0 0 1 4 4v9" style="fill:var(--primary-tint)"/>
-        <path d="M76 76h34" /><circle cx="86" cy="78" r="4" /><circle cx="101" cy="78" r="4" />
-        <path d="M6 86h108" />
+      <symbol id="ill-outage" viewBox="0 0 240 120">
+        <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+        <rect width="240" height="120" rx="20" style="fill:var(--ill-night)"/>
+        <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+        <circle cx="200" cy="26" r="11" style="fill:var(--ill-sun)"/>
+        <circle cx="206" cy="21" r="10" style="fill:var(--ill-night)"/>
+        <circle cx="26" cy="20" r="2.2" style="fill:var(--ill-cloud)"/>
+        <circle cx="58" cy="36" r="1.8" style="fill:var(--ill-cloud)"/>
+        <circle cx="108" cy="14" r="2.2" style="fill:var(--ill-cloud)"/>
+        <circle cx="150" cy="30" r="1.8" style="fill:var(--ill-cloud)"/>
+        <circle cx="176" cy="48" r="2.2" style="fill:var(--ill-cloud)"/>
+        <circle cx="18" cy="52" r="1.8" style="fill:var(--ill-cloud)"/>
+        <circle cx="226" cy="56" r="2" style="fill:var(--ill-cloud)"/>
+        <path d="M62 60 L105.0 29 L148 60Z" style="fill:var(--ill-house)"/>
+        <path d="M60 60 L105.0 27 L150 60" style="fill:none;stroke:var(--ill-roof);stroke-width:6;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="70" y="56" width="70" height="36" style="fill:var(--ill-house)"/>
+        <rect x="77" y="63.92" width="15.4" height="12.6" rx="3" style="fill:var(--ill-dark)"/>
+        <rect x="117.6" y="63.92" width="15.4" height="12.6" rx="3" style="fill:var(--ill-dark)"/>
+        <rect x="98" y="66.8" width="14" height="25.2" rx="3" style="fill:var(--ill-door)"/>
+        <circle cx="180" cy="84" r="17" style="fill:var(--ill-sun);opacity:.35"/>
+        <path d="M176 74a4 4 0 0 1 8 0" style="fill:none;stroke:var(--ill-leg);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="172" y="74" width="16" height="4" rx="1" style="fill:var(--ill-leg)"/>
+        <rect x="174" y="78" width="12" height="14" rx="2" style="fill:var(--ill-sun)"/>
+        <path d="M180 81c2 3 3 5 0 8-3-3-2-5 0-8z" style="fill:var(--ill-pot)"/>
+        <rect x="172" y="92" width="16" height="4" rx="1" style="fill:var(--ill-leg)"/>
       </symbol>
-      <symbol id="ill-outage" viewBox="0 0 120 96">
-        <path d="M40 14a16 16 0 0 0-9 29v8h18v-8A16 16 0 0 0 40 14z" />
-        <path d="M34 57h12M36 63h8" />
-        <path d="M14 22l5 4M66 22l-5 4M10 40h6M64 40h6" stroke-dasharray="1 7" />
-        <rect x="80" y="54" width="18" height="30" rx="2" style="fill:var(--primary-tint)"/>
-        <path d="M89 54v-6" />
-        <path d="M89 26c6 7 8 11 8 15a8 8 0 0 1-16 0c0-4 2-8 8-15z" style="fill:var(--primary-tint)"/>
-        <path d="M6 86h108" />
+      <symbol id="ill-pet" viewBox="0 0 240 120">
+        <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+        <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+        <circle cx="204" cy="26" r="12" style="fill:var(--ill-sun)"/>
+        <path d="M30 24a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H32a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
+        <path d="M108 94q20 2 15-20" style="fill:none;stroke:var(--ill-cat);stroke-width:5;stroke-linecap:round;stroke-linejoin:round"/>
+        <ellipse cx="92" cy="84" rx="20" ry="16" style="fill:var(--ill-cat)"/>
+        <circle cx="92" cy="58" r="13" style="fill:var(--ill-cat)"/>
+        <path d="M81 52l2-13 8 7zM103 52l-2-13-8 7z" style="fill:var(--ill-cat)"/>
+        <circle cx="87" cy="57" r="1.8" style="fill:var(--ill-window)"/>
+        <circle cx="97" cy="57" r="1.8" style="fill:var(--ill-window)"/>
+        <ellipse cx="152" cy="86" rx="18" ry="4" style="fill:var(--ill-pot)"/>
+        <path d="M134 86h36l-4 12h-28z" style="fill:var(--ill-dress)"/>
+        <path d="M152 58.8s-8.8-5.06-8.8-11.0a4.84 4.84 0 0 1 8.8-2.64 4.84 4.84 0 0 1 8.8 2.64c0 5.94-8.8 11.0-8.8 11.0z" style="fill:var(--ill-heart)"/>
       </symbol>
-      <symbol id="ill-pet" viewBox="0 0 120 96">
-        <circle cx="40" cy="38" r="16" style="fill:var(--primary-tint)"/>
-        <path d="M27 28 25 12l13 7M53 28l2-16-13 7" />
-        <circle cx="34" cy="38" r="1.6" style="fill:currentColor"/><circle cx="46" cy="38" r="1.6" style="fill:currentColor"/>
-        <path d="M38 44h4l-2 3zM24 42l-8-2M24 46l-8 2M56 42l8-2M56 46l8 2" />
-        <path d="M28 52c-8 8-8 24-2 32h28c6-8 6-24-2-32" />
-        <path d="M56 80c16 2 22-12 12-24" />
-        <path d="M80 66h30a15 14 0 0 1-30 0z" style="fill:var(--primary-tint)"/>
-        <path d="M88 62l2-2M96 62l2-2M104 62l2-2" />
-        <path d="M6 86h108" />
+      <symbol id="ill-mail" viewBox="0 0 240 120">
+        <rect width="240" height="120" rx="20" style="fill:var(--ill-sky)"/>
+        <path d="M0 90 Q120 74 240 90 V100 A20 20 0 0 1 220 120 H20 A20 20 0 0 1 0 100Z" style="fill:var(--ill-ground)"/>
+        <circle cx="204" cy="26" r="12" style="fill:var(--ill-sun)"/>
+        <path d="M150 20a7 7 0 0 1 9-6 9 9 0 0 1 16 1 6 6 0 0 1 2 11H152a6 6 0 0 1-2-6z" style="fill:var(--ill-cloud)"/>
+        <rect x="86" y="60" width="8" height="40" style="fill:var(--ill-cane)"/>
+        <path d="M58 62V46a14 14 0 0 1 14-14h36a14 14 0 0 1 14 14v16z" style="fill:var(--ill-car)"/>
+        <path d="M58 62V46a14 14 0 0 1 28 0v16z" style="fill:var(--ill-roof)"/>
+        <rect x="122" y="34" width="4" height="20" style="fill:var(--ill-dress)"/>
+        <rect x="122" y="34" width="12" height="7" style="fill:var(--ill-dress)"/>
+        <rect x="150" y="56" width="40" height="26" rx="3" style="fill:var(--ill-door)"/>
+        <path d="M150 58l20 13 20-13" style="fill:none;stroke:var(--ill-dash);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>
+        <rect x="160" y="72" width="40" height="26" rx="3" style="fill:var(--ill-door)"/>
+        <path d="M160 74l20 13 20-13" style="fill:none;stroke:var(--ill-dash);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>
       </symbol>
-      <symbol id="ill-mail" viewBox="0 0 120 96">
-        <path d="M24 58V44a16 16 0 0 1 16-16h14a16 16 0 0 1 16 16v14z" style="fill:var(--primary-tint)"/>
-        <path d="M70 38h10V24H70" /><path d="M24 58h46" />
-        <path d="M41 58v28M53 58v28" />
-        <path d="M33 44h26" />
-        <rect x="80" y="54" width="30" height="22" rx="2" />
-        <path d="m80 56 15 11 15-11" />
-        <path d="M6 86h108" />
+      <symbol id="ill-cat-plan" viewBox="0 0 120 80">
+        <rect width="120" height="80" rx="18" style="fill:var(--ill-sky)"/>
+        <rect x="36" y="12" width="44" height="58" rx="6" style="fill:var(--ill-door)"/>
+        <rect x="48" y="7" width="20" height="10" rx="3" style="fill:var(--ill-roof)"/>
+        <path d="M44 28l3 3 6-6" style="fill:none;stroke:var(--ill-plant);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/><path d="M58 29h14" style="fill:none;stroke:var(--ill-dash);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/>
+        <path d="M44 41l3 3 6-6" style="fill:none;stroke:var(--ill-plant);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/><path d="M58 42h14" style="fill:none;stroke:var(--ill-dash);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/>
+        <path d="M44 54l3 3 6-6" style="fill:none;stroke:var(--ill-plant);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/><path d="M58 55h14" style="fill:none;stroke:var(--ill-dash);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/>
+        <g transform="rotate(35 92 46)"><rect x="88" y="22" width="8" height="34" rx="2" style="fill:var(--ill-sun)"/><path d="M88 56h8l-4 8z" style="fill:var(--ill-pot)"/></g>
+      </symbol>
+      <symbol id="ill-cat-safe" viewBox="0 0 120 80">
+        <rect width="120" height="80" rx="18" style="fill:var(--ill-sky)"/>
+        <path d="M60 9 86 19v20c0 17-12 27-26 33-14-6-26-16-26-33V19z" style="fill:var(--ill-plant)"/>
+        <path d="M60 41.2s-11.2-6.44-11.2-14a6.16 6.16 0 0 1 11.2-3.36 6.16 6.16 0 0 1 11.2 3.36c0 7.56-11.2 14-11.2 14z" style="fill:var(--ill-door)"/>
+      </symbol>
+      <symbol id="ill-cat-help" viewBox="0 0 120 80">
+        <rect width="120" height="80" rx="18" style="fill:var(--ill-sky)"/>
+        <rect x="26" y="14" width="30" height="54" rx="7" style="fill:var(--ill-leg)"/>
+        <rect x="30" y="22" width="22" height="36" rx="3" style="fill:var(--ill-window)"/>
+        <circle cx="41" cy="63" r="2" style="fill:var(--ill-door)"/>
+        <path d="M64 14h34a10 10 0 0 1 10 10v8a10 10 0 0 1-10 10H80l-9 8v-8h-7a10 10 0 0 1-10-10v-8a10 10 0 0 1 10-10z" style="fill:var(--ill-door)"/>
+        <path d="M81 30s-8-4.6-8-10a4.4 4.4 0 0 1 8-2.4 4.4 4.4 0 0 1 8 2.4c0 5.4-8 10-8 10z" style="fill:var(--ill-heart)"/>
+      </symbol>
+      <symbol id="ill-cat-share" viewBox="0 0 120 80">
+        <rect width="120" height="80" rx="18" style="fill:var(--ill-sky)"/>
+        <path d="M24 72a20 20 0 0 1 40 0z" style="fill:var(--ill-car)"/>
+        <circle cx="44" cy="40" r="11" style="fill:var(--ill-hair)"/>
+        <circle cx="45" cy="43" r="9.5" style="fill:var(--ill-skin)"/>
+        <path d="M58 72a20 20 0 0 1 40 0z" style="fill:var(--ill-plant)"/>
+        <circle cx="78" cy="40" r="11" style="fill:var(--ill-leg)"/>
+        <circle cx="77" cy="43" r="9.5" style="fill:var(--ill-skin)"/>
+        <path d="M61 20s-8-4.6-8-10a4.4 4.4 0 0 1 8-2.4 4.4 4.4 0 0 1 8 2.4c0 5.4-8 10-8 10z" style="fill:var(--ill-heart)"/>
+      </symbol>
+      <symbol id="ill-chat" viewBox="0 0 120 80">
+        <rect width="120" height="80" rx="18" style="fill:var(--ill-sky)"/>
+        <path d="M22 14h56a10 10 0 0 1 10 10v20a10 10 0 0 1-10 10H46l-12 10V54H22a10 10 0 0 1-10-10V24a10 10 0 0 1 10-10z" style="fill:var(--ill-door)"/>
+        <circle cx="36" cy="34" r="4" style="fill:var(--ill-house)"/>
+        <circle cx="50" cy="34" r="4" style="fill:var(--ill-house)"/>
+        <circle cx="64" cy="34" r="4" style="fill:var(--ill-house)"/>
+        <path d="M84 52 98 40l14 12z" style="fill:var(--ill-house)"/>
+        <rect x="88" y="52" width="20" height="18" style="fill:var(--ill-house)"/>
+        <path d="M98 48s-4-2.3-4-5a2.2 2.2 0 0 1 4-1.2 2.2 2.2 0 0 1 4 1.2c0 2.7-4 5-4 5z" style="fill:var(--ill-heart)"/>
+      </symbol>
+      <symbol id="ill-print" viewBox="0 0 120 80">
+        <rect width="120" height="80" rx="18" style="fill:var(--ill-sky)"/>
+        <rect x="38" y="6" width="44" height="22" rx="2" style="fill:var(--ill-door)"/>
+        <rect x="22" y="24" width="76" height="32" rx="8" style="fill:var(--ill-leg)"/>
+        <circle cx="86" cy="34" r="3" style="fill:var(--ill-plant)"/>
+        <rect x="34" y="46" width="52" height="30" rx="3" style="fill:var(--ill-door)"/>
+        <rect x="34" y="46" width="52" height="7" style="fill:var(--ill-dark)"/>
+        <path d="M60 64.4s-6.4-3.68-6.4-8a3.52 3.52 0 0 1 6.4-1.92 3.52 3.52 0 0 1 6.4 1.92c0 4.32-6.4 8-6.4 8z" style="fill:var(--ill-heart)"/>
+        <path d="M30 56h60" style="fill:none;stroke:var(--ill-dark);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"/>
       </symbol>
     </defs>
   </svg>
@@ -812,10 +1269,6 @@
         <h2 id="f-access"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Accessibility</h2>
         <p>We work to make this site easy for everyone to use.</p>
         <details class="more"><summary>Show details</summary><p>We aim to meet WCAG 2.1 AA: large text you can make bigger, strong contrast in every theme, full keyboard use, screen reader labels, and no motion if your device asks for less.</p></details>
-      </section>
-      <section aria-labelledby="f-team">
-        <h2 id="f-team"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg> Who we are</h2>
-        <p>Made by Leya Jacob, Oluwaseyi Omisore, Joan Arches, and Satoshi Nagae. Built for the UMass Boston Applied AI Microcredential.</p>
       </section>
     </div>
   </footer>

@@ -29,7 +29,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from just_in_case.config import DATA_DIR, OUTPUT_DIR
-from just_in_case.config import AGENT_NAME
+from just_in_case.config import AGENT_NAME, has_ai_key
 from just_in_case.prompts import GREETING
 from just_in_case import timeline
 from just_in_case.encouragement import encouragement
@@ -108,10 +108,11 @@ def describe_trace(line: str) -> tuple[str, str] | None:
 class Session:
     summary_ok = False  # nothing is made until the person says yes
 
-    def __init__(self, ws: WebSocket, demo: bool = False):
+    def __init__(self, ws: WebSocket, mode: str = "live"):
         self.id = uuid.uuid4().hex
         self.ws = ws
-        self.demo = demo  # the scripted Ruth example: same tools and gate, no AI
+        self.mode = mode              # "live" (the AI agent), "guided" (no AI), or "example" (Ruth's story, no AI)
+        self.demo = mode != "live"     # no AI: the same tools and approval gate, run by the app's own rules
         self.out: asyncio.Queue = asyncio.Queue()
         self.pending: dict[str, asyncio.Future] = {}
         self.agent = None
@@ -409,7 +410,7 @@ class Session:
         if self.demo:
             from web.demo_agent import DemoAgent
             self.agent = DemoAgent(self.approver, trace=self.on_trace, on_tool=self.on_tool,
-                                   out_dir=self.out_dir)
+                                   out_dir=self.out_dir, mode=self.mode)
         else:
             from just_in_case.agent import JustInCaseAgent
             self.agent = JustInCaseAgent(approver=self.approver, trace=self.on_trace,
@@ -445,6 +446,10 @@ class Session:
             context = f"[Note from the app, not the user: {' '.join(notes)}]" if notes else ""
             try:
                 await self.agent.send(text, on_text=on_text, context=context)
+                tip = getattr(self.agent, "suggestion", None)   # the guided planner's optional outside service
+                if tip:
+                    self.agent.suggestion = None
+                    self.emit({"type": "suggest", **tip})
             except Exception as e:  # keep the page usable, say what happened
                 self.emit({"type": "error", "text": f"Something went wrong on our side: {e}. "
                            "Please try sending your message again."})
@@ -458,6 +463,17 @@ class Session:
 # Routes
 # ---------------------------------------------------------------------------
 
+@app.middleware("http")
+async def check_for_updates(request, call_next):
+    """Pages and their files are re-checked on each visit (a quick 304 when unchanged),
+    so a browser never mixes an old style.css or app.js with a new page."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith(("/static/", "/share/")):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
+
+
 def render_page(name: str, agent_name: str = AGENT_NAME) -> str:
     """A page with the agent's name filled in. The name lives in config.py, nowhere else."""
     return (STATIC / name).read_text().replace("{{AGENT_NAME}}", htmlmod.escape(agent_name))
@@ -470,7 +486,7 @@ async def index():
 
 @app.get("/api/config")
 async def config():
-    return JSONResponse({"demo": DEMO, "greeting": GREETING, "agent_name": AGENT_NAME,
+    return JSONResponse({"demo": DEMO, "ai": not DEMO and has_ai_key(), "greeting": GREETING, "agent_name": AGENT_NAME,
                          "needs_restart": code_fingerprint() != STARTED_WITH})
 
 
@@ -497,6 +513,17 @@ async def support():
     lines = json.loads((DATA_DIR / "support_lines.json").read_text())["lines"]
     keep = ("name", "how_to_reach", "hours", "what", "kind", "url")
     return JSONResponse([{k: l.get(k, "") for k in keep} for l in lines])
+
+
+@app.get("/api/family-updates")
+async def family_updates():
+    """For "Keep family in the loop": outside services for sharing updates, only from the services list."""
+    from just_in_case.directory import Directory
+    from just_in_case.safeguards import separate_service_line
+    d = Directory()
+    return JSONResponse([{**{k: s[k] for k in ("name", "url", "cost", "how_to_use")},
+                          "last_verified": d.by_id[s["id"]]["last_verified"],
+                          "separate": separate_service_line(s["name"])} for s in d.find_services("family_updates", "Boston")])
 
 
 @app.get("/card/{sid}")
@@ -614,7 +641,7 @@ async def table_print(sid: str):
                    f"<td>{e(t['person']) or '<em>Open: add your name</em>'}</td>"
                    f"<td>{TASK_STATUS[task_status(t)]}</td></tr>" for t in s.agent.state.helper_tasks)
     rows = rows or '<tr><td colspan="5">No rows yet.</td></tr>'
-    return HTMLResponse(f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+    return HTMLResponse(f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="light only"><meta name="darkreader-lock">
 <title>Who is helping</title>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -655,11 +682,17 @@ async def summary_print(sid: str):
     return HTMLResponse(render_summary_html(s.agent.state, s.agent.box.dir, s.agent.box.today))
 
 
+def visit_mode(example: bool) -> str:
+    """Ruth's example when asked for; otherwise the live agent if an AI key is set up, else the guided planner."""
+    if example:
+        return "example"
+    return "guided" if DEMO or not has_ai_key() else "live"
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
-    # "See an example" opens /ws?example=1: this visit runs the Ruth demo, even on a live server.
-    s = Session(ws, demo=DEMO or ws.query_params.get("example") == "1")
+    s = Session(ws, mode=visit_mode(ws.query_params.get("example") == "1"))
     SESSIONS[s.id] = s
 
     async def writer():
@@ -670,7 +703,7 @@ async def ws_endpoint(ws: WebSocket):
     tasks: set[asyncio.Task] = set()
     try:
         await s.start()
-        s.emit({"type": "hello", "session": s.id, "demo": s.demo, "greeting": GREETING, "agent_name": AGENT_NAME})
+        s.emit({"type": "hello", "session": s.id, "demo": s.demo, "mode": s.mode, "greeting": GREETING, "agent_name": AGENT_NAME})
         while True:
             msg = await ws.receive_json()
             if msg.get("type") == "say" and str(msg.get("text", "")).strip():

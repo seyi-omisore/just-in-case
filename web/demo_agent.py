@@ -1,12 +1,16 @@
-"""A scripted stand-in for the real agent. No AI, no internet, no cost.
+"""The planner that works without AI. No AI, no internet, no cost.
 
 Used for:
+  - "Make my plan" when no AI key is set up: the guided planner. It asks one
+    question at a time and builds the plan from the app's own rules and the
+    services list, using only what the visitor typed or tapped.
+  - "See Ruth's example": the same planner, while the page types Ruth's
+    made-up answers (the page does that, never this file).
   - testing the website without spending API money (python serve.py --demo)
-  - the presentation backup (replay mode, later step)
 
-It is NOT the product. It follows a fixed Ruth script, but it calls the REAL
-tools and the REAL approval gate, so every rule and checkpoint behaves exactly
-as it does with the live agent. The website shows a "Demo mode" banner.
+It calls the REAL tools and the REAL approval gate, so every rule and
+checkpoint behaves exactly as it does with the live agent: the visitor says yes
+to each step, only listed services appear, and free options come first.
 """
 
 import asyncio
@@ -14,7 +18,7 @@ import re
 
 from just_in_case.agent import make_gate
 from just_in_case.directory import Directory
-from just_in_case.safeguards import NO_ONE_LINE
+from just_in_case.safeguards import NO_ONE_LINE, separate_service_line
 from just_in_case.state import PlanState
 from just_in_case.tools import PREFIX, Toolbox, ToolError
 
@@ -26,8 +30,13 @@ HELPING = re.compile(r"helping (someone|my|a )|for (my )?(mom|mother|dad|father|
                      r"grand\w+|friend|neighbou?r|sister|brother)|someone else", re.I)
 NO_ONE = re.compile(r"no one|nobody|don'?t have anyone|do not have anyone|not anyone|no family|no friends", re.I)
 NO = re.compile(r"^\s*(no|nope|none|not really|nothing)\b", re.I)
+# Keeping family and friends updated during a health event, or many people helping over time.
+UPDATES = re.compile(r"keep(ing)? (my |our |the )?(family|friends|kids|children|everyone|people)\b[^.?!]*"
+                     r"\b(updated|posted|informed|in the loop|up to date)|updates? (to|for|with) (my |our )?(family|friends)|"
+                     r"\b(lots of|many|a lot of) (people|friends|neighbou?rs)|sign up to help|meal (train|schedule)|"
+                     r"take turns", re.I)
 
-# Keywords -> needs. The demo only plans for what the user brings up.
+# Keywords -> needs. The planner only plans for what the visitor brings up.
 NEED_WORDS = [
     ("ride_home_after_procedure", r"procedure|surgery|sedation|operation|take me home|ride home"),
     ("pet_care_during_stay", r"\bpets?\b|\bcats?\b|\bdogs?\b|\bbird\b|kitten|puppy"),
@@ -51,9 +60,19 @@ def names_in(text: str) -> list[str]:
     return out[:3]
 
 
+# A short name for each part, used in "Here's what I found".
+LABELS = {"ride_home_after_procedure": "Getting home", "spare_key_access": "Spare key",
+          "mail_while_away": "Mail", "power_outage": "Power", "pet_care_during_stay": "Your pet"}
+TOPICS = ("a ride home after a procedure, going away (your mail), care for a pet, "
+          "or a winter power outage")
+
+
 class DemoAgent:
+    """The planner without AI (see the top of this file)."""
+
     def __init__(self, approver, trace=print, on_tool=None, directory: Directory | None = None,
-                 out_dir=None):
+                 out_dir=None, mode: str = "guided"):
+        self.mode = mode   # "guided" for a visitor's own plan, "example" for Ruth's
         self.state = PlanState(town="Boston")
         self.box = Toolbox(self.state, directory or Directory(),
                            **({"out_dir": out_dir} if out_dir else {}))
@@ -69,6 +88,8 @@ class DemoAgent:
         self.papers = ""
         self.name = ""
         self.queue: list[str] = []
+        self.suggestion: dict | None = None   # an optional outside service, offered once, never added for them
+        self.suggested = False
         self.cost_usd = 0.0
         self.transcript: list[tuple[str, str]] = []
 
@@ -117,6 +138,30 @@ class DemoAgent:
             self.trace(f"  [rule]  blocked: {e}")
             return None
 
+    async def _best(self, need: str) -> str:
+        """Add the top choice the app's rules give for this need: a free service, then a simple
+        preparation, then any other listed service. Returns the line that describes it."""
+        b = self.box
+        found = await self._call("find_services", b.find_services, need)
+        services = (found or {}).get("services", [])
+        free = [s for s in services if s.get("cost") == "free"]
+        label = LABELS.get(need, need.replace("_", " ").capitalize())
+        if not free:
+            preps = ((await self._call("find_preparations", b.find_preparations, need)) or {}).get("preparations", [])
+            if preps:
+                await self._call("add_to_plan", b.add_to_plan, need, "preparation", preps[0]["id"])
+                return f"- **{label}:** {preps[0]['name']}. {preps[0]['what']}"
+        pick = (free or services or [None])[0]
+        if not pick:
+            await self._call("add_to_plan", b.add_to_plan, need, "blank")
+            return f"- **{label}:** nothing on our list yet. Boston's Council on Aging or Mass 211 can help."
+        await self._call("add_to_plan", b.add_to_plan, need, "service", pick["id"])
+        line = f"- **{label}:** {pick['name']}" + (" is free." if pick.get("cost") == "free" else ".")
+        line += f" {pick['how_to_use']}" + (f" Call {pick['phone']}." if pick.get("phone") else "")
+        if need == "ride_home_after_procedure":
+            line += " Please ask your surgical team if this meets their rule for who takes you home."
+        return line
+
     async def _next_card_step(self) -> str:
         """Ask about the next section the user ticked, or make the card."""
         questions = {"name": "What name would you like at the top of your card?",
@@ -138,9 +183,24 @@ class DemoAgent:
         return ("Your fridge card is ready. Press **See your fridge card** to look at it and print it.\n\n"
                 "Let's look at this plan again in a few months.")
 
+    async def _maybe_suggest(self, text: str) -> None:
+        """Only for keeping people updated, or many people helping over time: a link the person may choose.
+        It comes from the services list, and it is never added to the plan for them."""
+        if self.suggested or not UPDATES.search(text):
+            return
+        found = await self._call("find_services", self.box.find_services, "family_updates")
+        pick = next(iter((found or {}).get("services", [])), None)
+        if pick:
+            self.suggested = True
+            self.suggestion = {"name": pick["name"], "url": pick["url"], "what": pick["how_to_use"],
+                               "free": pick["cost"] == "free", "separate": separate_service_line(pick["name"]),
+                               "simpler": "For one or two small tasks, the helper list on this page is simpler."}
+
     async def send(self, user_text: str, on_text=print, context: str = "") -> str:  # context: live agent only
         self.transcript.append(("user", user_text))
         self.state.user_said.append(user_text)
+        if not CRISIS.search(user_text):
+            await self._maybe_suggest(user_text)
         reply = await self._script(user_text)
         on_text(reply)
         self.transcript.append(("agent", reply))
@@ -177,9 +237,8 @@ class DemoAgent:
                 if self.misses == 1:
                     return ("Thanks for telling me. What's coming up? For example, a procedure, a "
                             "hospital stay, or getting ready for winter.")
-                return ("This demo only knows a few topics. Try something like \"I have a procedure next "
-                        "month\", \"I'm going away for two weeks\", or \"a winter power outage\". "
-                        "The full version understands any wording.")
+                return (f"This planner can help with {TOPICS}. You can tap one of the sentences, "
+                        "or say something like \"I have a procedure next month\".")
             if "ride_home_after_procedure" in needs:
                 needs.insert(1, "spare_key_access")
             self.turn = 1
@@ -207,32 +266,11 @@ class DemoAgent:
             await self._call("set_comfort", b.set_comfort, bool(names), bool(BURDEN.search(text)), no_one)
             lines = []
             for need in st.confirmed_needs:
-                if need == "ride_home_after_procedure":
-                    await self._call("find_services", b.find_services, need)
-                    await self._call("add_to_plan", b.add_to_plan, need, "service", "svc_fw_escort")
-                    lines.append("- **Getting home:** FriendshipWorks is free. A volunteer goes with you "
-                                 "and helps you get home. Call 617-482-1510 to book. Please ask your "
-                                 "surgical team if this meets their rule for who takes you home.")
-                elif need == "spare_key_access":
-                    await self._call("find_preparations", b.find_preparations, need)
-                    await self._call("add_to_plan", b.add_to_plan, need, "preparation", "prep_key_lockbox")
-                    lines.append("- **Spare key:** a small lockbox by the door.")
-                elif need == "mail_while_away":
-                    await self._call("find_preparations", b.find_preparations, need)
-                    await self._call("add_to_plan", b.add_to_plan, need, "preparation", "prep_usps_hold_mail")
-                    lines.append("- **Mail:** USPS Hold Mail is free. Sign in at USPS.com a week or more early.")
-                elif need == "power_outage":
-                    await self._call("find_services", b.find_services, need)
-                    await self._call("add_to_plan", b.add_to_plan, need, "service", "svc_eversource_medical")
-                    lines.append("- **Power:** ask your electric company to note any medical equipment on your account.")
-                elif need == "pet_care_during_stay":
-                    if names:
-                        await self._call("add_to_plan", b.add_to_plan, need, "person")
-                        lines.append(f"- **Your pet:** {' and '.join(names)}.")
-                    else:
-                        await self._call("find_preparations", b.find_preparations, need)
-                        await self._call("add_to_plan", b.add_to_plan, need, "preparation", "prep_pet_sheet")
-                        lines.append("- **Your pet:** a pet care sheet on the fridge helps anyone who steps in.")
+                if need == "pet_care_during_stay" and names:   # a friend the visitor named
+                    await self._call("add_to_plan", b.add_to_plan, need, "person")
+                    lines.append(f"- **Your pet:** {' and '.join(names)}.")
+                else:
+                    lines.append(await self._best(need))      # the app's own rules pick it, free first
             if names:
                 who = " and ".join(names)
                 note = (f"Hi {who}. I'm making a small plan in case I need a hand. Would you be up "
@@ -269,5 +307,5 @@ class DemoAgent:
                 self.papers = text.strip(" .")[:120]
             return await self._next_card_step()
 
-        return ("This is the demo version, so it follows a set path. Turn on the real agent "
-                "to keep talking.")
+        return ("Your plan is ready. You can say yes or no to each part, print your fridge card, or make "
+                "a readiness summary. To plan for something else, reload this page and start a new plan.")

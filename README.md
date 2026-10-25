@@ -8,7 +8,7 @@ a hospital stay with a pet at home) *before* they happen. It leans on services a
 simple preparation first, and on people only when the user chooses. It ends with a
 printed one-page "If something happens" card for the refrigerator.
 
-> Team: Seyi (technical), Leya (services and safeguards), Joan (evaluation and documentation), Satoshi (story and presentation)
+> Team: Leya Jacob Kurzhiparambil (services and safeguards; technical), Oluwaseyi Omisore (technical), Joan Arches (evaluation and documentation), Satoshi Nagae (story, design, and presentation)
 
 ## How it works
 
@@ -55,13 +55,29 @@ pip install -r requirements.txt
 cp .env.example .env             # then paste your OpenRouter key into .env
 python run.py --check            # free: checks setup
 pytest -q                        # free: tests every safeguard
-python serve.py                  # the website, with the live agent
-python serve.py --demo           # the website, scripted demo (no AI, no cost)
+python serve.py                  # the website: the live agent with a key, the guided planner (no AI) without one
+python serve.py --demo           # the website with no AI: the guided planner and Ruth's example
+python serve.py --host 0.0.0.0   # to host it for other computers (works with no key)
 python run.py                    # talk to the agent in the terminal
 python eval/run_eval.py          # scripted test cases, writes eval/results.md
 ```
 
 Cards are saved in `output/` as printable HTML.
+
+## Remake the tour video
+
+The About tab shows a 1-minute tour of Ruth's made-up example. After the app changes, remake it:
+
+```bash
+pip install -r requirements-video.txt    # once: Playwright and an ffmpeg program, inside .venv
+python -m playwright install ffmpeg      # once: the small helper Playwright records with
+python scripts/make_tour_video.py        # about a minute; add --no-voice to leave out narration
+```
+
+It starts the app in demo mode (Light theme, phone size), plays Ruth's guided story, keeps the main
+moments, and saves `tour.mp4`, `tour.vtt` (captions), and `tour-poster.jpg` in `web/static/img/`.
+It records with your Google Chrome, or Playwright's Chromium if Chrome is missing. On a Mac, the
+built-in voice reads each caption quietly. Only Ruth's made-up details appear in the video.
 
 ## Built with
 

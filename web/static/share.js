@@ -138,7 +138,7 @@
   const setTheme = (t, save = true) => {
     document.documentElement.dataset.theme = t;
     for (const k of ["light", "dark", "contrast"]) $("theme-" + k).setAttribute("aria-pressed", String(t === k));
-    if (save) { try { localStorage.setItem("jic-theme", t); } catch (_) {} }
+    if (save) { try { localStorage.setItem("jic-theme-v2", t); } catch (_) {} }
   };
   setTheme(["dark", "contrast"].includes(document.documentElement.dataset.theme) ? document.documentElement.dataset.theme : "light", false);
   $("theme-light").onclick = () => setTheme("light");

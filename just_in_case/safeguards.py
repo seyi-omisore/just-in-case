@@ -18,6 +18,15 @@ NO_ONE_LINE = (
     "finding services, Boston's Age Strong Commission (617-635-4366), which is "
     "Boston's Council on Aging, or Mass 211 (dial 2-1-1) can help."
 )
+# Said with any outside service a person might sign up for, like a site for sharing updates.
+SEPARATE_SERVICE_LINE = ("{name} is a separate service with its own privacy settings. "
+                         "Just in Case never makes an account or shares anything for you.")
+
+
+def separate_service_line(name: str) -> str:
+    return SEPARATE_SERVICE_LINE.format(name=name)
+
+
 ESCORT_RULE_LINE = (
     "Ask your surgical team if this option meets their rule for who takes you "
     "home. Some clinics do not accept rides or paid services."
