@@ -601,6 +601,7 @@
     // A calm line at each milestone. The words come from the server, never from the model.
     $("plan-ready").hidden = !plan.encouragement;
     $("ready-ill").toggleAttribute("hidden", !plan.ready);  // the calm "you're prepared" picture, once every part is covered
+    $("checkins-cal").hidden = $("checkins-note").hidden = !plan.ready;   // plan check-ins, offered once the plan is ready
     if (plan.ready) playOnce($("ready-ill"), 1600);          // its check mark draws itself, once
     $("plan-ready-text").textContent = plan.encouragement || "";
     renderNextStep(plan.next_step);
@@ -755,7 +756,7 @@
   }
   // A standard .ics file, made here in the browser. No calendar account is touched,
   // nothing goes to our server, and there is no alarm: the user's calendar decides.
-  function makeICS(title, iso, details) {
+  function makeICS(title, iso, details, rrule) {
     const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
     const ymd = (d) => d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
     const start = isoToLocal(iso), end = new Date(start); end.setDate(end.getDate() + 1);
@@ -778,10 +779,28 @@
       "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Just in Case//Backup plan//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
       "BEGIN:VEVENT", `UID:${uid}`, `DTSTAMP:${stamp}`,
       `DTSTART;VALUE=DATE:${ymd(start)}`, `DTEND;VALUE=DATE:${ymd(end)}`,
+      ...(rrule ? [`RRULE:${rrule}`] : []),
       `SUMMARY:${esc(title)}`, `DESCRIPTION:${esc(details)}`, "TRANSP:TRANSPARENT",
       "END:VEVENT", "END:VCALENDAR",
     ].map(fold).join("\r\n") + "\r\n";
   }
+  function downloadICS(title, text) {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/calendar" }));
+    const a = el("a"); a.href = url;
+    a.download = "just-in-case-" + (title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "step") + ".ics";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  // Plan check-ins: one calendar event that repeats every 3 months. Optional, and the person's own calendar.
+  const CHECKIN_TITLE = "Review my Just in Case plan";
+  const CHECKIN_RULE = "FREQ=MONTHLY;INTERVAL=3";
+  $("checkins-cal").addEventListener("click", () => {
+    const first = new Date(); first.setMonth(first.getMonth() + 3);
+    const iso = `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, "0")}-${String(first.getDate()).padStart(2, "0")}`;
+    downloadICS(CHECKIN_TITLE, makeICS(CHECKIN_TITLE, iso,
+      "A quick look: is everything in your plan still right? Open Just in Case and mark it as reviewed.", CHECKIN_RULE));
+    $("checkins-note").textContent = "Downloaded. Open the file to add it to your calendar.";
+  });
   function calendarButton(title, iso, details) {
     const b = el("button", "btn btn-quiet btn-small cal-btn"); b.type = "button";
     b.append(icon("calendar"), document.createTextNode("Add to my calendar"));

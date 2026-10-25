@@ -730,9 +730,13 @@
             <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Mark my plan as reviewed
           </button>
           <p id="review-status" class="helper-small" role="status"></p>
+          <button type="button" id="checkins-cal" class="btn btn-quiet btn-block" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Add plan check-ins to my calendar
+          </button>
+          <p id="checkins-note" class="helper-small" hidden>Only if it helps. It repeats every 3 months.</p>
           <button type="button" id="review-undo" class="details-link" hidden>Undo today's review</button>
           <details class="more"><summary>Show details</summary>
-            <p>Each review saves only the date. Your printed plan and fridge card show when you last looked. Just in Case never sends reminders, so this is up to you.</p>
+            <p>Each review saves only the date. Your printed plan and fridge card show when you last looked. Just in Case never sends reminders. If you like, add check-ins to your own calendar.</p>
             <ul id="review-history" class="review-history"></ul>
           </details>
         </section>

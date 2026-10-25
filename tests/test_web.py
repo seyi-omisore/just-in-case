@@ -1620,3 +1620,17 @@ def test_ruths_example_and_the_tour_video_include_the_invite_step():
     script = (pathlib.Path(__file__).resolve().parent.parent / "scripts" / "make_tour_video.py").read_text()
     assert '"Haven writes the invite. You send it."' in script
     assert 'tour.tap("#helper-rows .invite-btn")' in script and "captions[8]" in script
+
+
+# ---- Round 11: less work after the plan --------------------------------------
+
+def test_plan_checkins_are_one_optional_repeating_calendar_event():
+    page = client.get("/").text
+    assert 'id="checkins-cal" class="btn btn-quiet btn-block" hidden' in page          # quiet, and only once the plan is ready
+    assert "Add plan check-ins to my calendar" in page
+    assert "Only if it helps. It repeats every 3 months." in page
+    js = client.get("/static/app.js").text
+    assert 'const CHECKIN_TITLE = "Review my Just in Case plan";' in js
+    assert 'const CHECKIN_RULE = "FREQ=MONTHLY;INTERVAL=3";' in js
+    assert '...(rrule ? [`RRULE:${rrule}`] : []),' in js
+    assert '$("checkins-cal").hidden = $("checkins-note").hidden = !plan.ready;' in js
