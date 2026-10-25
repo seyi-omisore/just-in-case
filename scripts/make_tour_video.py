@@ -12,6 +12,7 @@ phone frame, keeps only the main moments, and writes into web/static/img/:
     tour.vtt          the captions, with their timings
     tour-poster.jpg   the opening screen, shown before the video plays
     tour-captioned.mp4  the same video with the captions drawn in, for slides
+    tour-narration.wav  the narration on its own, to listen to
 """
 
 import argparse
@@ -35,8 +36,9 @@ HOLD = 2.6                  # seconds on each main moment
 MAX_MB = 10
 # Calm and warm, like the app's Read aloud: the most natural voice first.
 VOICES = ("Ava (Premium)", "Zoe (Premium)", "(Premium)", "(Enhanced)", "Samantha", "Daniel")
-RATE = 158                  # words a minute: about 90% of the Mac's usual 175
+SPEED = 0.9                 # about 90% of the voice's usual pace, set with the voice's own rate (never stretched after)
 PAUSE = 0.4                 # seconds of quiet between sentences
+AUDIO_RATE = 48000          # Hz, for the narration file and the video
 CAPTIONS = ["Meet Haven, your planning helper.", "Tell Haven what's coming up.", "Answer one question at a time.",
             "Your plan builds as you go.", "Do one next step at a time.", "Print your fridge card.",
             "Share a summary, if you choose.", "Plan today. Rest easier tomorrow."]
@@ -145,6 +147,8 @@ class Tour:
     def tap(self, selector: str):
         """A soft circle where the finger goes, then the tap."""
         target = self.app.locator(selector).first
+        if not target.is_visible():  # Ruth's example may have tapped her first sentence by itself already
+            return
         target.scroll_into_view_if_needed()
         box = target.bounding_box()
         self.page.evaluate("([x, y]) => showTap(x, y)", [box["x"] + box["width"] / 2, box["y"] + box["height"] / 2])
@@ -264,15 +268,29 @@ def seconds(ffmpeg: str, clip: Path) -> float:
     return int(h) * 3600 + int(m) * 60 + float(sec)
 
 
+def slower_rate(voice: str, ffmpeg: str, work: Path) -> int:
+    """The voice's own rate setting that makes it speak at about SPEED of its usual pace.
+    Voices respond differently (Ava Premium barely moves at 158), so this is measured, not guessed."""
+    test = "Answer one question at a time. Your plan builds as you go."
+    def length(rate: int | None) -> float:
+        clip = work / f"rate-{rate}.aiff"
+        subprocess.run(["say", "-v", voice, *(["-r", str(rate)] if rate else []), "-o", str(clip), test], check=True)
+        return seconds(ffmpeg, clip)
+    usual, want = length(None), length(None) / SPEED
+    return min(range(90, 181, 5), key=lambda r: abs(length(r) - want))
+
+
 def speak(work: Path, voice: str, ffmpeg: str) -> dict[str, list[tuple[Path, float, float]]]:
     """Each sentence as its own clip, so there is a short, calm pause between sentences.
     Returns, for each caption: (clip, start within the caption, length)."""
+    rate = slower_rate(voice, ffmpeg, work)
+    print(f"Voice: {voice}, rate setting {rate} (about {SPEED:.0%} of its usual pace)")
     out = {}
     for i, text in enumerate(CAPTIONS):
         at, clips = 0.4, []
         for j, sentence in enumerate(re.split(r"(?<=[.!?])\s+", text)):
             clip = work / f"say-{i}-{j}.aiff"
-            subprocess.run(["say", "-v", voice, "-r", str(RATE), "-o", str(clip), sentence], check=True)
+            subprocess.run(["say", "-v", voice, "-r", str(rate), "-o", str(clip), sentence], check=True)
             d = seconds(ffmpeg, clip)
             clips.append((clip, at, d))
             at += d + PAUSE
@@ -280,8 +298,29 @@ def speak(work: Path, voice: str, ffmpeg: str) -> dict[str, list[tuple[Path, flo
     return out
 
 
-def make(segments, video: Path, clips, ffmpeg: str, crf: int, out: Path) -> None:
-    """Keep only the main moments, with a soft fade between them, and add the quiet narration."""
+def narrate(clips, total: float, ffmpeg: str, out: Path) -> None:
+    """The narration as one clean track: each sentence placed in time, one fixed volume, and a gentle fade
+    in at the start and out at the end. No other effects, and one resample to AUDIO_RATE."""
+    ends = sorted((at, at + d) for _, at, d in clips)
+    for (a0, a1), (b0, _) in zip(ends, ends[1:]):
+        if b0 < a1 + 0.2:
+            sys.exit(f"Two narration lines overlap near {b0:.1f} seconds.")
+    inputs = sum((["-i", str(c)] for c, _, _ in clips), [])
+    place = ";".join(f"[{k}:a]adelay={int(at * 1000)}[a{k}]" for k, (_, at, _) in enumerate(clips))
+    mix = place + ";" + "".join(f"[a{k}]" for k in range(len(clips))) + f"amix=inputs={len(clips)}:normalize=0[m]"
+    raw = out.with_suffix(".raw.wav")
+    subprocess.run([ffmpeg, "-y", "-loglevel", "error", *inputs, "-filter_complex", mix, "-map", "[m]", "-t", f"{total:.3f}",
+                    "-c:a", "pcm_s16le", str(raw)], check=True)
+    peak = float(re.search(r"max_volume: (-?[\d.]+) dB", subprocess.run(
+        [ffmpeg, "-i", str(raw), "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr).group(1))
+    subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", str(raw), "-af",
+                    f"volume={-3 - peak:.2f}dB,afade=t=in:st=0:d=0.6,afade=t=out:st={max(total - 0.9, 0):.3f}:d=0.9,"
+                    f"aresample={AUDIO_RATE}", "-c:a", "pcm_s16le", str(out)], check=True)
+    raw.unlink()
+
+
+def make(segments, video: Path, narration: Path | None, ffmpeg: str, crf: int, out: Path) -> None:
+    """Keep only the main moments, with a soft fade between them, and add the narration track as it is."""
     parts, inputs = [], ["-i", str(video)]
     for i, (a, b, _) in enumerate(segments):
         d = b - a
@@ -290,17 +329,16 @@ def make(segments, video: Path, clips, ffmpeg: str, crf: int, out: Path) -> None
     graph = ";".join(parts) + ";" + "".join(f"[v{i}]" for i in range(len(segments))) + f"concat=n={len(segments)}:v=1:a=0[v]"
     maps = ["-map", "[v]"]
     total = sum(b - a for a, b, _ in segments)
-    if clips:
-        for clip, _, _ in clips:
-            inputs += ["-i", str(clip)]
-        # A soft edge on every sentence (no clicks), then one even, comfortable level,
-        # with a gentle fade in at the start and out at the end.
-        each = ";".join(f"[{k + 1}:a]afade=t=in:d=0.05,afade=t=out:st={max(d - 0.12, 0):.3f}:d=0.12,"
-                        f"adelay={int(at * 1000)}|{int(at * 1000)}[a{k}]" for k, (_, at, d) in enumerate(clips))
-        graph += (";" + each + ";" + "".join(f"[a{k}]" for k in range(len(clips))) +
-                  f"amix=inputs={len(clips)}:normalize=0,loudnorm=I=-18:TP=-2:LRA=11,aresample=44100,"
-                  f"afade=t=in:st=0:d=0.6,afade=t=out:st={max(total - 0.9, 0):.3f}:d=0.9[a]")
-        maps += ["-map", "[a]", "-c:a", "aac", "-b:a", "96k"]
+    if narration:
+        # On a Mac, Apple's AAC encoder at a steady 160 kbps, copied in untouched. Elsewhere, ffmpeg's own.
+        m4a = narration.with_suffix(".m4a")
+        if shutil.which("afconvert") and (m4a.exists() or subprocess.run(
+                ["afconvert", "-f", "m4af", "-d", "aac", "-b", "160000", "-s", "0", str(narration), str(m4a)]).returncode == 0):
+            inputs += ["-i", str(m4a)]
+            maps += ["-map", "1:a", "-c:a", "copy"]
+        else:
+            inputs += ["-i", str(narration)]
+            maps += ["-map", "1:a", "-c:a", "aac", "-b:a", "192k", "-ar", str(AUDIO_RATE)]
     subprocess.run([ffmpeg, "-y", "-loglevel", "error", *inputs, "-filter_complex", graph, *maps, "-t", f"{total:.3f}",
                     "-c:v", "libx264", "-preset", "slow", "-crf", str(crf), "-pix_fmt", "yuv420p", "-r", "30",
                     "-movflags", "+faststart", str(out)], check=True)
@@ -337,9 +375,13 @@ def main() -> None:
                 t += b - a
             clips = [(clip, s + at, d) for s, (_, _, text) in zip(starts, segments) for clip, at, d in spoken.get(text, [])]
             OUT.mkdir(parents=True, exist_ok=True)
+            wav = OUT / "tour-narration.wav" if clips else None
+            if wav:
+                narrate(clips, t, ffmpeg, wav)
+                wav.with_suffix(".m4a").unlink(missing_ok=True)   # encoded fresh below, from this narration
             mp4 = OUT / "tour.mp4"
             for crf in (28, 32, 36):                 # smaller until it is under 10 MB
-                make(segments, video, clips, ffmpeg, crf, mp4)
+                make(segments, video, wav, ffmpeg, crf, mp4)
                 if mp4.stat().st_size <= MAX_MB * 1024 * 1024:
                     break
             cues = [f"{i + 1}\n{vtt_time(s)} --> {vtt_time(s + (b - a) - 0.2)}\n{text}\n"
@@ -353,9 +395,15 @@ def main() -> None:
                             f"subtitles=tour.vtt:original_size={W}x{H}:force_style='{CAPTION_STYLE}'",
                             "-c:v", "libx264", "-preset", "slow", "-crf", str(crf), "-pix_fmt", "yuv420p", "-c:a", "copy",
                             "-movflags", "+faststart", "tour-captioned.mp4"], check=True, cwd=OUT)
+        if wav:
+            wav.with_suffix(".m4a").unlink(missing_ok=True)
+        for f in ("tour.mp4", "tour-captioned.mp4"):  # exactly one sound track: the narration
+            info = subprocess.run([ffmpeg, "-i", str(OUT / f)], capture_output=True, text=True).stderr
+            assert info.count("Audio:") == (1 if wav else 0), f"{f} has {info.count('Audio:')} audio tracks"
         size = mp4.stat().st_size / 1024 / 1024
         print(f"Done: {t:.0f} seconds, {size:.1f} MB, narration: {voice or 'none'}.")
-        print(f"Saved tour.mp4, tour-captioned.mp4, tour.vtt, and tour-poster.jpg in {OUT.relative_to(ROOT)}/")
+        print(f"Saved tour.mp4, tour-captioned.mp4, tour.vtt, tour-poster.jpg{', and tour-narration.wav' if wav else ''} "
+              f"in {OUT.relative_to(ROOT)}/")
     finally:
         server.terminate()
         server.wait(timeout=10)

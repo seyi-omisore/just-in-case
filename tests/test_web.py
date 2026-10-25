@@ -1230,5 +1230,10 @@ def test_the_tour_narration_uses_a_calm_premium_voice_and_a_captioned_copy_exist
     root = pathlib.Path(__file__).resolve().parent.parent
     src = (root / "scripts" / "make_tour_video.py").read_text()
     assert 'VOICES = ("Ava (Premium)", "Zoe (Premium)", "(Premium)", "(Enhanced)"' in src
-    assert "RATE = 158" in src and "PAUSE = 0.4" in src and "afade=t=in" in src and "loudnorm" in src
+    assert "SPEED = 0.9" in src and "PAUSE = 0.4" in src and "afade=t=in" in src
+    assert "def slower_rate" in src and '"-r", str(rate)' in src                 # slower with the voice's own rate setting
+    for effect in ("atempo", "asetrate", "rubberband", "loudnorm"):
+        assert effect not in src, effect                                         # nothing stretches or rides the sound
+    assert "Two narration lines overlap" in src and 'info.count("Audio:") == (1 if wav else 0)' in src
+    assert (root / "web" / "static" / "img" / "tour-narration.wav").exists()
     assert (root / "web" / "static" / "img" / "tour-captioned.mp4").stat().st_size < 10 * 1024 * 1024
