@@ -1604,3 +1604,12 @@ a.menu-home:is(:link, :visited), a.demo-exit:is(:link, :visited), .footer-help a
 .day-before-list { list-style: none; margin: .4rem 0 .6rem; padding: 0; display: grid; gap: .35rem; }
 .day-before-list li { display: flex; gap: .45rem; align-items: flex-start; }
 .day-before-list .icon { flex: 0 0 auto; margin-top: .2rem; color: var(--success); }
+.feedback { margin-top: 1rem; padding: .9rem; border: 2px solid var(--line); border-radius: 16px; background: var(--enamel); display: grid; gap: .5rem; }
+.feedback-title { margin: 0; font-size: 1.05rem; }
+.feedback-row { display: flex; flex-wrap: wrap; gap: .5rem; }
+.fb-btn { min-height: 48px; }
+.fb-btn[aria-pressed="true"] { border-color: var(--primary); color: var(--primary); font-weight: 700; outline: 2px solid var(--primary); }
+.fb-label { font-weight: 700; font-size: .92rem; }
+.fb-comment { width: 100%; min-width: 0; box-sizing: border-box; font: inherit; padding: .5rem; border: 2px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); }
+.feedback .btn-primary { justify-self: start; min-height: 48px; }
+.feedback .helper-small { margin: 0; }

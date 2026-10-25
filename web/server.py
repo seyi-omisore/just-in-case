@@ -636,6 +636,28 @@ async def family_updates():
                           "separate": separate_service_line(s["name"])} for s in d.find_services("family_updates", "Boston")])
 
 
+FEEDBACK_FILE = OUTPUT_DIR / "feedback" / "answers.jsonl"
+FEEDBACK_MAX_LINES = 5000
+
+
+@app.post("/api/feedback")
+async def feedback(request: Request):
+    """ "Was this helpful?": saves ONLY the yes/no and the comment. No session, plan, name, or time."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Please try again."}, status_code=400)
+    helpful = body.get("helpful") if isinstance(body, dict) else None
+    if helpful not in (True, False):
+        return JSONResponse({"error": "Please pick yes or no."}, status_code=400)
+    comment = str(body.get("comment") or "").replace("\r", " ").strip()[:500]
+    FEEDBACK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    lines = FEEDBACK_FILE.read_text().splitlines() if FEEDBACK_FILE.exists() else []
+    lines = (lines + [json.dumps({"helpful": helpful, "comment": comment})])[-FEEDBACK_MAX_LINES:]
+    FEEDBACK_FILE.write_text("\n".join(lines) + "\n")
+    return JSONResponse({"saved": True})
+
+
 @app.get("/wallet/{sid}")
 async def wallet(sid: str):
     """The wallet card: only the approved fridge card details. Made on request, never saved."""

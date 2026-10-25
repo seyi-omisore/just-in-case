@@ -1669,3 +1669,24 @@ def test_email_my_plan_opens_the_persons_own_email_without_card_only_details():
     assert "Samantha" in text and "medication" not in text.lower()       # helpers yes; medications never
     js = client.get("/static/app.js").text
     assert '$("plan-email").href = "mailto:?subject=" + encodeURIComponent("My Just in Case plan")' in js
+
+
+def test_was_this_helpful_saves_only_the_answer_and_comment(tmp_path, monkeypatch):
+    import json as _json
+    import web.server as srv
+    monkeypatch.setattr(srv, "FEEDBACK_FILE", tmp_path / "answers.jsonl")
+    assert client.post("/api/feedback", json={"helpful": "maybe"}).status_code == 400
+    r = client.post("/api/feedback", json={"helpful": True, "comment": "Clear and calm. " + "x" * 600,
+                                           "session": "abc", "name": "Ruth", "plan": {"a": 1}})
+    assert r.status_code == 200
+    saved = [_json.loads(l) for l in (tmp_path / "answers.jsonl").read_text().splitlines()]
+    assert saved == [{"helpful": True, "comment": ("Clear and calm. " + "x" * 600)[:500]}]   # nothing else, not even a time
+    monkeypatch.setattr(srv, "FEEDBACK_MAX_LINES", 3)
+    for _ in range(5):
+        client.post("/api/feedback", json={"helpful": False})
+    assert len((tmp_path / "answers.jsonl").read_text().splitlines()) == 3   # never grows without limit
+    page = client.get("/").text
+    assert "We save only your answer and comment. Please leave out names." in page
+    assert 'If you answer "Was this helpful?", we save only that answer and your comment' in page   # privacy page
+    js = client.get("/static/app.js").text
+    assert 'body: JSON.stringify({ helpful: fbAnswer, comment: $("fb-comment").value.trim() })' in js

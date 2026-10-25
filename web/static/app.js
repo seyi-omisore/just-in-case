@@ -695,6 +695,7 @@
     planPrintUrl = plan.plan_print;
     $("plan-print").hidden = !plan.plan_print;
     planEmail = plan.plan_email; $("plan-email").hidden = !plan.plan_email;
+    $("feedback").hidden = EXAMPLE || !plan.plan_email;   // at the end, once something is in the plan (not in Ruth's example)
     summaryUrl = plan.summary_print;
     $("summary-print").hidden = !plan.summary_available;   // only after something is in the plan, and only if you ask
     if (openSummaryWhenReady && summaryUrl) { openSummaryWhenReady = false; openSummary(); }
@@ -1350,6 +1351,30 @@
   let planEmail = null;
   $("plan-email").addEventListener("click", () => {
     $("plan-email").href = "mailto:?subject=" + encodeURIComponent("My Just in Case plan") + "&body=" + encodeURIComponent(planEmail || "");
+  });
+  // "Was this helpful?": only the answer and the comment are sent. No session, no plan, no name.
+  let fbAnswer = null;
+  for (const [id, val] of [["fb-up", true], ["fb-down", false]]) {
+    $(id).addEventListener("click", () => {
+      fbAnswer = val;
+      $("fb-up").setAttribute("aria-pressed", String(val === true));
+      $("fb-down").setAttribute("aria-pressed", String(val === false));
+      $("fb-send").disabled = false;
+    });
+  }
+  $("fb-send").addEventListener("click", async () => {
+    if (fbAnswer === null) return;
+    $("fb-send").disabled = true;
+    try {
+      const r = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ helpful: fbAnswer, comment: $("fb-comment").value.trim() }) });
+      if (!r.ok) throw new Error();
+      $("fb-status").textContent = "Thank you. Your answer was saved.";
+      for (const id of ["fb-up", "fb-down", "fb-comment"]) $(id).disabled = true;
+    } catch (_) {
+      $("fb-status").textContent = "That didn't go through. You can try again.";
+      $("fb-send").disabled = false;
+    }
   });
   let walletUrl = null;
   $("wallet-print").addEventListener("click", () => {

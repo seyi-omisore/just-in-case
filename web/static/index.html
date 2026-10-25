@@ -526,7 +526,7 @@
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg> Only if you choose</h2>
         <p>"Save my progress" keeps your plan on this device. "Share with family" saves your helper list on our server.</p>
-        <details class="more"><summary>Show details</summary><p>Saved progress holds your plan, helper table, card details, review dates, the day you started, and your last 100 chat messages. It stays in this browser. Helpers' phone numbers or emails you type stay in this browser too: they are never sent to our server or shown on a shared list. A shared list holds each task, date, time, and name, plus the first name you chose to show.</p><p>A readiness summary is made only when you ask and say yes. It is not saved, it shows helpers by first name only, and Just in Case never sends it. You choose who sees it.</p></details>
+        <details class="more"><summary>Show details</summary><p>Saved progress holds your plan, helper table, card details, review dates, the day you started, and your last 100 chat messages. It stays in this browser. If you answer "Was this helpful?", we save only that answer and your comment: no name, no plan, and no date. Helpers' phone numbers or emails you type stay in this browser too: they are never sent to our server or shown on a shared list. A shared list holds each task, date, time, and name, plus the first name you chose to show.</p><p>A readiness summary is made only when you ask and say yes. It is not saved, it shows helpers by first name only, and Just in Case never sends it. You choose who sees it.</p></details>
       </div>
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> Who can see it</h2>
@@ -790,6 +790,18 @@
         <button type="button" id="summary-print" class="btn btn-quiet btn-block plan-print" hidden>
           <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Create my readiness summary
         </button>
+        <section id="feedback" class="feedback" aria-labelledby="feedback-title" hidden>
+          <h3 id="feedback-title" class="feedback-title">Was this helpful?</h3>
+          <div class="feedback-row" role="group" aria-labelledby="feedback-title">
+            <button type="button" id="fb-up" class="btn btn-quiet fb-btn" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-thumb-up"/></svg> Yes</button>
+            <button type="button" id="fb-down" class="btn btn-quiet fb-btn" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-thumb-down"/></svg> Not really</button>
+          </div>
+          <label class="fb-label" for="fb-comment">What would make it better? <span class="optional">(optional)</span></label>
+          <textarea id="fb-comment" class="fb-comment" rows="3" maxlength="500"></textarea>
+          <button type="button" id="fb-send" class="btn btn-primary" disabled>Send my answer</button>
+          <p class="helper-small">We save only your answer and comment. Please leave out names.</p>
+          <p id="fb-status" class="helper-small" role="status"></p>
+        </section>
         <div id="save-zone" class="save-zone" hidden>
           <button type="button" id="save-start" class="btn btn-quiet btn-block">
             <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg> Save my progress
@@ -1109,6 +1121,8 @@
       <symbol id="i-card" viewBox="0 0 24 24"><path d="M4 4h16v16H4zm2 2v12h12V6zm2 2h8v2H8zm0 4h8v2H8zm0 4h5v2H8z" fill="currentColor"/></symbol>
       <symbol id="i-note" viewBox="0 0 24 24"><path d="M4 4h16v11l-5 5H4zm2 2v12h8v-4h4V6zm2 2h8v2H8zm0 4h6v2H8z" fill="currentColor"/></symbol>
       <symbol id="i-send" viewBox="0 0 24 24"><path d="M3 20.5 21 12 3 3.5V10l12 2-12 2z" fill="currentColor"/></symbol>
+      <symbol id="i-thumb-up" viewBox="0 0 24 24"><path d="M2 10h4v11H2zm6 11V10l5-8 1.2.8a2 2 0 0 1 .8 2.2L14 9h6a2 2 0 0 1 2 2.3l-1.3 8A2 2 0 0 1 18.7 21z" fill="currentColor"/></symbol>
+      <symbol id="i-thumb-down" viewBox="0 0 24 24"><path d="M22 14h-4V3h4zm-6-11v11l-5 8-1.2-.8a2 2 0 0 1-.8-2.2L10 15H4a2 2 0 0 1-2-2.3l1.3-8A2 2 0 0 1 5.3 3z" fill="currentColor"/></symbol>
       <symbol id="i-copy" viewBox="0 0 24 24"><path d="M8 3h11a1 1 0 0 1 1 1v13h-2V5H8zM4 7h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zm1 2v10h9V9z" fill="currentColor"/></symbol>
       <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 1 6 6v4l2 3v1H4v-1l2-3V9a6 6 0 0 1 6-6zm-2.5 15h5a2.5 2.5 0 0 1-5 0z" fill="currentColor"/></symbol>
       <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z" fill="currentColor"/></symbol>
