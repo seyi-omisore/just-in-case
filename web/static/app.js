@@ -652,6 +652,13 @@
         a.append(icon("info"), document.createTextNode("Website")); links.appendChild(a);
       }
       if (links.childNodes.length) panel.appendChild(links);
+      if (item.route === "service" && plan.report_email) {   // opens the person's own email app; nothing is sent for them
+        const rp = el("a", "report-link");
+        rp.href = "mailto:" + plan.report_email + "?subject=" + encodeURIComponent("Problem with a service: " + item.name) +
+          "&body=" + encodeURIComponent(`Service: ${item.name}\nWhat's wrong (for example, a wrong number or it has closed):\n\n`);
+        rp.append(icon("alert"), document.createTextNode("Report a problem with this service"));
+        panel.appendChild(rp);
+      }
       const checked = checkedLabel(item.checked);
       if (checked) { const c = el("p", "tag-checked"); c.append(icon("check"), document.createTextNode(checked)); panel.appendChild(c); }
       if (item.need === "mail_while_away") {

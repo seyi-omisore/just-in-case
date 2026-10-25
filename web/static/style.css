@@ -1613,3 +1613,5 @@ a.menu-home:is(:link, :visited), a.demo-exit:is(:link, :visited), .footer-help a
 .fb-comment { width: 100%; min-width: 0; box-sizing: border-box; font: inherit; padding: .5rem; border: 2px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); }
 .feedback .btn-primary { justify-self: start; min-height: 48px; }
 .feedback .helper-small { margin: 0; }
+.report-link { display: inline-flex; align-items: center; gap: .35rem; min-height: 48px; font-size: .88rem; color: var(--ink-soft); }
+.report-link .icon { flex: 0 0 auto; }

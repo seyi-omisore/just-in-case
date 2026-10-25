@@ -1690,3 +1690,15 @@ def test_was_this_helpful_saves_only_the_answer_and_comment(tmp_path, monkeypatc
     assert 'If you answer "Was this helpful?", we save only that answer and your comment' in page   # privacy page
     js = client.get("/static/app.js").text
     assert 'body: JSON.stringify({ helpful: fbAnswer, comment: $("fb-comment").value.trim() })' in js
+
+
+def test_report_a_problem_opens_email_to_a_clearly_marked_placeholder():
+    from just_in_case.config import REPORT_EMAIL
+    assert REPORT_EMAIL == "REPLACE-ME-team-email@example.com"           # placeholder until the team picks one
+    with client.websocket_connect("/ws") as ws:
+        *_, plan = ruth_flow(ws)
+    assert plan["report_email"] == REPORT_EMAIL
+    js = client.get("/static/app.js").text
+    assert 'if (item.route === "service" && plan.report_email) {' in js
+    assert 'encodeURIComponent("Problem with a service: " + item.name)' in js
+    assert "Report a problem with this service" in js

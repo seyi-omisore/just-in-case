@@ -29,7 +29,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from just_in_case.config import DATA_DIR, OUTPUT_DIR
-from just_in_case.config import AGENT_NAME, has_ai_key
+from just_in_case.config import AGENT_NAME, REPORT_EMAIL, has_ai_key
 from just_in_case.prompts import GREETING
 from just_in_case.why import why_this
 from just_in_case.card import plan_email_text
@@ -235,6 +235,7 @@ class Session:
                              "invite_subject": INVITE_SUBJECT, "reminder_subject": REMINDER_SUBJECT},
             "card": f"/card/{self.id}" if state.card_path else None,
             "wallet": f"/wallet/{self.id}" if state.card_path else None,
+            "report_email": REPORT_EMAIL,
             # "Email my plan": plain text for the person's own email app. No medications or allergies.
             "plan_email": plan_email_text(state, d) if any(i.user_ok for i in state.items) else None,
             "plan_print": f"/plan/{self.id}" if state.items else None,
