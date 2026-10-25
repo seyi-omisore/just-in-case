@@ -737,6 +737,11 @@
         }
         panel.appendChild(pb);
       }
+      const tl = plan.timeline;   // a part tied to the dated event: its own "Add to calendar"
+      if (tl && tl.date && item.user_ok && item.route !== "blank" && (tl.steps || []).some((x) => x.need === item.need)
+          && isoToLocal(tl.date) >= new Date(new Date().toDateString()))
+        panel.appendChild(calendarButton(`${item.need_label}: ${item.name}`, tl.date,
+          `Just in Case plan for your ${tl.label}: ${item.need_label}, ${item.name}.` + (item.phone && item.phone !== "see website" ? ` ${item.phone}` : "")));
       if (item.why_this) {   // "Why this?": one plain sentence, built from the services list and the person's answers
         const d = el("details", "more why-this");
         d.append(el("summary", null, "Why this?"), el("p", null, item.why_this));
@@ -964,8 +969,8 @@
   });
   function calendarButton(title, iso, details) {
     const b = el("button", "btn btn-quiet btn-small cal-btn"); b.type = "button";
-    b.append(icon("calendar"), document.createTextNode("Add to my calendar"));
-    b.setAttribute("aria-label", `Add to my calendar: ${title}, ${dayWords(iso)}`);
+    b.append(icon("calendar"), document.createTextNode("Add to calendar"));
+    b.setAttribute("aria-label", `Add to calendar: ${title}, ${dayWords(iso)}`);
     b.onclick = () => {
       const url = URL.createObjectURL(new Blob([makeICS(title, iso, details)], { type: "text/calendar" }));
       const a = el("a"); a.href = url;
@@ -998,6 +1003,56 @@
     if (date.getMonth() !== m - 1 || date.getDate() !== d) return null;  // like "2/31"
     return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
   }
+
+  // ---- Date and time pickers: tap the calendar or clock, or type it -----------------
+  // Each button opens the device's own picker. Typing still works, and nothing is sent anywhere.
+  const SHORT_MONTHS = MONTHS.map((m) => m.slice(0, 3));
+  const isoFromLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  function timeTo24(text) {   // "3 pm" -> "15:00", for the picker to start from
+    const m = /(\d{1,2})(?::(\d{2}))?\s*([ap])?\.?\s*m?/i.exec(String(text || ""));
+    if (!m) return "";
+    let h = +m[1]; const min = m[2] || "00", ap = (m[3] || "").toLowerCase();
+    if (ap === "p" && h < 12) h += 12; if (ap === "a" && h === 12) h = 0;
+    return h <= 23 ? `${String(h).padStart(2, "0")}:${min}` : "";
+  }
+  function timeWords(v) {   // "15:00" -> "3:00 PM"
+    const [h, m] = v.split(":").map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+  }
+  function openPicker(native, fallbackShow) {
+    try { if (native.showPicker) { native.showPicker(); return; } } catch (_) {}
+    fallbackShow(); native.focus();   // no picker on this browser: show the date box itself
+  }
+  function addPicker(input, kind) {
+    const wrap = el("span", "pick-row"); input.replaceWith(wrap); wrap.appendChild(input);
+    const btn = el("button", "pick-btn"); btn.type = "button";
+    btn.append(icon(kind === "time" ? "clock" : "calendar"));
+    btn.setAttribute("aria-label", kind === "time" ? "Pick a time" : "Pick a date from a calendar");
+    btn.title = kind === "time" ? "Pick a time" : "Pick a date";
+    if (input.type === "date") {   // already a date box: the button just opens its calendar
+      btn.onclick = () => openPicker(input, () => {});
+      wrap.appendChild(btn); return;
+    }
+    const native = el("input", "pick-native"); native.type = kind; native.tabIndex = -1; native.setAttribute("aria-hidden", "true");
+    native.addEventListener("change", () => {
+      if (!native.value) return;
+      input.value = kind === "time" ? timeWords(native.value)
+        : (() => { const d = isoToLocal(native.value); return `${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; })();
+      native.classList.remove("pick-open"); native.tabIndex = -1; native.setAttribute("aria-hidden", "true");
+      input.dispatchEvent(new Event("input", { bubbles: true })); input.dispatchEvent(new Event("change", { bubbles: true }));
+      input.focus();
+    });
+    btn.onclick = () => {
+      native.value = kind === "time" ? timeTo24(input.value) : (readTaskDate(input.value) || "");
+      openPicker(native, () => { native.classList.add("pick-open"); native.tabIndex = 0; native.removeAttribute("aria-hidden"); });
+    };
+    wrap.append(btn, native);
+  }
+  addPicker($("event-date"), "date");
+  addPicker($("pc-date"), "date");
+  addPicker($("pc-time"), "time");
+  addPicker($("task-form").elements.date, "date");
+  addPicker($("task-form").elements.time, "time");
 
   $("event-date").addEventListener("change", (e) => {
     $("timeline-error").textContent = "";
@@ -2089,8 +2144,8 @@
         for (const c of n.choices) {
           const b = smallBtn("person", `Choose ${c.name}`, () => ws.send(JSON.stringify({ type: "choose_helper", task_id: n.task_id, offer_id: c.offer_id })), c.fits);
           b.setAttribute("aria-label", `Choose ${c.name}. ${c.works}${c.fits ? "" : " This time may not fit."}`);
-          row.appendChild(b);
           row.appendChild(el("p", "helper-small news-choice", c.works + (c.fits ? "" : " This time may not fit.") + (c.note ? ` “${c.note}”` : "")));
+          row.appendChild(b);
         }
       } else if (n.kind === "mismatch") {
         row.appendChild(smallBtn("people", "Ask someone else", () => {

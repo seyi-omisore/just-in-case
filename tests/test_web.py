@@ -2119,3 +2119,36 @@ def test_ruths_example_has_two_friends_reply_with_different_times():
         ws.send_json({"type": "save"})
         assert client.get(f"/api/share/{sid}").json()["tasks"][0]["person"] == ""
         ws.send_json({"type": "share_delete"})
+
+
+# ---- Round 13, Part 4: calendar and clock buttons for dates --------------------------
+
+def test_every_date_and_time_box_has_a_picker_button_and_typing_still_works():
+    js = client.get("/static/app.js").text
+    for call in ('addPicker($("event-date"), "date")', 'addPicker($("pc-date"), "date")', 'addPicker($("pc-time"), "time")',
+                 'addPicker($("task-form").elements.date, "date")', 'addPicker($("task-form").elements.time, "time")'):
+        assert call in js
+    block = js[js.index("function addPicker"):js.index('addPicker($("event-date")')]
+    assert 'el("button", "pick-btn"); btn.type = "button"' in block                     # a real button: keyboard works
+    assert '"Pick a date from a calendar"' in block and '"Pick a time"' in block
+    assert "native.showPicker()" in js and "fallbackShow(); native.focus();" in js       # older browsers: the box itself
+    assert "fetch(" not in block and "ws.send" not in block
+    # A picked date is written so the helper table can read it back for calendar files.
+    assert "`${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`" in block
+    from datetime import date
+    from just_in_case.invites import read_task_date
+    assert read_task_date("Nov 24, 2026", date(2026, 10, 1)) == date(2026, 11, 24)
+    from just_in_case.availability import part_of_day
+    assert part_of_day("3:00 PM") == "afternoons"                                         # and a picked time, too
+    css = client.get("/static/style.css").text
+    assert ".pick-btn { flex: 0 0 auto; width: 48px; height: 48px;" in css
+    assert 'id="i-clock"' in client.get("/").text
+
+
+def test_dated_items_show_add_to_calendar():
+    js = client.get("/static/app.js").text
+    assert 'document.createTextNode("Add to calendar")' in js
+    plan_part = js[js.index("a part tied to the dated event"):js.index('if (item.why_this)')]
+    assert "calendarButton(" in plan_part                                                  # plan parts
+    assert "calendarButton(s.text, s.date" in js                                           # timeline steps
+    assert "box.appendChild(calendarButton(t.task, iso" in js                              # helper list rows

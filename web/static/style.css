@@ -719,7 +719,7 @@ a[href^="tel:"] { white-space: nowrap; }
 
 /* ---- Sharing ------------------------------------------------------------ */
 .share-zone { margin-top: 1rem; padding-top: 1rem; border-top: 2px dashed var(--line); }
-.share-box { display: grid; gap: .65rem; padding: .9rem; border-radius: 16px; background: var(--purple-tint); border: 2px solid var(--purple); }
+.share-box { display: grid; grid-template-columns: minmax(0, 1fr); gap: .65rem; padding: .9rem; border-radius: 16px; background: var(--purple-tint); border: 2px solid var(--purple); }
 .share-box-title { display: flex; gap: .5rem; align-items: center; font-weight: 700; font-size: 1.05rem; }
 .share-link-row { display: flex; gap: .5rem; }
 .share-link-row input {
@@ -1725,3 +1725,18 @@ html[data-ai="off"] .when-ai, html[data-ai="on"] .when-no-ai { display: none !im
 .news-note, .news-backup { width: 100%; margin: .2rem 0 0; }
 #thanks-drafts { margin-top: .6rem; }
 .attention-item > .news-actions, .attention-item > .news-note, .attention-item > .news-backup { grid-column: 2; width: auto; }
+
+/* ---- Date and time pickers (Round 13) ---- */
+.pick-row { position: relative; display: flex; gap: .4rem; align-items: center; min-width: 0; }
+.pick-row > input:not(.pick-native) { flex: 1 1 auto; min-width: 0; }
+.pick-btn { flex: 0 0 auto; width: 48px; height: 48px; display: inline-grid; place-items: center; padding: 0; cursor: pointer;
+  border: 2px solid var(--ink-soft); border-radius: 12px; background: var(--paper); color: var(--primary); }
+.pick-btn .icon { width: 1.4rem; height: 1.4rem; }
+.pick-btn:hover { background: var(--wall); }
+.pick-btn:focus-visible { outline: 3px solid var(--focus, var(--primary)); outline-offset: 2px; }
+.pick-native { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+.pick-native.pick-open { position: static; width: auto; height: 48px; opacity: 1; pointer-events: auto; font: inherit;
+  border: 2px solid var(--ink-soft); border-radius: 12px; background: var(--paper); color: var(--ink); padding: 0 .5rem; }
+html[data-theme="contrast"] .pick-btn { border-color: var(--ink); color: var(--ink); }
+/* One calendar button, not two: our big button replaces the browser's small one inside the box. */
+.pick-row > input[type="date"]:not(.pick-native)::-webkit-calendar-picker-indicator { display: none; }
