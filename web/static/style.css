@@ -1617,5 +1617,5 @@ a.menu-home:is(:link, :visited), a.demo-exit:is(:link, :visited), .footer-help a
 .report-link .icon { flex: 0 0 auto; }
 .delete-zone { margin-top: 1rem; padding-top: .8rem; border-top: 2px solid var(--line); display: grid; gap: .4rem; }
 .delete-zone .helper-small { margin: 0; }
-.delete-zone .btn-stop { border-color: var(--alert-icon); color: var(--ink); }
+.settings-dialog .delete-zone .btn.btn-stop { border-color: var(--alert-icon); color: var(--ink); }
 .delete-zone .btn-stop .icon { color: var(--alert-icon); }
