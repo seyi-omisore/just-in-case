@@ -1797,3 +1797,10 @@ def test_night_before_print_page_and_buttons():
     js = client.get("/static/app.js").text
     assert 'if ("speechSynthesis" in window) box.push(readAloudButton(text));' in js
     assert 'calendarButton("The night before: my summary", nb.date' in js
+
+
+def test_ruths_example_shows_round_12_and_still_reaches_the_end():
+    js = client.get("/static/app.js").text
+    assert 'target: () => $("attention"), done: () => story.card },' in js
+    assert 'show: () => { $("night-preview").open = true; }, target: () => $("night-preview"), done: () => story.summary },' in js
+    assert 'target: () => $("pc-open"), done: () => $("review-mark").hidden },' in js
