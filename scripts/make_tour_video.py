@@ -165,16 +165,28 @@ class Tour:
     def hold(self, seconds: float = HOLD):
         self.page.wait_for_timeout(int(seconds * 1000))
 
+    REVEAL = "e => { for (let d = e; d; d = d.parentElement) if (d.tagName === 'DETAILS' && !d.open) d.open = true; }"
+
+    def reveal(self, selector: str, timeout: float = 30):
+        """Open any closed drop-down section around the element, so it can be seen and tapped."""
+        target = self.app.locator(selector).first
+        target.wait_for(state="attached", timeout=timeout * 1000)
+        target.evaluate(self.REVEAL)
+
     def wait(self, selector: str, timeout: float = 30):
+        self.reveal(selector, timeout)
         self.app.locator(selector).first.wait_for(state="visible", timeout=timeout * 1000)
 
     def calm_scroll(self, selector: str):
+        self.reveal(selector)
         self.app.locator(selector).first.evaluate("e => e.scrollIntoView({ behavior: 'smooth', block: 'center' })")
         self.page.wait_for_timeout(900)
 
     def tap(self, selector: str):
         """A soft circle where the finger goes, then the tap."""
         target = self.app.locator(selector).first
+        if target.count():
+            target.evaluate(self.REVEAL)
         if not target.is_visible():  # Ruth's example may have tapped her first sentence by itself already
             return
         target.scroll_into_view_if_needed()
@@ -188,7 +200,8 @@ class Tour:
         """Tap the ringed Yes on each checkpoint until `done` (a selector) shows. Not part of the video."""
         end = time.monotonic() + timeout
         while time.monotonic() < end:
-            if self.app.locator(done).first.is_visible():
+            shown = self.app.locator(done).first
+            if shown.count() and shown.evaluate("e => !e.hidden"):   # it may sit in a closed drop-down section
                 return
             ring = self.app.locator(".slip-actions .btn-primary.story-next")
             if ring.count() and ring.first.is_visible():
@@ -297,6 +310,7 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
         tour.app.locator("#card-close").click()
         tour.snap(wait=2)                          # "My plans changed"
         tour.story_next()                          # her last step: marking the plan reviewed
+        tour.reveal("#review-mark")
         tour.app.locator("#review-mark").click()
         tour.wait("#story-own")
         with tour.moment(captions[8]):            # the end of Ruth's story

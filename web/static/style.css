@@ -1651,3 +1651,32 @@ html[data-ai="off"] .when-ai, html[data-ai="on"] .when-no-ai { display: none !im
 .footer-contact li { display: flex; flex-wrap: wrap; align-items: center; gap: 0 .6rem; }
 .footer-contact .contact-name { font-weight: 700; color: var(--ink); flex: 1 1 100%; }
 .footer-contact a { display: inline-flex; align-items: center; min-height: 48px; padding: 0 .2rem; font-weight: 700; }
+
+/* ---- Drop-down sections on the plan side: short by default, every feature kept ---- */
+.fold { margin: .8rem 0; border: 2px solid var(--line); border-radius: 16px; background: var(--enamel); }
+.fold[hidden] { display: none; }
+.fold > summary.fold-head {
+  list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .6rem;
+  min-height: 56px; padding: .55rem .9rem; border-radius: 14px;
+}
+.fold > summary.fold-head::-webkit-details-marker { display: none; }
+.fold > summary.fold-head:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.fold-title { flex: 1 1 0; min-width: 0; margin: 0; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: .45rem; }
+.fold-word { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto; flex: 0 0 auto; font-weight: 700; color: var(--primary); }
+.fold-word::before { content: "Show"; }
+.fold[open] > summary .fold-word::before { content: "Hide"; }
+.fold-word::after {   /* the same arrow as the other drop-downs on the page */
+  content: ""; flex: 0 0 auto; box-sizing: content-box; width: .55rem; height: .55rem;
+  border-right: 3px solid currentColor; border-bottom: 3px solid currentColor;
+  transform: rotate(45deg) translateY(-3px);
+}
+.fold[open] > summary .fold-word::after { transform: rotate(225deg) translateY(-3px); }
+.fold-sum { order: 3; flex: 1 1 100%; color: var(--ink-soft); font-size: .92rem; font-weight: 400; }
+.fold-sum:empty { display: none; }
+.fold-body { padding: 0 .9rem .9rem; }
+#fold-ready .getting-ready > h3 { display: none; }           /* the section title already says "Getting ready" */
+.helpers > .fold, .activity > .fold { margin-top: .4rem; }
+.quick-bar { display: flex; flex-wrap: wrap; gap: .5rem; margin: .6rem 0 .2rem; }
+.quick-bar[hidden] { display: none; }
+.quick-btn { flex: 1 1 11rem; min-height: 48px; justify-content: center; }
+@media (prefers-reduced-motion: no-preference) { .fold-word::after { transition: transform .2s ease; } }

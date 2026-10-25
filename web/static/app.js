@@ -588,6 +588,54 @@
   $("review-mark").addEventListener("click", () => sendReview("mark"));
   $("review-undo").addEventListener("click", () => sendReview("undo"));
 
+  // ---- Drop-down sections: the plan side stays short. Every feature is still here. ----
+  // reveal() opens any closed section around an element, so buttons and the story can always reach it.
+  function reveal(node) {
+    for (let d = node; d; d = d.parentElement) if (d.tagName === "DETAILS" && !d.open) d.open = true;
+  }
+  const FOLDS_KEY = "jic-folds";   // which sections were open, in this browser only
+  const folds = [...document.querySelectorAll("details.fold")];
+  try {
+    const saved = JSON.parse(localStorage.getItem(FOLDS_KEY) || "{}");
+    for (const f of folds) if (f.id in saved) f.open = !!saved[f.id];
+  } catch (_) {}
+  for (const f of folds) f.addEventListener("toggle", () => {
+    try { localStorage.setItem(FOLDS_KEY, JSON.stringify(Object.fromEntries(folds.map((x) => [x.id, x.open])))); } catch (_) {}
+  });
+  let foldItems = 0;
+  function updateFolds(plan) {
+    const tasks = plan.tasks || [];
+    // My plan: opens by itself when a new part arrives, so nothing new is ever hidden.
+    if (plan.items.length > foldItems) $("fold-plan").open = true;
+    foldItems = plan.items.length;
+    const p = plan.progress || {};
+    $("fold-plan-sum").textContent = p.total ? `${p.covered} of ${p.total} covered` : (plan.items.length ? "In progress" : "");
+    // Getting ready: the timeline and "Keep your plan current".
+    $("fold-ready").hidden = $("getting-ready").hidden && $("review-box").hidden;
+    const tl = plan.timeline || {};
+    $("fold-ready-sum").textContent = tl.date ? dayWords(tl.date) + (tl.countdown ? " \u00b7 " + tl.countdown : "") : "Pick your date";
+    // Who's helping: a count and the latest status.
+    const invited = tasks.filter((t) => taskStatus(t) === "invited").length;
+    const confirmed = tasks.filter((t) => taskStatus(t) === "confirmed").length;
+    $("fold-helpers-sum").textContent = !tasks.length ? "No helpers yet" :
+      [`${tasks.length} ${tasks.length === 1 ? "task" : "tasks"}`, invited ? `${invited} invited` : "", confirmed ? `${confirmed} confirmed` : ""]
+        .filter(Boolean).join(" \u00b7 ");
+    // Print and share: hidden until there is something to print or share.
+    const printables = ["card-link", "wallet-print", "plan-print", "plan-email", "summary-print", "save-zone", "feedback"];
+    $("fold-print").hidden = printables.every((id) => $(id).hidden);
+    $("fold-print-sum").textContent = plan.card ? "Your fridge card is ready" : "Print, email, or save your plan";
+    // Quick buttons at the top, so the most used things are one tap away.
+    $("qb-card").hidden = !plan.card;
+    $("qb-print").hidden = $("fold-print").hidden;
+    $("quick-bar").hidden = $("qb-card").hidden && $("qb-print").hidden;
+  }
+  $("qb-card").addEventListener("click", () => $("card-link").click());
+  $("qb-print").addEventListener("click", () => {
+    reveal($("fold-print"));
+    $("fold-print").scrollIntoView({ block: "start" });
+    $("fold-print").querySelector("summary").focus({ preventScroll: true });
+  });
+
   function renderPlan(plan) {
     // Until something is in the plan, the side shows one friendly line (and the support lines, always).
     $("side").classList.toggle("plan-empty", !plan.items.length && !(plan.tasks || []).length);
@@ -717,6 +765,7 @@
     planEmail = plan.plan_email; $("plan-email").hidden = !plan.plan_email;
     renderAttention(plan);
     renderNight(plan);
+    updateFolds(plan);
     $("feedback").hidden = EXAMPLE || !plan.plan_email;   // at the end, once something is in the plan (not in Ruth's example)
     summaryUrl = plan.summary_print;
     $("summary-print").hidden = !plan.summary_available;   // only after something is in the plan, and only if you ask
@@ -740,7 +789,7 @@
   }
   $("show-table").addEventListener("click", () => {
     showTableAnyway = true; $("services-only").hidden = true; $("helper-body").hidden = false;
-    $("helper-more").open = true;
+    reveal($("helper-more"));
     form.elements.task.focus();
   });
 
@@ -863,7 +912,7 @@
     const close = el("button", "btn btn-quiet btn-small"); close.type = "button"; close.textContent = "Done";
     close.onclick = () => { box.hidden = true; box.replaceChildren(); };
     box.appendChild(close);
-    box.scrollIntoView({ block: "start" });
+    reveal(box); box.scrollIntoView({ block: "start" });
   }
   // A standard .ics file, made here in the browser. No calendar account is touched,
   // nothing goes to our server, and there is no alarm: the user's calendar decides.
@@ -1355,7 +1404,7 @@
   }
   function startEdit(t) {
     editingId = t.id;
-    $("helper-more").open = true;
+    reveal($("helper-more"));
     for (const k of ["task", "person", "date", "time"]) form.elements[k].value = t[k] || "";
     form.elements.contact.value = contacts.get(t.id) || "";
     $("task-form-title").textContent = "Change this row";
@@ -1746,7 +1795,7 @@
         b = el("button", "btn btn-quiet btn-small attention-btn"); b.type = "button";
         b.onclick = () => {
           if (a.kind === "unconfirmed") {   // the Round 10 send panel, with the reminder draft
-            $("helper-more").open = true;
+            reveal($("helper-more"));
             openInvite = { id: a.task_id, kind: "reminder", text: null, focus: true };
             renderTasks(lastPlanForInvites);
             const row = [...document.querySelectorAll("#helper-rows .invite-panel")][0];
@@ -1762,6 +1811,7 @@
   function openPlanPart(need) {
     const tag = planEl.querySelector(`.tag[data-need="${need}"]`);
     if (tag) {
+      reveal(tag);
       const head = tag.querySelector(".tag-head");
       if (head.getAttribute("aria-expanded") === "false") head.click();
       tag.scrollIntoView({ block: "center" }); head.focus({ preventScroll: true });
@@ -1801,9 +1851,9 @@
       show: () => { lastPage(); const d = $("event-date"); if (!d.value) { d.value = isoIn(30); d.dispatchEvent(new Event("change")); } },
       target: () => document.querySelector("#steps .cal-btn") || $("getting-ready") },
     { text: "Doris will check in on Ruth. Her row in the helper table says \u201cSomeone's helping.\u201d", next: true,
-      show: () => { $("helper-more").open = true; }, target: () => document.querySelector("#helper-rows .status-helping") },
+      show: () => { reveal($("helper-more")); }, target: () => document.querySelector("#helper-rows .status-helping") },
     { text: `Ruth taps Invite. ${AGENT} writes a warm message, and she sends it from her own phone or email.`, next: true,
-      show: () => { $("helper-more").open = true; },
+      show: () => { reveal($("helper-more")); },
       target: () => document.querySelector("#helper-rows .send-row .send-btn") || document.querySelector("#helper-rows .invite-btn") },
     { text: "Her next step card has Call now. When the ride is booked, she taps Done.", target: () => $("next-done"), done: () => story.done },
     { text: "Ruth says yes to the rest of her plan.", target: () => yesOn(), done: () => !planEl.querySelector(".tag-answer") },
@@ -1839,7 +1889,7 @@
     if (t !== story.mark) {
       if (story.mark) story.mark.classList.remove("story-next");
       story.mark = t;
-      if (t) { t.classList.add("story-next"); t.scrollIntoView({ block: "center" }); }
+      if (t) { reveal(t); t.classList.add("story-next"); t.scrollIntoView({ block: "center" }); }
     }
   }
   $("story-next").addEventListener("click", () => { story.at = Math.min(story.at + 1, STORY.length - 1); storyTick(); });

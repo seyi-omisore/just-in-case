@@ -685,6 +685,13 @@
           <ul id="attention-list" class="attention-list"></ul>
           <p id="attention-ok" class="attention-ok" hidden><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> <span id="attention-ok-text"></span></p>
         </section>
+        <div id="quick-bar" class="quick-bar" hidden>
+          <button type="button" id="qb-card" class="btn btn-primary quick-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-card"/></svg> See my fridge card</button>
+          <button type="button" id="qb-print" class="btn btn-quiet quick-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-note"/></svg> Print and share</button>
+        </div>
+        <details id="fold-plan" class="fold" open>
+          <summary class="fold-head"><span class="fold-title">My plan</span><span class="fold-sum" id="fold-plan-sum"></span><span class="fold-word" aria-hidden="true"></span></summary>
+          <div class="fold-body">
         <section id="next-step" class="next-step" aria-labelledby="next-step-title" hidden>
           <h3 id="next-step-title" class="next-step-title"><svg class="icon" aria-hidden="true"><use href="#i-bolt"/></svg> Your next step</h3>
           <svg id="next-ill" class="ill scene next-ill" viewBox="0 0 240 120" role="img" aria-label="" hidden><use href="#ill-clinic"/></svg>
@@ -738,6 +745,12 @@
         </p>
         <p id="fridge-empty" class="fridge-empty"><svg class="icon" aria-hidden="true"><use href="#i-chat"/></svg> <span>Your plan will appear here as we talk.</span></p>
         <ul id="plan" class="plan"></ul>
+        <div id="notes"></div>
+          </div>
+        </details>
+        <details id="fold-ready" class="fold">
+          <summary class="fold-head"><span class="fold-title">Getting ready</span><span class="fold-sum" id="fold-ready-sum"></span><span class="fold-word" aria-hidden="true"></span></summary>
+          <div class="fold-body">
         <section id="review-box" class="review-box" aria-labelledby="review-title" hidden>
           <h3 id="review-title" class="review-title"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Keep your plan current</h3>
           <p id="review-text" class="review-text"></p>
@@ -808,7 +821,11 @@
             <div id="day-before-cal"></div>
           </div>
         </section>
-        <div id="notes"></div>
+          </div>
+        </details>
+        <details id="fold-print" class="fold">
+          <summary class="fold-head"><span class="fold-title">Print and share</span><span class="fold-sum" id="fold-print-sum"></span><span class="fold-word" aria-hidden="true"></span></summary>
+          <div class="fold-body">
         <button type="button" id="card-link" class="btn btn-card" hidden>
           <svg class="icon" aria-hidden="true"><use href="#i-card"/></svg>
           See your fridge card
@@ -849,13 +866,11 @@
           </div>
           <p class="helper-small">Saved only in this browser, on this device. Anyone who uses this device could open it.</p>
         </div>
+          </div>
+        </details>
       </section>
 
       <section class="helpers" aria-labelledby="helpers-title">
-        <h2 id="helpers-title">
-          <svg class="icon" aria-hidden="true"><use href="#i-person"/></svg>
-          Who's helping
-        </h2>
         <div id="notices-wrap" class="notices-wrap" hidden>
           <p class="notice-911">
             <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg>
@@ -863,6 +878,9 @@
           </p>
           <div id="notices" class="notices" role="status"></div>
         </div>
+        <details id="fold-helpers" class="fold">
+          <summary class="fold-head"><h2 id="helpers-title" class="fold-title"><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> Who's helping</h2><span class="fold-sum" id="fold-helpers-sum"></span><span class="fold-word" aria-hidden="true"></span></summary>
+          <div class="fold-body">
         <div id="services-only" class="services-only" hidden>
           <p class="services-only-title">
             <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
@@ -950,6 +968,8 @@
           </div>
         </div>
         </div>
+          </div>
+        </details>
       </section>
 
       <details id="support" class="helper-box support-box">
@@ -991,8 +1011,10 @@
       </details>
 
       <section class="activity" aria-labelledby="activity-title">
-        <h2 id="activity-title">What {{AGENT_NAME}} is doing</h2>
-        <ol id="feed" class="feed" aria-live="polite"></ol>
+        <details id="fold-activity" class="fold">
+          <summary class="fold-head"><h2 id="activity-title" class="fold-title">What {{AGENT_NAME}} is doing</h2><span class="fold-word" aria-hidden="true"></span></summary>
+          <ol id="feed" class="feed" aria-live="polite"></ol>
+        </details>
       </section>
     </aside>
     <section id="story-guide" class="story-guide" aria-labelledby="story-count" aria-live="polite" hidden>

@@ -906,7 +906,7 @@ def test_helper_table_download_and_print_are_behind_more_options():
         assert part in more
     assert 'id="share-open"' not in more                                         # sharing stays in view
     js = client.get("/static/app.js").text
-    assert '$("helper-more").open = true' in js and 'id="helper-count"' in page   # tasks are counted on the label
+    assert 'reveal($("helper-more"));' in js and 'id="helper-count"' in page   # tasks are counted on the label
 
 
 def test_your_plan_waits_for_its_first_item_and_988_never_hides():
@@ -1931,3 +1931,27 @@ def test_when_the_daily_limit_is_reached_the_guided_planner_takes_over_and_keeps
         assert until(ws, "hello")["mode"] == "guided"
     js = client.get("/static/app.js").text
     assert 'case "mode":' in js
+
+
+# ---- Round 13: a shorter plan side, with every feature kept -------------------
+
+def test_plan_side_uses_labeled_drop_downs_and_keeps_every_feature():
+    page = client.get("/").text
+    side = page[page.index('<aside id="side"'):page.index("</aside>")]
+    assert '<details id="fold-plan" class="fold" open>' in side                     # My plan starts open
+    for fold_id in ("fold-ready", "fold-print", "fold-helpers", "fold-activity"):
+        assert f'<details id="{fold_id}" class="fold">' in side                        # the rest start closed
+    order = [side.index(f'id="{i}"') for i in ("attention", "quick-bar", "fold-plan", "plan", "notes", "fold-ready",
+                                                "getting-ready", "fold-print", "card-link", "wallet-print", "plan-print",
+                                                "plan-email", "summary-print", "feedback", "save-zone",
+                                                "notices-wrap", "fold-helpers", "helper-table", "share-open",
+                                                "fold-activity", "feed")]
+    assert order == sorted(order)                                                     # each feature sits in its section
+    assert side.count('<span class="fold-word" aria-hidden="true"></span>') == 5        # "Show" / "Hide" on every heading
+    css = client.get("/static/style.css").text
+    assert '.fold-word::before { content: "Show"; }' in css and '.fold[open] > summary .fold-word::before { content: "Hide"; }' in css
+    assert "min-height: 56px;" in css                                                # big headings to tap
+    js = client.get("/static/app.js").text
+    assert "if (t) { reveal(t); t.classList.add(\"story-next\");" in js               # the story opens the right section
+    assert "if (plan.items.length > foldItems) $(\"fold-plan\").open = true;" in js     # a new part is never hidden
+    assert '$("qb-card").addEventListener("click", () => $("card-link").click());' in js
