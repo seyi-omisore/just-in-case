@@ -1068,25 +1068,6 @@ def test_display_button_in_the_header_has_text_size_and_colors_and_settings_keep
     assert 'localStorage.setItem("jic-theme-v2", t)' in js and 'localStorage.setItem("jic-size"' in js   # remembered
 
 
-def test_ruths_example_tells_the_newer_features_in_order_and_never_taps_yes_for_you():
-    js = client.get("/static/app.js").text
-    story = js[js.index("const STORY = ["):js.index("function storyTick")]
-    order = ["Ruth taps a sentence", "one short question at a time", "sums up", "yes to her ride home", "calendar",
-             "Someone's helping", "Call now", "yes to the rest", "plan is ready", "fridge card", "readiness summary",
-             "marks her plan as reviewed"]
-    at = [story.index(w) for w in order]
-    assert at == sorted(at)                                                   # the story goes in this order
-    assert ".click()" not in story.replace('document.querySelector(".starter").click()', "").replace("head.click()", "")
-    assert ".slip-actions .btn-primary" in story and "story-next" in js     # yes buttons are ringed, never pressed
-    assert 'EXAMPLE) cb.checked = ["contacts", "allergies", "papers"]' in js  # her card lists allergies and papers
-    assert "Ruth's example is always Simple" in js
-    page = client.get("/").text
-    guide = page[page.index('id="story-guide"'):]
-    assert " hidden" in guide.split(">", 1)[0] and "position: fixed" not in client.get("/static/style.css").text.split("Ruth's example: a story card")[1]
-
-
-# ---- Round 7, part 2: Settings ---------------------------------------------------------
-
 def test_settings_has_three_collapsible_sections_with_the_current_choice_and_911_first():
     import re
     page = client.get("/").text
@@ -1298,8 +1279,11 @@ def test_ruths_example_is_named_and_reachable_from_home_and_about():
     page = client.get("/").text
     home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
     about = page[page.index('id="panel-about"'):page.index('id="panel-features"')]
-    assert '<a href="/?example=1#plan" class="btn btn-quiet home-link"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See Ruth\'s example</a>' in home
-    assert "See Ruth's example" in about and "See an example" not in page
+    story = '<a class="btn btn-quiet home-story" href="/?example=1#plan">'
+    assert story in home and home.index(story) < home.index('class="how-home"')    # above "How it works"
+    assert "See how Ruth used Just in Case" in home and "See how Ruth used Just in Case" in about
+    assert about.index("See how Ruth used Just in Case") < about.index('class="trust-checks"')   # above the lists
+    assert "See Ruth's example" not in page and "See an example" not in page
     assert 'href="#plan"' in home                                         # Make my plan starts the visitor's own plan
     js = client.get("/static/app.js").text
     assert "No AI is used" not in page + js and "with no AI" not in page          # no "no AI" labels on screen
@@ -1398,7 +1382,8 @@ def test_read_aloud_prefers_premium_and_enhanced_voices_and_keeps_the_users_choi
 def test_home_has_two_separate_buttons_that_stack_on_a_phone():
     page = client.get("/").text
     links = page[page.index('<div class="home-links">'):page.index("</div>", page.index('<div class="home-links">'))]
-    assert links.count('class="btn btn-quiet home-link"') == 2 and "#i-help" in links and "#i-play" in links
+    assert links.count('class="btn btn-quiet home-link"') == 1 and "#i-help" in links   # Ruth's story moved up (Round 14)
+    assert 'class="btn btn-quiet home-story"' in page
     css = client.get("/static/style.css").text
     assert ".home-link { min-height: 48px;" in css
     assert "@media (max-width: 560px) { .home-links { grid-template-columns: minmax(0, 1fr); } }" in css
@@ -1440,8 +1425,8 @@ def test_keep_family_in_the_loop_sits_below_support_and_comes_from_the_services_
 def test_home_points_new_visitors_to_the_about_page():
     page = client.get("/").text
     home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
-    assert ('<p class="about-pointer">New here? The <a href="#about">About page</a> has a 1-minute video, '
-            "answers to common questions, and Ruth's example.</p>") in home
+    assert ('<p class="about-pointer">New here? The <a href="#about">About page</a> has a short video, '
+            "answers to common questions, and Ruth's story.</p>") in home
     css = client.get("/static/style.css").text
     assert ".about-pointer a { display: inline-block; min-height: 48px;" in css   # tap target floor
 
@@ -1619,7 +1604,6 @@ def test_live_agent_prepares_the_message_and_the_page_opens_send_buttons():
 def test_ruths_example_and_the_tour_video_include_the_invite_step():
     import pathlib
     js = client.get("/static/app.js").text
-    assert "{ text: `Ruth taps Invite. ${AGENT} writes a warm message, and she sends it from her own phone or email.`" in js
     script = (pathlib.Path(__file__).resolve().parent.parent / "scripts" / "make_tour_video.py").read_text()
     assert '"Haven writes the invite. You send it."' in script
     assert 'tour.tap("#helper-rows .invite-btn")' in script and "captions[8]" in script
@@ -1734,12 +1718,6 @@ def test_delete_everything_removes_saved_plan_contacts_and_shared_lists():
     assert client.get(f"/api/share/{sid}").status_code == 404
 
 
-def test_ruths_example_shows_why_this_and_the_wallet_card():
-    js = client.get("/static/app.js").text
-    assert 'target: () => planEl.querySelector(".why-this summary"), done: () => story.card }' in js
-    assert '{ text: "She can print a wallet card too, with the same details.", next: true, target: () => $("wallet-print"), done: () => story.summary }' in js
-
-
 def test_plan_carries_what_needs_attention_and_the_page_shows_one_button_each():
     with client.websocket_connect("/ws") as ws:
         *_, plan = ruth_flow(ws)
@@ -1803,15 +1781,6 @@ def test_night_before_print_page_and_buttons():
     assert 'if ("speechSynthesis" in window) box.push(readAloudButton(text));' in js
     assert 'calendarButton("The night before: my summary", nb.date' in js
 
-
-def test_ruths_example_shows_round_12_and_still_reaches_the_end():
-    js = client.get("/static/app.js").text
-    assert 'target: () => $("attention"), done: () => story.card },' in js
-    assert 'show: () => { $("night-preview").open = true; }, target: () => $("night-preview"), done: () => story.summary },' in js
-    assert 'target: () => $("pc-open"), done: () => $("review-mark").hidden },' in js
-
-
-# ---- Quick fixes for the hosted demo -----------------------------------------
 
 def test_privacy_wording_follows_whether_this_visit_uses_the_ai(monkeypatch):
     import web.server as srv
@@ -1954,7 +1923,7 @@ def test_plan_side_uses_labeled_drop_downs_and_keeps_every_feature():
     assert '.fold-word::before { content: "Show"; }' in css and '.fold[open] > summary .fold-word::before { content: "Hide"; }' in css
     assert "min-height: 56px;" in css                                                # big headings to tap
     js = client.get("/static/app.js").text
-    assert "if (t) { reveal(t); t.classList.add(\"story-next\");" in js               # the story opens the right section
+    assert 'reveal(t); t.classList.add("story-next"); storyShow(t);' in js               # the story opens the right section
     assert "if (plan.items.length > foldItems) $(\"fold-plan\").open = true;" in js     # a new part is never hidden
     assert '$("qb-card").addEventListener("click", () => $("card-link").click());' in js
 
@@ -1998,14 +1967,6 @@ def test_each_person_gets_an_invite_they_can_edit_or_delete():
     assert '"Edit"' in block and '"Delete"' in block and 'confirm(`Delete ${p.name} from My people?' in block
     assert 'name="template"' in client.get("/").text                      # the saved invite can be changed
 
-
-def test_ruths_example_adds_two_people():
-    js = client.get("/static/app.js").text
-    story = js[js.index("const STORY = ["):js.index("function storyTick")]
-    assert 'addPerson("Doris", "neighbor", "")' in story and 'addPerson("Leo", "friend from church", "")' in story
-
-
-# ---- Round 13, Part 2: Invite my people -------------------------------------------
 
 def _invite_block():
     js = client.get("/static/app.js").text
@@ -2105,14 +2066,14 @@ def test_whats_new_sits_in_the_attention_card_and_every_button_waits_for_a_tap()
     assert "sendControls({" in thanks and "ws.send" not in thanks
 
 
-def test_ruths_example_has_two_friends_reply_with_different_times():
+def test_ruths_example_has_doris_reply_on_the_shared_list():
     from web.server import Session
     import inspect
     src = inspect.getsource(Session.example_replies)
     assert 'if self.mode != "example"' in src and "SHARES.claim(" in src       # only in Ruth's story, through the same code
     js = client.get("/static/app.js").text
-    story = js[js.index("const STORY = ["):js.index("function storyTick")]
-    assert 'type: "example_replies"' in story and "Leo's time fits" in story and "Doris is free mornings" in story
+    story = js[js.index("const MOMENTS = ["):js.index("function storyTick")]
+    assert 'type: "example_replies"' in story and "Doris signed up for mornings" in story
     with client.websocket_connect("/ws") as ws:                               # a visitor's own plan can't fake replies
         sid, _, _ = _shared_owner(ws, [{"task": "Drive me home"}])
         ws.send_json({"type": "example_replies"})
@@ -2180,3 +2141,47 @@ def test_every_move_starts_at_the_top_and_tips_sit_beside_their_target():
     tip = js[js.index("function showTip"):js.index("function startTour")]
     assert "above > below" in tip and 'tourTip.classList.add("tip-above")' in tip and "showTopThen(tourTip, tourTarget)" in tip
     assert "scrollIntoView" not in tip
+
+
+
+# ---- Round 14, Part 2: Ruth's story in five moments -------------------------------------
+
+def _moments():
+    js = client.get("/static/app.js").text
+    return js, js[js.index("const MOMENTS = ["):js.index("const END_WORDS")]
+
+
+def test_ruths_story_has_five_moments_in_her_own_words():
+    js, story = _moments()
+    titles = ['title: "The call"', 'title: "Telling " + AGENT', "title: `${AGENT} finds help`", 'title: "Friends reply"', 'title: "The night before"']
+    at = [story.index(t) for t in titles]
+    assert at == sorted(at) and story.count("title:") == 5
+    for words in ("My doctor says I need a procedure next month, and someone has to drive me home. I live alone. Who do I ask?",
+                  "I didn't have to ask anyone for a big favor.", "Doris signed up for mornings", "Home safe."):
+        assert words in story
+    assert 'const END_WORDS = "That\'s Ruth\'s story. Now make your own plan.";' in js
+    assert "${at + 1} of ${n}: ${mo.title}" in js                                  # "1 of 5: The call"
+    page = client.get("/").text
+    guide = page[page.index('id="story-guide"'):page.index("</section>", page.index('id="story-guide"'))]
+    for part in ('id="story-back"', 'id="story-next"', "Ruth is an example.", 'id="story-fill"', "Make my plan</a>", "Watch again</a>",
+                 'href="/?example=1#plan"'):
+        assert part in guide, part
+    assert page.index('id="story-guide"') < page.index('class="chat simple"')     # at the top of the plan screen
+
+
+def test_the_story_rings_each_tap_and_never_presses_it_for_ruth():
+    js, story = _moments()
+    assert ".click()" not in story and "requestSubmit" not in story.replace("storyRow(", "")
+    example = js[js.index("function exampleNext"):js.index("// ---- checkpoints")]
+    assert "input.value = hit[1];" in example and "send(" not in example           # typed in for her; the visitor taps Send
+    assert 'if (!shownBefore.startsWith(`${at}-`)) window.scrollTo({ top: 0, left: 0, behavior: "instant" });' in js   # each moment from the top
+    assert '$("story-next").disabled = waiting;' in js
+
+
+def test_home_safe_thank_you_note_passes_the_note_checks():
+    from just_in_case.invites import HOME_SAFE
+    from just_in_case.safeguards import check_helper_note
+    note = HOME_SAFE.replace("{name}", "Doris").replace("{task}", "feed Fifi in the morning")
+    assert check_helper_note(note) is None and note.startswith("Hi Doris,") and "home safe" in note
+    js, story = _moments()
+    assert "function homeSafe()" in js and "showThankYous(" in js[js.index("function homeSafe()"):js.index("const MOMENTS")]

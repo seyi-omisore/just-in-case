@@ -40,6 +40,10 @@ PEOPLE_REMINDER = (f"Hi {NAME_SLOT},\n\n"
                    "If it fits your schedule, you can add your name. If not, that's completely fine, "
                    "and there's no need to reply.")
 THANKS_SUBJECT = "Thank you"
+# After the event: "Home safe." A thank-you for a helper. The page fills in the name and the task.
+HOME_SAFE = (f"Hi {NAME_SLOT},\n\n"
+             f"I'm home safe. Thank you so much for helping with this: {TASK_SLOT}. It made a real difference.\n\n"
+             "No need to reply. I just wanted you to know.")
 
 
 def thank_you_text(name: str, task: str) -> str:

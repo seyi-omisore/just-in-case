@@ -170,6 +170,9 @@
         <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg> <span>Get help now<small>911, 988, and Mass 211</small></span>
       </a>
     </div>
+    <a class="btn btn-quiet home-story" href="/?example=1#plan">
+      <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> <span>See how Ruth used Just in Case</span>
+    </a>
     <section class="how-home" aria-labelledby="how-home-title">
       <h2 id="how-home-title" class="how-home-title">How it works</h2>
       <ol class="how-row">
@@ -185,9 +188,8 @@
     </p>
     <div class="home-links">
       <a href="#tour" class="btn btn-quiet home-link"><svg class="icon" aria-hidden="true"><use href="#i-help"/></svg> Show me how</a>
-      <a href="/?example=1#plan" class="btn btn-quiet home-link"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See Ruth's example</a>
     </div>
-    <p class="about-pointer">New here? The <a href="#about">About page</a> has a 1-minute video, answers to common questions, and Ruth's example.</p>
+    <p class="about-pointer">New here? The <a href="#about">About page</a> has a short video, answers to common questions, and Ruth's story.</p>
   </section>
 
   <section id="panel-help" class="panel help" data-panel="help" tabindex="-1" aria-labelledby="help-title" hidden>
@@ -214,7 +216,7 @@
             <svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg> Make my plan
           </a>
           <a id="example-open" class="btn btn-quiet btn-big" href="/?example=1#plan">
-            <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See Ruth's example
+            <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See how Ruth used Just in Case
           </a>
         </div>
         <ul class="trust-checks" aria-label="Our promises">
@@ -314,10 +316,10 @@
       <h2 id="ruth-title" class="section-title">Meet Ruth</h2>
       <p>Ruth is a made-up example, not a real person. She lives alone in Boston and has a procedure next month.</p>
       <details class="more"><summary>Show details</summary><p>She is 74, lives alone in Boston with her cat, Fifi, and has a procedure next month. Her clinic says someone has to take her home.</p></details>
-      <p>{{AGENT_NAME}} finds her a free ride home and helps with her mail and her cat. Ruth says yes or no to each step.</p>
-      <details class="more"><summary>Show details</summary><p>In the example, {{AGENT_NAME}} finds a free volunteer escort, suggests a key lockbox and USPS Hold Mail, and helps her write a gentle note to her friend Doris about feeding Fifi. Ruth says yes or no to each step. Share your lockbox code only directly with someone you trust. Just in Case never stores it.</p></details>
+      <p>{{AGENT_NAME}} finds her a free ride home, a key lockbox, and her neighbor Doris for her cat. Her story takes about two minutes.</p>
+      <details class="more"><summary>Show details</summary><p>It has five moments: the call, telling {{AGENT_NAME}}, finding help, friends replying, and the night before. Ruth says yes or no to each step. Share your lockbox code only directly with someone you trust. Just in Case never stores it.</p></details>
       <a class="btn btn-quiet" href="/?example=1#plan">
-        <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See Ruth's example
+        <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See how Ruth used Just in Case
       </a>
     </article>
 
@@ -607,6 +609,24 @@
   </section>
 
   <div id="panel-plan" class="panel layout" data-panel="plan" tabindex="-1" hidden>
+    <!-- Ruth's story: five moments, told in her own words, with the real app underneath -->
+    <section id="story-guide" class="story-guide" aria-labelledby="story-count" hidden>
+      <div class="story-top">
+        <p id="story-count" class="story-count"></p>
+        <p class="story-label">Ruth is an example. <a href="/#plan" class="story-leave">Leave the story</a></p>
+      </div>
+      <div class="story-line" aria-hidden="true"><span id="story-fill"></span></div>
+      <p id="story-text" class="story-text" aria-live="polite"></p>
+      <p id="story-hint" class="story-hint"></p>
+      <div id="story-actions" class="story-actions">
+        <button type="button" id="story-back" class="btn btn-quiet story-btn"><span aria-hidden="true">&larr;</span> Back</button>
+        <button type="button" id="story-next" class="btn tour-next story-btn">Next <span aria-hidden="true">&rarr;</span></button>
+      </div>
+      <div id="story-end" class="story-end" hidden>
+        <a id="story-own" class="btn btn-primary btn-big" href="/#plan"><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Make my plan</a>
+        <a id="story-again" class="btn btn-quiet" href="/?example=1#plan"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Watch again</a>
+      </div>
+    </section>
     <p class="promise" role="note">
       <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
       <span>Just in Case never sends, shares, or books anything without your OK.</span>
@@ -1068,14 +1088,6 @@
         </details>
       </section>
     </aside>
-    <section id="story-guide" class="story-guide" aria-labelledby="story-count" aria-live="polite" hidden>
-      <p id="story-count" class="story-count"></p>
-      <p id="story-text" class="story-text"></p>
-      <div class="story-actions">
-        <button type="button" id="story-next" class="btn tour-next" hidden>Next</button>
-        <a id="story-own" class="btn tour-next" href="/#plan" hidden>Start my own plan</a>
-      </div>
-    </section>
   </div>
   </main>
 

@@ -35,7 +35,7 @@ from just_in_case.prompts import GREETING
 from just_in_case.why import why_this
 from just_in_case import attention, replies
 from just_in_case.card import plan_email_text
-from just_in_case.invites import (INVITE_SUBJECT, LINK_LINE, PEOPLE_REMINDER, PEOPLE_TEMPLATE, REMINDER_SUBJECT,
+from just_in_case.invites import (HOME_SAFE, INVITE_SUBJECT, LINK_LINE, PEOPLE_REMINDER, PEOPLE_TEMPLATE, REMINDER_SUBJECT,
                                   THANKS_SUBJECT, YOU_SEND_LINE, drafts_for)
 from just_in_case import timeline
 from just_in_case.encouragement import encouragement
@@ -256,7 +256,7 @@ class Session:
             "quiet_invites": state.worried_about_burden,
             "invite_words": {"link_line": LINK_LINE, "you_send": YOU_SEND_LINE,
                              "invite_subject": INVITE_SUBJECT, "reminder_subject": REMINDER_SUBJECT,
-                             "people_reminder": PEOPLE_REMINDER, "thanks_subject": THANKS_SUBJECT},
+                             "people_reminder": PEOPLE_REMINDER, "thanks_subject": THANKS_SUBJECT, "home_safe": HOME_SAFE},
             # What's new: helpers' replies on the shared list, gathered by code each time the plan is shown.
             "whats_new": replies.whats_new(state, d, self.agent.box.today, bool(self.share_id)),
             "card": f"/card/{self.id}" if state.card_path else None,
@@ -477,12 +477,11 @@ class Session:
         self.apply_share(rec, "Checked your shared helper list for new sign-ups")
 
     def example_replies(self) -> None:
-        """Ruth's example only: Leo and Doris answer on her shared list, through the same sign-up code."""
+        """Ruth's example only: Doris answers on Ruth's shared list, through the same sign-up code."""
         if self.mode != "example" or not self.share_id:
             return
         today = self.agent.box.today
-        for name, words, days, times, note in (("Leo", "drive", "weekdays", "afternoons", "Happy to drive."),
-                                               ("Doris", "groceries", "any", "mornings", "Mornings are best for me.")):
+        for name, words, days, times, note in (("Doris", "fifi", "any", "mornings", "Happy to feed her."),):
             row = next((t for t in self.agent.state.helper_tasks if words in t["task"].lower() and not t.get("person")), None)
             if row:
                 try:

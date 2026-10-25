@@ -1364,17 +1364,30 @@ a:where(:link, :visited) { color: var(--link); }
   .header-actions nav { margin-left: auto; }
 }
 
-/* ---- Ruth's example: a story card at the bottom of the screen, and a ring on the next button ---- */
+/* ---- Ruth's example: a story card at the top of the plan screen, and a ring on the next button ---- */
 .story-guide {
-  grid-column: 1 / -1; position: sticky; bottom: .75rem; z-index: 15; display: grid; gap: .4rem;
-  max-width: 44rem; width: 100%; margin: 0 auto; padding: .9rem 1.1rem;
-  background: var(--strip); color: var(--strip-ink); border-radius: 20px; box-shadow: var(--shadow-card);
+  grid-column: 1 / -1; position: sticky; top: calc(var(--strip-h, 46px) + .4rem); z-index: 20; display: grid; gap: .45rem; max-width: 44rem; width: 100%; margin: 0 auto .4rem; padding: .9rem 1.1rem;
+  background: var(--strip); color: var(--strip-ink); border-radius: 20px; box-shadow: var(--shadow-card); box-sizing: border-box;
 }
-.story-count { font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.story-text { font-size: 1.02rem; line-height: 1.4; }
-.story-actions { display: flex; justify-content: flex-end; gap: .6rem; }
-.story-actions .btn:empty, .story-actions [hidden] { display: none; }
+.story-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .2rem 1rem; align-items: baseline; }
+.story-count { font-size: .9rem; font-weight: 700; margin: 0; }
+.story-label { font-size: .85rem; margin: 0; }
+.story-leave { color: var(--strip-ink); font-weight: 700; display: inline-block; padding: .6rem .3rem; margin: -.6rem 0; }
+.story-line { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .25); overflow: hidden; }
+.story-line span { display: block; height: 100%; width: 0; background: var(--strip-ink); border-radius: inherit; transition: width .4s ease; }
+.story-text { font-size: 1.1rem; line-height: 1.35; margin: 0; }
+.story-hint { font-size: .85rem; margin: 0; }
+.story-hint:empty { display: none; }
+.story-actions { display: flex; justify-content: space-between; gap: .6rem; }
+.story-actions[hidden], .story-end[hidden] { display: none; }
+.story-btn { min-height: 48px; min-width: 6.5rem; }
+.story-btn:disabled { opacity: .55; cursor: default; }
+#story-back { background: transparent; color: var(--strip-ink); border: 2px solid var(--strip-ink); }
+.story-end { display: grid; gap: .6rem; }
+.story-end .btn-big { min-height: 64px; font-size: 1.2rem; }
+#story-again { background: transparent; color: var(--strip-ink); border: 2px solid var(--strip-ink); justify-self: start; min-height: 48px; }
 [data-theme="contrast"] .story-guide { border: 2px solid #FFFF00; }
+@media (prefers-reduced-motion: reduce) { .story-line span { transition: none; } }
 .story-next { box-shadow: 0 0 0 3px var(--wall), 0 0 0 6px var(--accent) !important; border-radius: 14px; animation: ring 1.8s ease-in-out 3; }
 @keyframes ring { 50% { box-shadow: 0 0 0 3px var(--wall), 0 0 0 9px var(--accent-tint) !important; } }
 @media (prefers-reduced-motion: reduce) { .story-next { animation: none; } }
@@ -1755,8 +1768,15 @@ html[data-theme="contrast"] .pick-btn { border-color: var(--ink); color: var(--i
 /* A tour tip above its target points down. */
 .tour-tip.tip-above::before { top: auto; bottom: -9px; }
 /* Large text on a phone: the header buttons wrap onto a second row instead of running off the screen. */
-@media (max-width: 640px) { .header-actions { flex-wrap: wrap; justify-content: flex-end; min-width: 0; max-width: 100%; } }
+@media (max-width: 640px) {
+  .header-actions { flex-wrap: wrap; justify-content: flex-end; min-width: 0; max-width: 100%; gap: .35rem; }
+  .site-header { padding-left: .75rem; padding-right: .75rem; }
+}
 /* A long name at the largest text size breaks onto the next line instead of running off a phone screen. */
 .team-text :is(.team-name, .team-program, .team-role) { overflow-wrap: break-word; }
 .team-text { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 640px) { .team-list > li { grid-template-columns: minmax(0, 1fr); } }   /* phones: initials above the name */
+.story-guide .story-leave, .story-guide .story-leave:visited { color: var(--strip-ink); }
+/* Home: Ruth's story, right under the main buttons and above "How it works" */
+.home-story { display: flex; justify-content: center; gap: .5rem; min-height: 56px; margin: .6rem auto 0; max-width: 32rem; font-weight: 700; }
+.home-links:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }

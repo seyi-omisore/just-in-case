@@ -377,9 +377,9 @@
   // ---- "See Ruth's example": plays Ruth's side of the story ----------------
   // The page only types Ruth's lines. Every checkpoint still waits for a real tap.
   const EXAMPLE = new URLSearchParams(location.search).get("example") === "1";
-  let lastAgent = "", exampleTimer = null;
+  let lastAgent = "";
   const RUTH = [  // [what Just in Case asked, what Ruth says]. Fictional details only.
-    [/comfortable asking/i, "Yes, I could ask Doris."],
+    [/comfortable asking/i, "Yes, I could ask Doris, my neighbor."],
     [/phone numbers/i, "Marion Kelly, 617-555-0142, and Doris Chen, 617-555-0177"],
     [/medications/i, "Blood pressure pill in the morning; eye drops at night"],
     [/allergies/i, "Penicillin and shellfish"],
@@ -388,11 +388,12 @@
     [/top of your card/i, "Ruth"],
   ];
   function exampleNext() {
-    if (!EXAMPLE || busy || exampleTimer || messages.querySelector(".slip-actions")) return;
+    if (!EXAMPLE || busy || messages.querySelector(".slip-actions")) return;
     const question = lastAgent.trim().split(/\n\s*\n/).pop();  // the last paragraph holds the question
     const hit = RUTH.find(([asked]) => asked.test(question));
-    if (!hit) return;  // off the script (for example, "Change something"): the viewer takes over
-    exampleTimer = setTimeout(() => { exampleTimer = null; send(hit[1]); }, 1500);
+    if (!hit || input.value.trim()) return;  // off the script (for example, "Change something"): the viewer takes over
+    input.value = hit[1];   // typed in for Ruth; the visitor taps Send
+    if (typeof storyTick === "function") setTimeout(storyTick, 0);
   }
 
   // ---- checkpoints -------------------------------------------------------
@@ -1141,6 +1142,7 @@
           // Ruth's example says it is a made-up story. The live agent says clearly that it is AI.
           // The guided planner (the app's own rules, no AI) needs no label.
           $("demo-banner").hidden = m.mode === "guided";
+          if (EXAMPLE) $("demo-banner").hidden = true;   // Ruth's story bar says she is an example, at the very top
           if (m.mode === "live") {
             $("demo-title").textContent = `${AGENT} is an AI planning helper.`; $("demo-text").textContent = "You make every choice.";
             $("demo-icon").setAttribute("href", "#i-info");
@@ -1253,7 +1255,7 @@
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input.value); }
   });
   for (const b of document.querySelectorAll(".starter")) b.addEventListener("click", () => send(b.dataset.text));
-  if (EXAMPLE) { $("example-open").hidden = true; $("example-exit").hidden = false; }   // the starters stay: Ruth taps one
+  if (EXAMPLE) { $("example-open").hidden = true; $("example-exit").hidden = false; $("starters").hidden = true; }   // Ruth's words are typed in for her
 
   // ---- text size (remembered on this device only) ------------------------
   const SIZES = [18, 20, 22, 24, 27];
@@ -2233,9 +2235,10 @@
     }
   }
 
-  // ---- Ruth's example: a guided story -------------------------------------------
-  // Ruth's words are typed for her. Every yes is still a real tap: the guide rings the button to tap.
-  const story = { at: 0, shown: -1, mark: null, card: false, summary: false, done: false, invited: false };
+  // ---- Ruth's example: a story in five moments, through Ruth's eyes ----------------------
+  // Ruth is made up. Her words are typed in for her, and the visitor taps each answer and each yes:
+  // the story rings the button to tap and never presses it. Each moment starts at the top of the screen.
+  const story = { m: 0, b: 0, view: 0, shown: "", mark: null, card: false, summary: false, done: false, invited: false, end: false };
   const isoIn = (days) => { const d = new Date(); d.setDate(d.getDate() + days);
     while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);   // Ruth's procedure is on a weekday
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -2245,16 +2248,6 @@
     f.elements.task.value = task; f.elements.date.value = date; f.elements.time.value = time;
     f.requestSubmit();
   }
-  const wizardButton = () => {   // the one button to tap next in Invite my people
-    if ($("consent-dialog").open) return $("consent-yes");
-    const wz = $("invite-wizard");
-    if (wz.hidden) return $("invite-people");
-    const ask = wz.querySelector(".send-ask:not([hidden]) .btn-primary");
-    if (ask) return ask;
-    if (/Marked as sent/.test(wz.textContent) || !wz.querySelector(".send-row .send-btn")) return wz.querySelector(".wizard-next") || wz.querySelector("button");
-    return wz.querySelector(".send-row .send-btn");
-  };
-  const rideConfirmed = () => ((lastPlanForInvites && lastPlanForInvites.tasks) || []).some((t) => /drive/i.test(t.task) && t.confirmed);
   function yesOn(need) {   // the "Yes, add this" button on a plan part, opened so it can be seen
     const tag = [...planEl.querySelectorAll(".tag")].find((t) => t.querySelector(".tag-answer") && (!need || t.dataset.need === need));
     if (!tag) return null;
@@ -2262,99 +2255,124 @@
     if (head.getAttribute("aria-expanded") === "false") head.click();
     return tag.querySelector(".tag-answer .btn-primary");
   }
-  const lastPage = () => { view = pages.length - 1; renderView(); };
-  const STORY = [
-    { text: `${AGENT} says hello. Ruth taps a sentence to start.`, target: () => document.querySelector(".starter"),
-      auto: () => setTimeout(() => { if (!chatHistory.some((m) => m.who === "user")) document.querySelector(".starter").click(); }, 4000),   // time to read the greeting first
-      done: () => chatHistory.some((m) => m.who === "user") },
-    { text: `${AGENT} asks one short question at a time. Ruth answers, and you tap the ringed button for her.`,
-      target: () => messages.querySelector(".slip-actions .btn-primary"),
-      done: () => !!cardUrl && !busy && !messages.querySelector(".slip-actions") },
-    { text: `${AGENT} sums up what is planned so far. Back and Next move between the steps.`, next: true,
-      show: () => { const r = [...messages.querySelectorAll(".msg-recap")].pop(); if (r) { view = +r.dataset.page; renderView(); } },
-      target: () => [...messages.querySelectorAll(".msg-recap")].pop() },
-    // The timeline lists only parts Ruth said yes to, so her first yes comes before it.
-    { text: "Ruth says yes to her ride home.", target: () => yesOn("ride_home_after_procedure"),
-      done: () => !!planEl.querySelector('.tag[data-need="ride_home_after_procedure"] .status-ok') },
-    { text: "Ruth picks the date of her procedure. Each step to get ready can go in her calendar.", next: true,
-      show: () => { lastPage(); const d = $("event-date"); if (!d.value) { d.value = isoIn(30); d.dispatchEvent(new Event("change")); } },
-      target: () => document.querySelector("#steps .cal-btn") || $("getting-ready") },
-    { text: "Doris will check in on Ruth. Her row in the helper table says \u201cSomeone's helping.\u201d", next: true,
-      show: () => { reveal($("helper-more")); }, target: () => document.querySelector("#helper-rows .status-helping") },
-    { text: `Ruth taps Invite. ${AGENT} writes a warm message, and she sends it from her own phone or email.`, next: true,
-      show: () => { reveal($("helper-more")); },
-      target: () => document.querySelector("#helper-rows .send-row .send-btn") || document.querySelector("#helper-rows .invite-btn") },
-    { text: `Ruth adds two people she might ask to My people. ${AGENT} writes a short invite for each one.`, next: true,
-      show: () => {
-        if (!people.length) { addPerson("Doris", "neighbor", ""); addPerson("Leo", "friend from church", ""); renderPeople(); }
-        reveal($("fold-people"));
-      },
-      target: () => $("people-list") },
-    { text: "She adds two things her people could help with, on the day of her procedure.", next: true,
-      show: () => {
-        reveal($("helper-more"));
-        const tasks = (lastPlanForInvites && lastPlanForInvites.tasks) || [];
-        const day = shortDay($("event-date").value || isoIn(30));
-        if (!tasks.some((t) => /drive/i.test(t.task))) storyRow("Drive me home after my procedure", day, "3 pm");
-        setTimeout(() => { if (!((lastPlanForInvites && lastPlanForInvites.tasks) || []).some((t) => /groceries/i.test(t.task)))
-          storyRow("Pick up groceries", day, "3 pm"); }, 600);
-      },
-      target: () => $("helper-table") },
-    { text: "She taps Invite my people. One at a time, she sends each message from her own phone or email.",
-      show: () => { for (const p of people) pickedPeople.add(p.id); renderInvitePeople(); reveal($("fold-people")); },
-      target: wizardButton, done: () => story.invited },
-    { text: "Leo and Doris answer on her shared list. Each picks the days and times that work for them.", next: true,
-      show: () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "example_replies" })); },
-      target: () => $("whats-new") },
-    { text: `${AGENT} gathers the replies. Doris is free mornings, but the groceries are at 3 pm, so ${AGENT} asks what Ruth would like.`, next: true,
-      target: () => $("whats-new-list").querySelector(".news-mismatch") || $("whats-new") },
-    { text: "Leo's time fits. Ruth marks his ride as confirmed.",
-      target: () => $("whats-new-list").querySelector(".news-helping .btn-primary"), done: rideConfirmed },
-    { text: "Her next step card has Call now. When the ride is booked, she taps Done.", target: () => $("next-done"), done: () => story.done },
-    { text: "Ruth says yes to the rest of her plan.", target: () => yesOn(), done: () => !planEl.querySelector(".tag-answer") },
-    { text: "Every part is covered. A calm picture shows that her plan is ready.", next: true, target: () => $("ready-ill") },
-    { text: "Each part has a \u201cWhy this?\u201d link. It explains the choice using only facts.", next: true,
-      target: () => planEl.querySelector(".why-this summary"), done: () => story.card },
-    { text: `${AGENT} checks her plan each time. \u201cWhat needs attention\u201d lists only real gaps.`, next: true,
-      target: () => $("attention"), done: () => story.card },
-    { text: "Ruth opens her fridge card. It lists her allergies and where her papers are.", target: () => $("card-link"), done: () => story.card },
-    { text: "She can print a wallet card too, with the same details.", next: true, target: () => $("wallet-print"), done: () => story.summary },
-    { text: "The night before, a calm summary shows who is doing what. She can preview it now.", next: true,
-      show: () => { $("night-preview").open = true; }, target: () => $("night-preview"), done: () => story.summary },
-    { text: "She makes a readiness summary. She decides who sees it.", target: () => $("summary-print"), done: () => story.summary },
-    { text: "If her date moves, \u201cMy plans changed\u201d moves everything and drafts an update for each helper.", next: true,
-      target: () => $("pc-open"), done: () => $("review-mark").hidden },
-    { text: "Last, she marks her plan as reviewed.", target: () => $("review-mark"), done: () => $("review-mark").hidden },
-    { text: "That's Ruth's story. Your own plan works the same way, one question at a time.", last: true },
+  const RUTH_START = "I have a procedure coming up next month. Someone has to drive me home, and my cat Fifi will need feeding.";
+  const planTasks = () => (lastPlanForInvites && lastPlanForInvites.tasks) || [];
+  const fifiTask = () => planTasks().find((t) => /feed fifi/i.test(t.task));
+  // The one button to tap next while Ruth tells her story: a yes on a checkpoint, or Send for her typed answer.
+  // In Simple view the chat's own Next sends the typed answer; in Full view it is Send.
+  const sendTarget = () => (sendBtn.offsetParent ? sendBtn : $("step-next"));
+  const answerButton = () => messages.querySelector(".slip-actions .btn-primary") || (input.value.trim() && !busy ? sendTarget() : null);
+  function homeSafe() {   // after the event: a thank-you to Doris, from fixed wording, sent by Ruth's own tap
+    const t = fifiTask(), words = lastPlanForInvites && lastPlanForInvites.invite_words.home_safe;
+    if (!t || !words || $("thanks-drafts").querySelector(".home-safe")) return;
+    const task = t.task[0].toLowerCase() + t.task.slice(1);
+    showThankYous({ task: t.task, drafts: [{ to: t.person || "Doris", text: words.split("{name}").join("Doris").split("{task}").join(task) }] });
+    $("thanks-drafts").firstElementChild.textContent = "Home safe.";
+    $("thanks-drafts").firstElementChild.classList.add("home-safe");
+  }
+  const MOMENTS = [
+    { title: "The call", beats: [
+      { say: "My doctor says I need a procedure next month, and someone has to drive me home. I live alone. Who do I ask?", look: true } ] },
+    { title: "Telling " + AGENT, beats: [
+      { say: `So I told ${AGENT} what was coming up.`, hint: "Tap the ringed button for Ruth.",
+        show: () => { input.value = RUTH_START; }, target: () => (busy ? null : sendTarget()),
+        done: () => chatHistory.some((m) => m.who === "user") },
+      { say: `${AGENT} asked me one thing at a time. I just answered.`, hint: "Tap the ringed button for each answer.",
+        target: answerButton, done: () => !!cardUrl && !busy && !messages.querySelector(".slip-actions") } ] },
+    { title: `${AGENT} finds help`, beats: [
+      { say: "It found a free escort service, a key lockbox, and my neighbor Doris for Fifi. I didn't have to ask anyone for a big favor.",
+        hint: "Tap Yes for each part of Ruth's plan.",
+        show: () => { const d = $("event-date"); if (!d.value) { d.value = isoIn(30); d.dispatchEvent(new Event("change")); } reveal($("fold-plan")); },
+        target: () => yesOn(), done: () => !planEl.querySelector(".tag-answer") && !!planEl.querySelector(".tag") } ] },
+    { title: "Friends reply", beats: [
+      { say: "I shared my helper list with the people I chose.", hint: "Tap the ringed button to share Ruth's list.",
+        show: () => { reveal($("fold-helpers")); if (!fifiTask()) storyRow("Feed Fifi in the morning", shortDay($("event-date").value || isoIn(30)), "8 am"); },
+        target: () => ($("consent-dialog").open ? $("consent-yes") : fifiTask() ? $("share-open") : null),
+        done: () => !!(lastPlanForInvites && lastPlanForInvites.share) },
+      { say: `Doris signed up for mornings, and ${AGENT} told me in What's new.`, look: true,
+        show: () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "example_replies" })); },
+        target: () => $("whats-new-list").querySelector(".news-helping") || $("whats-new") },
+      { say: "Then I printed my fridge card.", hint: "Tap the ringed button to see Ruth's card.",
+        target: () => $("card-link"), done: () => story.card } ] },
+    { title: "The night before", beats: [
+      { say: `The night before, ${AGENT} showed me who is doing what. I slept well.`, look: true,
+        show: () => { reveal($("night-preview")); $("night-preview").open = true; }, target: () => $("night-preview-list") },
+      { say: `Home safe. ${AGENT} wrote a thank-you note to Doris, and I sent it from my own phone.`, look: true,
+        show: homeSafe, target: () => $("thanks-drafts").querySelector(".invite-panel") || $("thanks-drafts") } ] },
   ];
-  function storyTick() {
-    if (!EXAMPLE || $("panel-plan").hidden) return;
-    while (STORY[story.at].done && STORY[story.at].done()) story.at += 1;
-    const step = STORY[story.at];
-    if (story.shown !== story.at) {
-      story.shown = story.at;
-      $("story-guide").hidden = false;
-      $("story-count").textContent = `Ruth's example \u00b7 step ${story.at + 1} of ${STORY.length}`;
-      $("story-text").textContent = step.text;
-      $("story-next").hidden = !step.next; $("story-own").hidden = !step.last;
-      if (step.show) step.show();
-      if (step.auto) step.auto();
-    }
-    const t = step.target ? step.target() : null;
-    if (t !== story.mark) {
-      if (story.mark) story.mark.classList.remove("story-next");
-      story.mark = t;
-      if (t) { reveal(t); t.classList.add("story-next"); showTopThen(t); }
+  const END_WORDS = "That's Ruth's story. Now make your own plan.";
+  // The story card stays pinned under the emergency bar, so the ringed button is scrolled to just below it.
+  const stripBar = document.querySelector(".safety-strip");
+  const setStripH = () => document.documentElement.style.setProperty("--strip-h", stripBar.getBoundingClientRect().height + "px");
+  setStripH(); new ResizeObserver(setStripH).observe(stripBar);
+  function storyShow(t) {
+    const r = t.getBoundingClientRect(), top = $("story-guide").getBoundingClientRect().bottom + 12;
+    if (r.top < top || r.bottom > window.innerHeight - 8) window.scrollBy({ top: r.top - top, behavior: "instant" });
+  }
+  function storyMark(t) {
+    if (t === story.mark) return;
+    if (story.mark) story.mark.classList.remove("story-next");
+    story.mark = t;
+    if (t) {
+      reveal(t); t.classList.add("story-next"); storyShow(t);
+      setTimeout(() => { if (story.mark === t) storyShow(t); }, 400);   // again, once sections above it have opened
     }
   }
-  $("story-next").addEventListener("click", () => { story.at = Math.min(story.at + 1, STORY.length - 1); storyTick(); });
+  function storyTick() {
+    if (!EXAMPLE || $("panel-plan").hidden) return;
+    $("story-guide").hidden = false;
+    const n = MOMENTS.length;
+    if (story.end) {
+      if (story.shown !== "end") {
+        story.shown = "end"; storyMark(null);
+        $("story-count").textContent = "The end"; $("story-fill").style.width = "100%";
+        $("story-text").textContent = END_WORDS; $("story-hint").textContent = "";
+        $("story-actions").hidden = true; $("story-end").hidden = false;
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" }); $("story-own").focus({ preventScroll: true });
+      }
+      return;
+    }
+    // Looking back with Back: the caption of an earlier moment, nothing to tap.
+    const looking = story.view < story.m;
+    const mo = MOMENTS[looking ? story.view : story.m];
+    let beat = null;
+    if (!looking) {
+      while (story.b < mo.beats.length && !mo.beats[story.b].look && mo.beats[story.b].done && mo.beats[story.b].done()) story.b += 1;
+      beat = mo.beats[Math.min(story.b, mo.beats.length - 1)];
+    }
+    const key = looking ? `view-${story.view}` : `${story.m}-${story.b}`;
+    const shownBefore = story.shown;
+    if (story.shown !== key) {
+      story.shown = key;
+      const at = looking ? story.view : story.m;
+      $("story-count").textContent = `${at + 1} of ${n}: ${mo.title}`;
+      $("story-fill").style.width = `${((at + 1) / n) * 100}%`;
+      $("story-text").textContent = looking ? mo.beats[mo.beats.length - 1].say : beat.say;
+      if (!looking && beat.show) beat.show();
+      if (!shownBefore.startsWith(`${at}-`)) window.scrollTo({ top: 0, left: 0, behavior: "instant" });   // a new moment: from the top
+    }
+    const waiting = !looking && story.b < mo.beats.length && !beat.look && beat.done && !beat.done();
+    $("story-hint").textContent = looking ? "You're looking back. Tap Next to keep going." : waiting ? (beat.hint || "") : "";
+    $("story-next").disabled = waiting;
+    $("story-back").disabled = (looking ? story.view : story.m) === 0;
+    storyMark(looking ? null : beat.target ? beat.target() : null);
+  }
+  $("story-next").addEventListener("click", () => {
+    if (story.view < story.m) { story.view += 1; storyTick(); return; }
+    const mo = MOMENTS[story.m];
+    if (story.b < mo.beats.length - 1) story.b += 1;                 // the next beat in this moment
+    else if (story.m < MOMENTS.length - 1) { story.m += 1; story.b = 0; story.view = story.m; }
+    else story.end = true;
+    storyTick();
+  });
+  $("story-back").addEventListener("click", () => { story.view = Math.max(0, Math.min(story.view, story.m) - 1); storyTick(); });
   $("next-done").addEventListener("click", () => { story.done = true; });
   $("card-link").addEventListener("click", () => { story.card = true; });
   if (EXAMPLE) {
     let queued = false;
     new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; storyTick(); }); } })
       .observe($("main"), { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
-    // The fridge card and summary open in dialogs outside the page, so also look again after each tap and each close.
+    // The fridge card and the sharing box open in dialogs outside the page, so also look again after each tap and each close.
     document.addEventListener("click", () => setTimeout(storyTick, 0));
     for (const d of document.querySelectorAll("dialog")) d.addEventListener("close", () => setTimeout(storyTick, 0));
   }
