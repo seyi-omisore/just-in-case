@@ -754,6 +754,7 @@
 
     renderTasks(plan);
     renderShare(plan);
+    renderInvitePeople(); inviteWhenShared(plan);
     renderServicesOnly(plan);
     renderTimeline(plan.timeline);
     const card = $("card-link");
@@ -1492,8 +1493,9 @@
     const formShown = editingPerson != null || !peopleSkipped || personFormOpen;
     personForm.hidden = !formShown; $("person-add-open").hidden = formShown;
     $("fold-people-sum").textContent = has ? `${people.length} ${people.length === 1 ? "person" : "people"}` : "Optional";
-    if (typeof renderInvitePeople === "function") renderInvitePeople();
+    onPeopleChange();
   }
+  let onPeopleChange = () => {};   // the Invite my people step (below) listens here
   let personFormOpen = false;
   $("people-skip").addEventListener("click", () => {
     peopleSkipped = true; try { if (!EXAMPLE) localStorage.setItem(PEOPLE_SKIP_KEY, "1"); } catch (_) {}
@@ -1548,6 +1550,128 @@
   renderPeople();
   // ---- end My people --------------------------------------------------------
 
+  // ---- Invite my people: one person after another, each from your own phone or email ----
+  // Everyone gets the same link to the shared helper list, and helpers pick what fits their
+  // schedule. Nothing is sent by the app: each message waits for the person's own tap.
+  const MY_NUMBER_KEY = "jic-my-number";
+  let myNumber = ""; try { myNumber = EXAMPLE ? "" : localStorage.getItem(MY_NUMBER_KEY) || ""; } catch (_) {}
+  const pickedPeople = new Set();
+  let wizard = null;              // { ids: [...], at, kind: "invite" | "reminder", task, sent: 0 }
+  let inviteAfterShare = false;   // "Invite my people" asked to share first
+  const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const numberDigits = () => ($("my-number-on").checked ? myNumber.replace(/[^\d+]/g, "") : "");
+  function shareLink(plan) {
+    if (!plan || !plan.share) return "";
+    const digits = numberDigits();
+    return location.origin + plan.share.url + (digits.replace(/\D/g, "").length >= 7 ? "#from=" + encodeURIComponent(digits) : "");
+  }
+  function renderInvitePeople() {
+    const plan = lastPlanForInvites;
+    $("invite-people-zone").hidden = !people.length;
+    if (!people.length) return;
+    for (const id of [...pickedPeople]) if (!people.some((p) => p.id === id)) pickedPeople.delete(id);
+    $("invite-pick").replaceChildren(...people.map((p) => {
+      const li = el("li"); const lab = el("label");
+      const cb = el("input"); cb.type = "checkbox"; cb.value = p.id; cb.checked = pickedPeople.has(p.id);
+      cb.onchange = () => { if (cb.checked) pickedPeople.add(p.id); else pickedPeople.delete(p.id); renderInvitePeople(); };
+      lab.append(cb, avatar(p.name), document.createTextNode(p.name + (p.how ? ` (${p.how})` : "")));
+      li.appendChild(lab); return li;
+    }));
+    const tasks = (plan && plan.tasks) || [];
+    const why = !tasks.length ? "Add a task to your helper list first. Then you can invite people." :
+      !pickedPeople.size ? "Pick at least one person." : "";
+    $("invite-people").disabled = !!why;
+    $("invite-people-why").hidden = !why; $("invite-people-why").textContent = why;
+    if (wizard) renderWizard();
+  }
+  onPeopleChange = renderInvitePeople;
+  renderInvitePeople();
+  $("my-number-on").addEventListener("change", () => {
+    $("my-number-wrap").hidden = !$("my-number-on").checked;
+    if ($("my-number-on").checked) { $("my-number").value = myNumber; $("my-number").focus(); }
+    if (wizard) renderWizard();
+  });
+  $("my-number").addEventListener("change", () => {
+    myNumber = $("my-number").value.trim().slice(0, 20);
+    try { if (!EXAMPLE) localStorage.setItem(MY_NUMBER_KEY, myNumber); } catch (_) {}
+    if (wizard) renderWizard();
+  });
+  function startWizard(kind, task) {
+    const ids = people.filter((p) => pickedPeople.has(p.id)).map((p) => p.id);
+    if (!ids.length) return;
+    wizard = { ids, at: 0, kind: kind || "invite", task: task || null, sent: 0, text: null };
+    renderWizard();
+    $("invite-wizard").scrollIntoView({ block: "start" });
+    const box = $("invite-wizard").querySelector("textarea"); if (box) box.focus({ preventScroll: true });
+  }
+  function wizardText(p, plan) {
+    if (wizard.kind === "reminder" && wizard.task) {
+      return (plan.invite_words.people_reminder || "").split("{name}").join(firstWord(p.name)).split("{task}").join(wizard.task)
+        + "\n\n" + plan.invite_words.link_line + " " + shareLink(plan);
+    }
+    return (p.template || fillTemplate(p.name)) + "\n\n" + plan.invite_words.link_line + " " + shareLink(plan);
+  }
+  function renderWizard() {
+    const box = $("invite-wizard"), plan = lastPlanForInvites;
+    box.hidden = !wizard; box.replaceChildren();
+    if (!wizard || !plan) return;
+    if (wizard.at >= wizard.ids.length) {
+      box.appendChild(el("p", "invite-title", wizard.sent ? `All done. You sent ${wizard.sent} ${wizard.sent === 1 ? "message" : "messages"}.` : "All done."));
+      box.appendChild(el("p", "helper-small", `${AGENT} will tell you here when someone signs up.`));
+      const close = el("button", "btn btn-quiet btn-small"); close.type = "button"; close.textContent = "Close";
+      close.onclick = () => { wizard = null; renderWizard(); $("invite-people").focus(); };
+      box.appendChild(close);
+      return;
+    }
+    const p = people.find((x) => x.id === wizard.ids[wizard.at]);
+    if (!p) { wizard.at += 1; renderWizard(); return; }
+    box.appendChild(el("p", "helper-small wizard-count", `Person ${wizard.at + 1} of ${wizard.ids.length}`));
+    box.appendChild(el("p", "invite-title", (wizard.kind === "reminder" ? "Remind " : "Invite ") + p.name));
+    const lab = el("label", "invite-label", "Your message (you can change it)"); lab.htmlFor = "wizard-text";
+    const ta = el("textarea"); ta.id = "wizard-text"; ta.rows = 10; ta.maxLength = 1500;
+    if (wizard.text == null) wizard.text = wizardText(p, plan);
+    ta.value = wizard.text; ta.addEventListener("input", () => { wizard.text = ta.value; });
+    box.append(lab, ta);
+    if (!p.contact) box.appendChild(el("p", "helper-small", `No phone or email saved for ${p.name}. Your app will ask who to send it to.`));
+    const sent = el("p", "helper-small"); sent.setAttribute("role", "status");
+    box.appendChild(sendControls({
+      text: () => ta.value,
+      subject: wizard.kind === "reminder" ? plan.invite_words.reminder_subject : plan.invite_words.invite_subject,
+      contact: () => p.contact || "",
+      onSent: () => {
+        wizard.sent += 1; sent.textContent = "Thank you. Marked as sent.";
+        if (wizard.kind === "invite") {
+          p.invited = todayISO(); savePeople();
+          // Open tasks now say Invited, until someone signs up.
+          for (const t of plan.tasks || []) if (!t.person && !t.invited) sendTable("invited", { id: t.id });
+        }
+      },
+    }));
+    box.append(sent, el("p", "helper-small invite-you-send", plan.invite_words.you_send));
+    const row = el("div", "send-row");
+    const next = el("button", "btn btn-primary send-btn wizard-next"); next.type = "button";
+    const last = wizard.at === wizard.ids.length - 1;
+    next.append(icon(last ? "check" : "send"), document.createTextNode(last ? "Done" : "Next person"));
+    next.onclick = () => { wizard.at += 1; wizard.text = null; renderWizard(); const t2 = $("invite-wizard").querySelector("textarea, .wizard-next, button"); if (t2) t2.focus({ preventScroll: true }); };
+    const stop = el("button", "btn btn-quiet send-btn"); stop.type = "button"; stop.textContent = "Stop for now";
+    stop.onclick = () => { wizard = null; renderWizard(); $("invite-people").focus(); };
+    row.append(next, stop); box.appendChild(row);
+  }
+  $("invite-people").addEventListener("click", () => {
+    const plan = lastPlanForInvites;
+    if (!plan) return;
+    if (!plan.share) {   // the same consent box as "Share with family". Nothing is shared without it.
+      inviteAfterShare = true;
+      $("consent-name").value = ""; $("consent-dialog").showModal();
+      return;
+    }
+    startWizard("invite");
+  });
+  // After the person says yes to sharing, the invites start as soon as the link exists.
+  function inviteWhenShared(plan) {
+    if (inviteAfterShare && plan.share) { inviteAfterShare = false; startWizard("invite"); }
+  }
+
   // ---- helper updates: calm, non-urgent notices -------------------------
   // For example, a helper stepped back from a task. Never styled as an emergency.
   function addNotice(text) {
@@ -1597,7 +1721,10 @@
     }
   }
   $("share-open").addEventListener("click", () => { $("consent-name").value = ""; consent.showModal(); });
+  consent.addEventListener("close", () => { if (!sharingAsked) inviteAfterShare = false; sharingAsked = false; });
+  let sharingAsked = false;
   $("consent-yes").addEventListener("click", () => {
+    sharingAsked = true;
     ws.send(JSON.stringify({ type: "share_create", consent: true, label: $("consent-name").value.trim() }));
     consent.close();
   });
@@ -1659,7 +1786,7 @@
     }
     try {
       for (const k of Object.keys(localStorage)) {
-        if (k === SAVE_KEY || k === MY_SHARES || k === PEOPLE_KEY || k === PEOPLE_SKIP_KEY || k.startsWith("jic-claims-")) localStorage.removeItem(k);
+        if (k === SAVE_KEY || k === MY_SHARES || k === PEOPLE_KEY || k === PEOPLE_SKIP_KEY || k === MY_NUMBER_KEY || k.startsWith("jic-claims-")) localStorage.removeItem(k);
       }
     } catch (_) {}
     contacts.clear(); people = []; saving = false;

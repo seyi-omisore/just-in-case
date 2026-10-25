@@ -423,6 +423,7 @@ class Session:
     def apply_share(self, rec: dict, activity: str) -> None:
         """A helper signed up or stepped back: update the owner's table live."""
         people = {t["id"]: t["person"] for t in rec["tasks"]}
+        offers = {t["id"]: t.get("offers", []) for t in rec["tasks"]}
         for t in self.agent.state.helper_tasks:
             if t["id"] in people:
                 if people[t["id"]] != t["person"]:
@@ -430,6 +431,8 @@ class Session:
                     if people[t["id"]]:
                         t["invited"] = False  # the helper signed up: Invited becomes Someone's helping
                 t["person"] = people[t["id"]]
+                # Each offer, with the days and times that work. Never the helper's token.
+                t["offers"] = [{k: o[k] for k in ("id", "name", "days", "times", "note")} for o in offers[t["id"]]]
         self.agent.box.refresh_card()
         self.emit({"type": "activity", "kind": "heart", "text": activity})
         self.emit({"type": "plan", "plan": self.plan()})
@@ -804,13 +807,17 @@ async def share_get(share_id: str, owner: str = ""):
 @app.post("/api/share/{share_id}/claim")
 async def share_claim(share_id: str, request: Request):
     body = await request.json()
+    name = str(body.get("name", ""))
     try:
-        rec, token = SHARES.claim(share_id, int(body.get("task_id", -1)), str(body.get("name", "")))
+        rec, token = SHARES.claim(share_id, int(body.get("task_id", -1)), name, str(body.get("days", "any")),
+                                  str(body.get("times", "any")), str(body.get("note", "")))
     except (ShareError, ValueError) as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     row = next(t for t in rec["tasks"] if t["id"] == int(body["task_id"]))
-    _notify_owner(rec, f"{row['person']} signed up to help: {row['task']}")
-    return JSONResponse({**ShareStore.public(rec), "claim_token": token, "task_id": row["id"]})
+    placed = bool(row["person"])   # their times fit, so their name is on it now
+    _notify_owner(rec, f"{row['person']} signed up to help: {row['task']}" if placed else
+                  f"{name.strip()} offered to help: {row['task']}")
+    return JSONResponse({**ShareStore.public(rec), "claim_token": token, "task_id": row["id"], "placed": placed})
 
 
 @app.post("/api/share/{share_id}/unclaim")

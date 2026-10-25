@@ -906,6 +906,19 @@
               </div>
             </form>
             <details class="more"><summary>Show details</summary><p>{{AGENT_NAME}} writes a short invite for each person, and you can change it. It is only a saved message. It is never used to train or change the AI.</p></details>
+            <div id="invite-people-zone" class="invite-people-zone" hidden>
+              <p class="task-form-title"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg> Invite my people</p>
+              <p class="helper-small">Pick who to invite. Each one gets the same link to your helper list.</p>
+              <ul id="invite-pick" class="slip-checks"></ul>
+              <label class="share-pick my-number-pick"><input type="checkbox" id="my-number-on"> Add my phone number so helpers can text me back</label>
+              <label id="my-number-wrap" class="free-note" hidden>My phone number <input id="my-number" maxlength="20" inputmode="tel" autocomplete="tel"></label>
+              <details class="more"><summary>Show details</summary><p>Your number goes at the end of the link, after a # sign. That part of a link is never sent to our server.</p></details>
+              <button type="button" id="invite-people" class="btn btn-primary btn-block">
+                <svg class="icon" aria-hidden="true"><use href="#i-send"/></svg> Invite my people
+              </button>
+              <p id="invite-people-why" class="helper-small" hidden></p>
+              <div id="invite-wizard" class="invite-panel" role="group" aria-label="Invite my people, one at a time" hidden></div>
+            </div>
           </div>
         </details>
 

@@ -1148,3 +1148,20 @@ def test_my_people_invite_template_passes_the_note_checks():
     assert people_invite_text("Doris Chen").startswith("Hi Doris,")      # first name only
     assert people_invite_text("").startswith("Hi,")
     assert PEOPLE_TEMPLATE.count(NAME_SLOT) == 1
+
+
+def test_availability_fits_only_when_days_and_times_match():
+    """Round 13: plain rules decide whether a helper's free times fit a task. Unknown never counts against anyone."""
+    from datetime import date
+    from just_in_case.availability import fits, free_words, part_of_day
+    today = date(2026, 11, 1)
+    mon_3pm = {"date": "2026-11-23", "time": "3 pm"}
+    assert fits(mon_3pm, "weekdays", "afternoons", today)
+    assert not fits(mon_3pm, "weekends", "any", today)
+    assert not fits(mon_3pm, "any", "mornings", today)
+    assert fits({"date": "", "time": ""}, "weekends", "mornings", today)            # nothing to compare: it fits
+    assert fits({"date": "Tuesdays", "time": "3:00"}, "weekends", "mornings", today)  # can't read these for sure
+    assert [part_of_day(t) for t in ("9:30 AM", "3 pm", "12 pm", "12 am", "6:15 PM", "15:00", "evening", "Morning")] == \
+        ["mornings", "afternoons", "afternoons", "mornings", "evenings", "afternoons", "evenings", "mornings"]
+    assert free_words("weekdays", "afternoons") == "weekday afternoons" and free_words("any", "any") == "any time"
+    assert free_words("any", "mornings") == "mornings" and free_words("weekends", "any") == "weekends"

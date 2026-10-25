@@ -1719,7 +1719,7 @@ def test_delete_everything_removes_saved_plan_contacts_and_shared_lists():
     block = block[:block.index("let walletUrl")]
     assert block.index('confirm("Delete everything?') < block.index("fetch(")                  # asks first
     assert "/delete`" in block and "body: JSON.stringify({ owner: s.owner })" in block
-    assert 'k === SAVE_KEY || k === MY_SHARES || k === PEOPLE_KEY || k === PEOPLE_SKIP_KEY || k.startsWith("jic-claims-")' in block
+    assert 'k === SAVE_KEY || k === MY_SHARES || k === PEOPLE_KEY || k === PEOPLE_SKIP_KEY || k === MY_NUMBER_KEY || k.startsWith("jic-claims-")' in block
     assert "people = [];" in block                                                     # My people goes too (Round 13)
     assert "contacts.clear();" in block
     # The delete call it uses really deletes a shared list with the owner's token.
@@ -2003,3 +2003,31 @@ def test_ruths_example_adds_two_people():
     js = client.get("/static/app.js").text
     story = js[js.index("const STORY = ["):js.index("function storyTick")]
     assert 'addPerson("Doris", "neighbor", "")' in story and 'addPerson("Leo", "friend from church", "")' in story
+
+
+# ---- Round 13, Part 2: Invite my people -------------------------------------------
+
+def _invite_block():
+    js = client.get("/static/app.js").text
+    return js[js.index("// ---- Invite my people"):js.index("function inviteWhenShared")]
+
+
+def test_invite_my_people_goes_one_person_at_a_time_and_waits_for_each_tap():
+    block = _invite_block()
+    assert "sendControls({" in block and '"Next person"' in block and '"Stop for now"' in block
+    assert "Person ${wizard.at + 1} of ${wizard.ids.length}" in block
+    assert "ws.send" not in block and "fetch(" not in block              # the app never sends a message
+    assert 'sendTable("invited", { id: t.id })' in block[block.index("onSent:"):]   # only after "Yes, I sent it"
+    assert '$("consent-dialog").showModal()' in block                    # not shared yet: the consent box first
+    page = client.get("/").text
+    assert 'id="invite-people"' in page and "Each one gets the same link to your helper list." in page
+
+
+def test_my_number_rides_after_the_hash_and_never_reaches_the_server():
+    block = _invite_block()
+    assert '"#from=" + encodeURIComponent(digits)' in block
+    js = client.get("/static/app.js").text
+    for line in js.splitlines():
+        if "ws.send(" in line or "fetch(" in line:
+            assert "myNumber" not in line and "people" not in line and "contact" not in line, line
+    assert "k === MY_NUMBER_KEY" in js                                     # Delete everything removes it

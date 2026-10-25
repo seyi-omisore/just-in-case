@@ -1695,3 +1695,23 @@ html[data-ai="off"] .when-ai, html[data-ai="on"] .when-no-ai { display: none !im
 .person-form textarea { width: 100%; min-width: 0; box-sizing: border-box; font: inherit; font-weight: 400; line-height: 1.45; padding: .6rem;
   border: 2px solid var(--ink-soft); border-radius: 12px; background: var(--paper); color: var(--ink); resize: vertical; }
 .person-form { margin-bottom: .7rem; }
+
+/* ---- Helper page: pick tasks and say when you're free (Round 13) ---- */
+.share-pick { display: flex; gap: .65rem; align-items: center; min-height: 48px; padding: .3rem .8rem; margin-top: .5rem;
+  border: 2px solid var(--line); border-radius: 12px; cursor: pointer; font-weight: 700; }
+.share-pick:has(input:checked) { border-color: var(--blue); background: var(--sky-tint); }
+.share-pick input, .free-options input { width: 1.5rem; height: 1.5rem; accent-color: var(--blue); flex: none; }
+.free-box { display: grid; gap: .6rem; margin-top: .6rem; padding: .7rem; border-radius: 14px; background: var(--enamel); }
+.free-pick { border: 0; margin: 0; padding: 0; min-width: 0; }
+.free-pick legend { font-weight: 700; margin-bottom: .35rem; padding: 0; }
+.free-options { grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); }
+.free-options label { min-height: 48px; }
+.free-note { display: grid; gap: .2rem; font-weight: 700; }
+.free-note input, .signup input { min-height: 48px; font: inherit; font-weight: 400; padding: 0 .7rem; border: 2px solid var(--ink-soft);
+  border-radius: 12px; background: var(--paper); color: var(--ink); width: 100%; min-width: 0; box-sizing: border-box; }
+.signup { margin-top: 1rem; display: grid; gap: .6rem; }
+.signup label { display: grid; gap: .2rem; font-weight: 700; }
+.share-thanks { margin: .8rem 0; padding: .9rem; border: 2px solid var(--green, var(--primary)); border-radius: 14px; background: var(--green-tint); display: grid; gap: .5rem; }
+.share-thanks-title { font-weight: 700; font-size: 1.1rem; margin: 0; }
+.share-thanks-list { margin: 0; padding-left: 1.1rem; display: grid; gap: .4rem; }
+.share-thanks .btn { justify-self: start; min-height: 48px; }

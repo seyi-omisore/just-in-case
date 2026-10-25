@@ -3,6 +3,7 @@
 What is saved (one small JSON file per list, in output/shared/):
   - the name the user chose to show (optional)
   - the helper table rows: task, date, time, person
+  - each helper's offer: first name as typed, the days and times that work, and an optional short note
   - when it was made and when it is deleted (30 days, or sooner if she deletes it)
 Nothing else: no chat, no card, no contacts, no medications.
 
@@ -21,11 +22,15 @@ import threading
 import time
 from pathlib import Path
 
+from datetime import date
+
+from just_in_case.availability import clean as _clean_free, fits as _fits
 from just_in_case.safeguards import first_name as _first_name
 
 KEEP_DAYS = 30
 MAX_FIELD = 120
 MAX_ROWS = 40
+MAX_OFFERS = 10   # per task
 
 
 class ShareError(Exception):
@@ -96,14 +101,22 @@ class ShareStore:
         return bool(owner_token) and secrets.compare_digest(rec["owner_hash"], _hash(owner_token))
 
     def _merge(self, old: list[dict], tasks: list[dict]) -> list[dict]:
-        """Owner's table is the source of truth for rows; keep helpers' sign-ups."""
-        claims = {t["id"]: t.get("claim_hash") for t in old}
+        """Owner's table is the source of truth for rows; keep helpers' sign-ups and offers."""
+        before = {t["id"]: t for t in old}
         out = []
         for t in tasks[:MAX_ROWS]:
             row = {k: _clean(t.get(k)) for k in ("task", "date", "time", "person")}
             row["id"] = int(t["id"])
+            prev = before.get(row["id"], {})
             row["confirmed"] = bool(t.get("confirmed")) and bool(row["person"])
-            row["claim_hash"] = claims.get(row["id"]) if row["person"] else None
+            row["offers"] = prev.get("offers", [])
+            if not row["person"]:
+                row["claim_hash"] = None
+            elif row["person"] == prev.get("person"):
+                row["claim_hash"] = prev.get("claim_hash")
+            else:   # the owner chose someone who offered: they can still remove their own name
+                hit = next((o for o in row["offers"] if o["name"].lower() == row["person"].lower()), None)
+                row["claim_hash"] = hit["hash"] if hit else None
             out.append(row)
         return out
 
@@ -122,19 +135,32 @@ class ShareStore:
             self._path(share_id).unlink(missing_ok=True)
 
     # ---- helper actions ------------------------------------------------------
-    def claim(self, share_id: str, task_id: int, name: str) -> tuple[dict, str]:
+    def claim(self, share_id: str, task_id: int, name: str, days: str = "any", times: str = "any",
+              note: str = "", today: date | None = None) -> tuple[dict, str]:
+        """A helper offers to help, with the days and times that work for them.
+
+        If the task is open and their times fit, their name goes on it right away (Someone's
+        helping). If not, the offer waits for the owner, who sees it in What's new."""
         name = _clean(name)
         if not name:
             raise ShareError("Please type your name.")
+        days, times = _clean_free(days, times)
         with self.lock:
             rec = self._load(share_id)
             row = next((t for t in rec["tasks"] if t["id"] == task_id), None)
             if row is None:
                 raise ShareError("That task is no longer on the list.")
             if row["person"]:
-                raise ShareError(f"{row['person']} is already helping with this one.")
+                raise ShareError(f"{first_name(row['person'])} is already helping with this one.")
+            offers = row.setdefault("offers", [])
+            if len(offers) >= MAX_OFFERS:
+                raise ShareError("This task has plenty of offers already. Thank you.")
             token = secrets.token_urlsafe(16)
-            row["person"], row["claim_hash"] = name, _hash(token)
+            fit = _fits(row, days, times, today or date.today())
+            offers.append({"id": max((o["id"] for o in offers), default=0) + 1, "name": name, "days": days,
+                           "times": times, "note": _clean(note), "hash": _hash(token)})
+            if fit:
+                row["person"], row["claim_hash"] = name, _hash(token)
             self._save(rec)
             return rec, token
 
@@ -145,9 +171,13 @@ class ShareStore:
             if row is None:
                 raise ShareError("That task is no longer on the list.")
             mine = row.get("claim_hash") and secrets.compare_digest(row["claim_hash"], _hash(token or ""))
-            if not (mine or self.is_owner(rec, token)):
+            my_offer = any(secrets.compare_digest(o["hash"], _hash(token or "")) for o in row.get("offers", []))
+            if not (mine or my_offer or self.is_owner(rec, token)):
                 raise ShareError("You can only remove your own name.")
-            row["person"], row["claim_hash"], row["confirmed"] = "", None, False
+            gone = _hash(token or "") if (mine or my_offer) else row.get("claim_hash")
+            row["offers"] = [o for o in row.get("offers", []) if o["hash"] != gone]
+            if mine or self.is_owner(rec, token):
+                row["person"], row["claim_hash"], row["confirmed"] = "", None, False
             self._save(rec)
             return rec
 
