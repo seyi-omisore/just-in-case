@@ -21,7 +21,7 @@ from . import timeline
 from .card import write_card
 from .config import MAX_HELPERS, OUTPUT_DIR
 from .directory import Directory
-from .safeguards import (ESCORT_RULE_LINE, FALLBACK_LINE, NO_ONE_LINE, check_helper_note, safe_cell,
+from .safeguards import (LOCKBOX_ID, LOCKBOX_LINE, ESCORT_RULE_LINE, FALLBACK_LINE, NO_ONE_LINE, check_helper_note, safe_cell,
                          said_by_user)
 from .state import CARD_SECTIONS, NEEDS, ROUTES, PlanItem, PlanState
 
@@ -163,6 +163,8 @@ class Toolbox:
 
         if need == "ride_home_after_procedure" and route != "blank":
             flags.append(ESCORT_RULE_LINE)
+        if route == "preparation" and ref_id == LOCKBOX_ID:
+            flags.append(LOCKBOX_LINE)   # in code, like the escort rule: never left to the model
 
         # One route per need: replace any earlier choice.
         s.items = [i for i in s.items if i.need != need]

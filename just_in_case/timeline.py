@@ -8,6 +8,7 @@ where it can, so it also reads well when someone is planning for another person.
 
 from datetime import date, timedelta
 
+from .safeguards import LOCKBOX_ID, LOCKBOX_LINE
 from .state import PlanState
 
 # need -> [(days before the day, step)]
@@ -89,13 +90,15 @@ def build(state: PlanState, today: date) -> dict:
     out["day_before"] = None
     if not planned:
         return out
+    lockbox = any(i.ref_id == LOCKBOX_ID and i.user_ok for i in state.items)
     if event:
         items = [DAY_BEFORE[n] for n in planned if n in DAY_BEFORE]
         if state.card_path:
             items.append(DAY_BEFORE_CARD)
         items.append(DAY_BEFORE_ALWAYS)
         on = event - timedelta(days=1)
-        out["day_before"] = {"date": on.isoformat(), "past": on < today, "items": items}
+        out["day_before"] = {"date": on.isoformat(), "past": on < today, "items": items,
+                             "note": LOCKBOX_LINE if lockbox else ""}
     chosen = [(need, d, text) for need in planned for d, text in STEPS.get(need, [])]
     chosen += [("", d, text) for d, text in ALWAYS]
     if state.card_path:
@@ -107,6 +110,7 @@ def build(state: PlanState, today: date) -> dict:
             "id": sid, "need": need, "text": text, "when": when_words(days_before),
             "date": on.isoformat() if on else "", "done": sid in state.steps_done,
             "past": bool(on and on < today),
+            "note": LOCKBOX_LINE if need == "spare_key_access" and lockbox else "",
         })
     return out
 
@@ -134,8 +138,8 @@ def night_before(state: PlanState, directory, today: date) -> dict | None:
         what = NIGHT_SHORT.get(i.need, i.need.replace("_", " ").capitalize())
         if i.route == "person":
             lines.append(f"{what}: {' and '.join(names) if names else 'the person you asked'}.")
-        elif i.ref_id == "prep_key_lockbox":
-            lines.append(f"{what}: in the lockbox.")
+        elif i.ref_id == LOCKBOX_ID:
+            lines += [f"{what}: in the lockbox.", LOCKBOX_LINE]
         else:
             ref = directory.by_id.get(i.ref_id or "", {})
             phone = ref.get("phone", "")

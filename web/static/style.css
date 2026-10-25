@@ -1643,3 +1643,4 @@ a.menu-home:is(:link, :visited), a.demo-exit:is(:link, :visited), .footer-help a
 .night-title { display: flex; gap: .45rem; align-items: center; margin: 0 0 .4rem; font-size: 1.1rem; }
 .night-list { margin: .3rem 0 .6rem; padding-left: 1.2rem; display: grid; gap: .3rem; }
 .night-preview { margin: .6rem 0; }
+.lockbox-note { margin: .3rem 0 0; }

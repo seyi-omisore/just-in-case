@@ -27,6 +27,10 @@ def separate_service_line(name: str) -> str:
     return SEPARATE_SERVICE_LINE.format(name=name)
 
 
+# Wherever a key lockbox appears. The app never asks for, keeps, or shows a lockbox code.
+LOCKBOX_LINE = "Share your lockbox code only directly with someone you trust. Just in Case never stores it."
+LOCKBOX_ID = "prep_key_lockbox"
+
 ESCORT_RULE_LINE = (
     "Ask your surgical team if this option meets their rule for who takes you "
     "home. Some clinics do not accept rides or paid services."

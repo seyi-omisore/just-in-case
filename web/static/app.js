@@ -781,6 +781,7 @@
       meta.append(document.createTextNode(s.when + (s.date ? " · " + dayWords(s.date) : "")));
       if (s.done) meta.append(" ", el("strong", "step-done-word", "Done"));
       li.append(lab, meta);
+      if (s.note) li.appendChild(el("p", "helper-small lockbox-note", s.note));
       if (s.date && !s.past) li.appendChild(calendarButton(s.text, s.date, `Just in Case: ${s.when.toLowerCase()} your ${tl.label}.`));
       ol.appendChild(li);
     }
@@ -791,6 +792,7 @@
       $("day-before-date").textContent = dayWords(db.date);
       $("day-before-list").replaceChildren(...db.items.map((t) => { const li = el("li"); li.append(icon("check"), document.createTextNode(t)); return li; }));
       $("day-before-cal").replaceChildren();
+      if (db.note) $("day-before-cal").appendChild(el("p", "helper-small lockbox-note", db.note));
       if (!db.past) $("day-before-cal").appendChild(calendarButton("The day before: my checklist", db.date, db.items.join("\n")));
     }
   }

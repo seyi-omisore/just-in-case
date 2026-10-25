@@ -13,7 +13,7 @@ from pathlib import Path
 from . import reviews
 from .config import OUTPUT_DIR
 from .directory import Directory
-from .safeguards import CRISIS_LINE, EMERGENCY_LINE
+from .safeguards import CRISIS_LINE, EMERGENCY_LINE, LOCKBOX_ID, LOCKBOX_LINE
 from .state import NEEDS, PlanState
 
 
@@ -82,6 +82,8 @@ def build_card_lines(card: dict, state: PlanState, directory: Directory, today: 
             if item.route == "service":
                 name += f", {phone}" if phone else ", see website and call to confirm"
             lines.append(f"  {need}: {name}")
+            if item.ref_id == LOCKBOX_ID:
+                lines.append(f"    {LOCKBOX_LINE}")
 
     last = reviews.parse(state.reviews[-1]) if state.reviews else None
     lines += [""] + ([f"Plan last reviewed: {reviews.words(last)}"] if last else [])

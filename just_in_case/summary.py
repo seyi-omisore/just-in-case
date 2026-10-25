@@ -103,6 +103,8 @@ def render_summary_html(state: PlanState, directory: Directory, today: date | No
         ("card", "Fridge card", "Made" if a["fridge_card"] else "Not made yet", a["fridge_card"]),
     ]
     parts = ("helpers", "lockbox", "card")  # the names the checkboxes use
+    from .safeguards import LOCKBOX_LINE
+    lockbox_note = f'<p class="lockbox-note">{e(LOCKBOX_LINE)}</p>' if a["key_lockbox"] else ""
     across_html = "".join(f'<li class="chip" data-part="{part}">{_svg(icon)}<span><strong>{e(name)}:</strong> {e(text)}</span></li>'
                           for part, (icon, name, text, _) in zip(parts, across))
     return f"""<!doctype html>
@@ -164,7 +166,7 @@ def render_summary_html(state: PlanState, directory: Directory, today: date | No
  </ul></section>
  <section data-part="situations"><h2>{_svg("check")}By situation: {d["covered"]} of {d["total"]} in place</h2>
   <ul>{"".join(rows) or "<li>No situations chosen yet.</li>"}</ul></section>
- <section id="across"><h2>{_svg("list")}Across my plan</h2><ul class="facts">{across_html}</ul></section>
+ <section id="across"><h2>{_svg("list")}Across my plan</h2><ul class="facts">{across_html}</ul>{lockbox_note}</section>
  <p class="foot">{e(EMERGENCY_LINE)}</p>
  <button class="print" id="print" onclick="window.print()">Print my summary</button>
 <script>

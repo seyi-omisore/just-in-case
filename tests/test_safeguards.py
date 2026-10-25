@@ -1104,4 +1104,34 @@ def test_night_before_summary_is_built_from_the_plan_and_shows_on_the_day_before
     nb = timeline.night_before(st, d, date(2026, 11, 13))
     assert nb["show_now"] is True and nb["title"] == "Tomorrow is your procedure."
     assert nb["lines"] == ["Getting home: FriendshipWorks Medical Escort, 617-482-1510.", "Your key: in the lockbox.",
+                           "Share your lockbox code only directly with someone you trust. Just in Case never stores it.",
                            "Doris: Feed Fifi, morning.", "In an emergency, call 911."]
+
+
+def test_lockbox_safety_line_appears_wherever_a_lockbox_does():
+    from datetime import date
+    from just_in_case import timeline
+    from just_in_case.card import build_card_lines, render_plan_html
+    from just_in_case.directory import Directory
+    from just_in_case.prompts import SYSTEM_PROMPT
+    from just_in_case.safeguards import LOCKBOX_LINE
+    from just_in_case.state import PlanState
+    from just_in_case.summary import render_summary_html
+    from just_in_case.tools import Toolbox
+    assert LOCKBOX_LINE == "Share your lockbox code only directly with someone you trust. Just in Case never stores it."
+    st = PlanState()
+    box = Toolbox(st, Directory(), today=date(2026, 10, 25))
+    box.confirm_needs(["spare_key_access"])
+    box.add_to_plan("spare_key_access", "preparation", "prep_key_lockbox")
+    assert LOCKBOX_LINE in st.items[0].flags                       # added by code, like the escort rule
+    box.user_confirm_item("spare_key_access", True)
+    st.event_date = "2026-11-14"
+    tl = timeline.build(st, box.today)
+    assert all(s["note"] == LOCKBOX_LINE for s in tl["steps"] if s["need"] == "spare_key_access")
+    assert tl["day_before"]["note"] == LOCKBOX_LINE
+    assert LOCKBOX_LINE in timeline.night_before(st, box.dir, box.today)["lines"]
+    card = {"name": "", "contacts": [], "medications": [], "allergies": [], "papers": "", "pet": None, "sections": ["plan"]}
+    assert f"    {LOCKBOX_LINE}" in build_card_lines(card, st, box.dir, box.today)
+    assert LOCKBOX_LINE in render_plan_html(st, box.dir, box.today)
+    assert LOCKBOX_LINE in render_summary_html(st, box.dir, box.today)
+    assert "Never ask for, repeat, or write down a lockbox code" in SYSTEM_PROMPT
