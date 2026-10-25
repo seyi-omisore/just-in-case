@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from just_in_case.agent import JustInCaseAgent  # noqa: E402
+from just_in_case.config import MODEL  # noqa: E402
 from just_in_case.safeguards import EMERGENCY_LINE, ESCORT_RULE_LINE, reading_grade  # noqa: E402
 
 CASES = json.loads((ROOT / "eval" / "cases.json").read_text())["cases"]
@@ -99,8 +100,16 @@ async def main(ids):
 
     total = sum(sum(r["results"].values()) for r in logs)
     count = sum(len(r["results"]) for r in logs)
+    per_case = [f"| {r['id']} | {r['title']} | {sum(r['results'].values())}/{len(r['results'])} | "
+                f"{r['grade']} | ${r['cost']:.4f} |" for r in logs]
+    worst = max((r["grade"] for r in logs), default=0)
     md = [f"# Evaluation run {datetime.now():%Y-%m-%d %H:%M}", "",
-          f"**{total}/{count} checks passed**", "", "| Case | Check | Result |", "|---|---|---|", *rows]
+          f"Live agent, model: {MODEL}", "",
+          f"**{total}/{count} checks passed**", "",
+          f"Highest reading grade across all agent replies: **{worst}** (target: 8 or lower)", "",
+          "## By case", "", "| Case | Situation | Checks passed | Reading grade | Cost (estimate) |",
+          "|---|---|---|---|---|", *per_case, "",
+          "## Every check", "", "| Case | Check | Result |", "|---|---|---|", *rows]
     (ROOT / "eval" / "results.md").write_text("\n".join(md) + "\n")
     (ROOT / "output" / "eval_transcripts.json").write_text(json.dumps(logs, indent=1))
     print(f"\n{total}/{count} checks passed. Scorecard: eval/results.md")
