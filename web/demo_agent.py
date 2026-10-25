@@ -18,7 +18,7 @@ import re
 
 from just_in_case.agent import make_gate
 from just_in_case.directory import Directory
-from just_in_case.safeguards import NO_ONE_LINE
+from just_in_case.safeguards import NO_ONE_LINE, separate_service_line
 from just_in_case.state import PlanState
 from just_in_case.tools import PREFIX, Toolbox, ToolError
 
@@ -30,6 +30,11 @@ HELPING = re.compile(r"helping (someone|my|a )|for (my )?(mom|mother|dad|father|
                      r"grand\w+|friend|neighbou?r|sister|brother)|someone else", re.I)
 NO_ONE = re.compile(r"no one|nobody|don'?t have anyone|do not have anyone|not anyone|no family|no friends", re.I)
 NO = re.compile(r"^\s*(no|nope|none|not really|nothing)\b", re.I)
+# Keeping family and friends updated during a health event, or many people helping over time.
+UPDATES = re.compile(r"keep(ing)? (my |our |the )?(family|friends|kids|children|everyone|people)\b[^.?!]*"
+                     r"\b(updated|posted|informed|in the loop|up to date)|updates? (to|for|with) (my |our )?(family|friends)|"
+                     r"\b(lots of|many|a lot of) (people|friends|neighbou?rs)|sign up to help|meal (train|schedule)|"
+                     r"take turns", re.I)
 
 # Keywords -> needs. The planner only plans for what the visitor brings up.
 NEED_WORDS = [
@@ -83,6 +88,8 @@ class DemoAgent:
         self.papers = ""
         self.name = ""
         self.queue: list[str] = []
+        self.suggestion: dict | None = None   # an optional outside service, offered once, never added for them
+        self.suggested = False
         self.cost_usd = 0.0
         self.transcript: list[tuple[str, str]] = []
 
@@ -176,9 +183,24 @@ class DemoAgent:
         return ("Your fridge card is ready. Press **See your fridge card** to look at it and print it.\n\n"
                 "Let's look at this plan again in a few months.")
 
+    async def _maybe_suggest(self, text: str) -> None:
+        """Only for keeping people updated, or many people helping over time: a link the person may choose.
+        It comes from the services list, and it is never added to the plan for them."""
+        if self.suggested or not UPDATES.search(text):
+            return
+        found = await self._call("find_services", self.box.find_services, "family_updates")
+        pick = next(iter((found or {}).get("services", [])), None)
+        if pick:
+            self.suggested = True
+            self.suggestion = {"name": pick["name"], "url": pick["url"], "what": pick["how_to_use"],
+                               "free": pick["cost"] == "free", "separate": separate_service_line(pick["name"]),
+                               "simpler": "For one or two small tasks, the helper list on this page is simpler."}
+
     async def send(self, user_text: str, on_text=print, context: str = "") -> str:  # context: live agent only
         self.transcript.append(("user", user_text))
         self.state.user_said.append(user_text)
+        if not CRISIS.search(user_text):
+            await self._maybe_suggest(user_text)
         reply = await self._script(user_text)
         on_text(reply)
         self.transcript.append(("agent", reply))

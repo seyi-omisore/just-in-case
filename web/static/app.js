@@ -496,6 +496,24 @@
     typing.hidden = true;  // waiting for her answer, not thinking
   }
 
+  // ---- an optional outside service: a link the person may choose, never used for them ----
+  function addSuggestion(s) {
+    const li = el("li", "slip suggest");
+    li.dataset.page = Math.max(0, pages.length - 1);
+    const head = el("div", "slip-head"); head.append(icon("info"), document.createTextNode("You might also like"));
+    const body = el("div", "slip-body");
+    const what = el("p"); what.append(el("strong", null, s.name + (s.free && !/\bfree\b/i.test(s.what) ? " (free)" : "")),
+                                      document.createTextNode(". " + s.what));
+    body.append(what, el("p", "helper-small", s.separate),
+                el("p", "helper-small", s.simpler));
+    const a = el("a", "btn btn-quiet"); a.href = s.url; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.append(icon("info"), document.createTextNode(`Open ${s.name} (new tab)`));
+    body.appendChild(a);
+    li.append(head, body);
+    messages.appendChild(li);
+    scrollChat();
+  }
+
   // ---- activity feed -----------------------------------------------------
   function addActivity(kind, text) {
     const empty = feed.querySelector(".feed-empty"); if (empty) empty.remove();
@@ -875,6 +893,7 @@
         case "busy": setBusy(m.on); if (!m.on) exampleNext(); break;
         case "table_error": $("task-error").textContent = m.text; break;
         case "notice": addNotice(m.text); break;
+        case "suggest": addSuggestion(m); break;
         case "timeline_error": $("timeline-error").textContent = m.text; break;
         case "error": addMessage("agent", m.text, "msg-error"); setBusy(false); break;
       }

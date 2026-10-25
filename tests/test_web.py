@@ -1321,3 +1321,42 @@ def test_serve_starts_without_an_ai_key():
         assert cfg["ai"] is False and cfg["demo"] is False
     finally:
         proc.terminate(); proc.wait(timeout=10)
+
+
+# ---- Round 8, part 2: CaringBridge -----------------------------------------------------
+
+def test_caringbridge_comes_only_from_the_services_list_with_its_real_website():
+    import json, pathlib
+    from just_in_case.config import DATA_DIR
+    root = pathlib.Path(__file__).resolve().parent.parent
+    cb = next(s for s in json.loads((DATA_DIR / "services.json").read_text())["services"] if s["id"] == "svc_caringbridge")
+    assert cb["name"] == "CaringBridge" and cb["url"] == "https://www.caringbridge.org" and cb["cost"] == "free"
+    assert cb["last_verified"].startswith("2026-10") and cb["phone"] == "" and cb["needs"] == ["family_updates"]
+    for f in [*root.glob("just_in_case/*.py"), *root.glob("web/*.py"), *root.glob("web/static/*.*")]:
+        assert "caringbridge" not in f.read_text().lower(), f.name            # never typed in code: only the list has it
+    with client.websocket_connect("/ws") as ws:
+        until(ws, "hello")
+        ws.send_json({"type": "say", "text": "I have surgery next month and want to keep my family updated."})
+        approve(ws)                                       # the list of needs comes first
+        tip = until(ws, "suggest")                        # then the reply, with the optional link
+        plan = until(ws, "plan")["plan"]
+    assert tip["name"] == "CaringBridge" and tip["url"] == cb["url"]               # the link is the list's own
+    assert "separate service with its own privacy settings" in tip["separate"] and "helper list" in tip["simpler"]
+    assert "CaringBridge" not in [i["name"] for i in plan["items"]]                # offered, never added for them
+
+def test_caringbridge_is_not_offered_for_one_small_task():
+    with client.websocket_connect("/ws") as ws:
+        until(ws, "hello")
+        ws.send_json({"type": "say", "text": "I have a procedure next month and need a ride home."})
+        seen = []
+        while not seen or seen[-1] != "approval":
+            seen.append(ws.receive_json()["type"])
+    assert "suggest" not in seen
+    js = client.get("/static/app.js").text
+    assert 'case "suggest": addSuggestion(m); break;' in js and 'a.rel = "noopener noreferrer"' in js
+
+def test_the_live_agent_is_told_when_to_offer_an_updates_service():
+    from just_in_case.prompts import SYSTEM_PROMPT
+    text = " ".join(SYSTEM_PROMPT.split())
+    assert 'call find_services(need="family_updates")' in text and "separate service with its own privacy settings" in text
+    assert "Do not add it to the plan unless they ask" in text and "suggest the helper list" in text

@@ -906,3 +906,11 @@ def test_no_code_measures_time_in_the_app_or_counts_visits():
     files = [*root.glob("just_in_case/*.py"), *root.glob("web/*.py"), *root.glob("web/static/*.js")]
     hits = [f"{f.name}: {m.group(0)}" for f in files for m in [pattern.search(f.read_text())] if m]
     assert not hits, hits
+
+
+def test_an_outside_service_is_always_named_as_separate_with_its_own_privacy():
+    from just_in_case.safeguards import pressure_phrases, separate_service_line
+    line = separate_service_line("CaringBridge")
+    assert line == ("CaringBridge is a separate service with its own privacy settings. "
+                    "Just in Case never makes an account or shares anything for you.")
+    assert pressure_phrases(line) == []

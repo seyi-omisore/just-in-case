@@ -446,6 +446,10 @@ class Session:
             context = f"[Note from the app, not the user: {' '.join(notes)}]" if notes else ""
             try:
                 await self.agent.send(text, on_text=on_text, context=context)
+                tip = getattr(self.agent, "suggestion", None)   # the guided planner's optional outside service
+                if tip:
+                    self.agent.suggestion = None
+                    self.emit({"type": "suggest", **tip})
             except Exception as e:  # keep the page usable, say what happened
                 self.emit({"type": "error", "text": f"Something went wrong on our side: {e}. "
                            "Please try sending your message again."})
