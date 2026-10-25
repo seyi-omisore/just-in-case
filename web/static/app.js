@@ -694,6 +694,7 @@
     walletUrl = plan.wallet; $("wallet-print").hidden = !plan.wallet;
     planPrintUrl = plan.plan_print;
     $("plan-print").hidden = !plan.plan_print;
+    planEmail = plan.plan_email; $("plan-email").hidden = !plan.plan_email;
     summaryUrl = plan.summary_print;
     $("summary-print").hidden = !plan.summary_available;   // only after something is in the plan, and only if you ask
     if (openSummaryWhenReady && summaryUrl) { openSummaryWhenReady = false; openSummary(); }
@@ -1344,6 +1345,11 @@
     $("card-dialog-title").textContent = "Your fridge card"; frame.title = "Your fridge card"; $("card-print-label").textContent = "Print card";
     frame.src = cardUrl + "?t=" + Date.now();
     dialog.showModal();
+  });
+  // "Email my plan": opens the person's own email app with the summary filled in. They choose who gets it.
+  let planEmail = null;
+  $("plan-email").addEventListener("click", () => {
+    $("plan-email").href = "mailto:?subject=" + encodeURIComponent("My Just in Case plan") + "&body=" + encodeURIComponent(planEmail || "");
   });
   let walletUrl = null;
   $("wallet-print").addEventListener("click", () => {

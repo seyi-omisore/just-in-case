@@ -320,3 +320,34 @@ def render_wallet_html(card: dict) -> str:
 <div class="pair"><section class="side" aria-label="Front">{front}</section><section class="side" aria-label="Back">{back}</section></div>
 <button class="print" onclick="window.print()">Print wallet card</button>
 </body></html>"""
+
+
+def plan_email_text(state: PlanState, directory: Directory) -> str:
+    """"Email my plan": a plain-text summary the person sends from their own email app.
+    Built by code from the plan. Card-only details (medications, allergies) are left off,
+    because emails get forwarded. Nothing here is sent by the app."""
+    from .state import NEEDS
+    lines = ["My Just in Case plan", ""]
+    for i in state.items:
+        need = NEEDS.get(i.need, i.need)
+        if i.route == "blank":
+            lines.append(f"- {need}: not covered yet. Age Strong (617-635-4366) or Mass 211 (dial 2-1-1) can help.")
+            continue
+        ref = directory.by_id.get(i.ref_id or "", {})
+        name = ref.get("name", i.label)
+        if i.route == "person":
+            names = [h for n in state.helper_notes for h in n["helpers"]]
+            name = " and ".join(names) if names else "Someone I chose"
+        phone = ref.get("phone") or ""
+        tail = "" if i.user_ok else " (still deciding)"
+        lines.append(f"- {need}: {name}" + (f", {phone}" if phone else "") + tail)
+    if state.event_date:
+        lines += ["", f"The date: {state.event_date}"]
+    tasks = [t for t in state.helper_tasks if t.get("task")]
+    if tasks:
+        lines += ["", "Who is helping"]
+        for t in tasks:
+            when = ", ".join(x for x in (t.get("date", ""), t.get("time", "")) if x)
+            lines.append(f"- {t['task']}" + (f" ({when})" if when else "") + f": {t['person'] or 'open'}")
+    lines += ["", EMERGENCY_LINE, CRISIS_LINE]
+    return "\n".join(lines)

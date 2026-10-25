@@ -32,6 +32,7 @@ from just_in_case.config import DATA_DIR, OUTPUT_DIR
 from just_in_case.config import AGENT_NAME, has_ai_key
 from just_in_case.prompts import GREETING
 from just_in_case.why import why_this
+from just_in_case.card import plan_email_text
 from just_in_case.invites import (INVITE_SUBJECT, LINK_LINE, REMINDER_SUBJECT, YOU_SEND_LINE,
                                   drafts_for)
 from just_in_case import timeline
@@ -234,6 +235,8 @@ class Session:
                              "invite_subject": INVITE_SUBJECT, "reminder_subject": REMINDER_SUBJECT},
             "card": f"/card/{self.id}" if state.card_path else None,
             "wallet": f"/wallet/{self.id}" if state.card_path else None,
+            # "Email my plan": plain text for the person's own email app. No medications or allergies.
+            "plan_email": plan_email_text(state, d) if any(i.user_ok for i in state.items) else None,
             "plan_print": f"/plan/{self.id}" if state.items else None,
             "summary_available": any(i["user_ok"] for i in items),          # the button may show
             "summary_print": f"/summary/{self.id}" if self.summary_ok and any(i["user_ok"] for i in items) else None,

@@ -1654,3 +1654,18 @@ def test_wallet_card_escapes_what_was_typed():
     page = render_wallet_html({"name": "<b>Ruth</b>", "contacts": [{"name": "Leo<script>", "phone": "617-555-0142"}],
                                "medications": ["Eye drops"], "allergies": []})
     assert "<script>" not in page and "&lt;script&gt;" in page and "My medications" in page
+
+
+def test_email_my_plan_opens_the_persons_own_email_without_card_only_details():
+    with client.websocket_connect("/ws") as ws:
+        *_, plan = ruth_flow(ws)
+        assert plan["plan_email"] is None                                  # nothing said yes to yet: no button
+        ws.send_json({"type": "item", "need": "ride_home_after_procedure", "ok": True})
+        plan = until(ws, "plan")["plan"]
+    text = plan["plan_email"]
+    assert text.startswith("My Just in Case plan")
+    assert "FriendshipWorks Medical Escort, 617-482-1510" in text and "In an emergency, call 911." in text
+    assert "(still deciding)" in text                                      # parts not said yes to are marked, not hidden
+    assert "Samantha" in text and "medication" not in text.lower()       # helpers yes; medications never
+    js = client.get("/static/app.js").text
+    assert '$("plan-email").href = "mailto:?subject=" + encodeURIComponent("My Just in Case plan")' in js
