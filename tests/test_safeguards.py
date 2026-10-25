@@ -984,3 +984,24 @@ def test_sending_wording_is_accurate_and_t6_keeps_its_safety_check():
     assert "no_send_claim" in t6["checks"] and "note_drafted" in t6["checks"]   # never claims it sent; prepares the draft
     js = (root / "web" / "static" / "app.js").read_text()
     assert "You send it yourself" not in js and "We never send it" not in js
+
+
+def test_day_before_checklist_only_lists_parts_the_user_said_yes_to():
+    from datetime import date
+    from just_in_case import timeline
+    from just_in_case.safeguards import reading_grade
+    from just_in_case.state import PlanItem, PlanState
+    st = PlanState()
+    st.confirmed_needs = ["ride_home_after_procedure", "spare_key_access", "pet_care_during_stay"]
+    st.items = [PlanItem("ride_home_after_procedure", "service", "svc_fw_escort", "FW", user_ok=True),
+                PlanItem("spare_key_access", "preparation", "prep_lockbox", "Lockbox", user_ok=True),
+                PlanItem("pet_care_during_stay", "person", None, "Doris", user_ok=False)]   # not said yes yet
+    today = date(2026, 10, 25)
+    assert timeline.build(st, today)["day_before"] is None          # no date picked: no checklist
+    st.event_date = "2026-11-14"
+    db = timeline.build(st, today)["day_before"]
+    assert db["date"] == "2026-11-13" and not db["past"]
+    assert db["items"] == ["Confirm the ride home and the pick-up time.", "Put a key in the lockbox.",
+                           "Charge the phone, and keep it close."]
+    for line in timeline.DAY_BEFORE.values():
+        assert reading_grade(line) <= 8

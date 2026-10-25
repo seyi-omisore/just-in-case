@@ -753,6 +753,15 @@
       if (s.date && !s.past) li.appendChild(calendarButton(s.text, s.date, `Just in Case: ${s.when.toLowerCase()} your ${tl.label}.`));
       ol.appendChild(li);
     }
+    // "The day before": one short checklist, with an optional calendar event for that day.
+    const db = tl.day_before;
+    $("day-before").hidden = !db;
+    if (db) {
+      $("day-before-date").textContent = dayWords(db.date);
+      $("day-before-list").replaceChildren(...db.items.map((t) => { const li = el("li"); li.append(icon("check"), document.createTextNode(t)); return li; }));
+      $("day-before-cal").replaceChildren();
+      if (!db.past) $("day-before-cal").appendChild(calendarButton("The day before: my checklist", db.date, db.items.join("\n")));
+    }
   }
   // A standard .ics file, made here in the browser. No calendar account is touched,
   // nothing goes to our server, and there is no alarm: the user's calendar decides.

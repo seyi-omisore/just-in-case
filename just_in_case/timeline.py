@@ -29,6 +29,20 @@ CARD_STEP = (1, "Put the fridge card where it's easy to see.")
 
 MAX_DAYS_AHEAD = 366
 
+# "The day before" checklist: short, one line per part the user said yes to. Logistics only.
+DAY_BEFORE: dict[str, str] = {
+    "ride_home_after_procedure": "Confirm the ride home and the pick-up time.",
+    "check_in_after_procedure": "Remind the person who will check in that evening.",
+    "spare_key_access": "Put a key in the lockbox.",
+    "pet_care_during_stay": "Leave pet food where it's easy to find.",
+    "mail_while_away": "Check that Hold Mail is set.",
+    "transportation": "Confirm the ride and the pick-up time.",
+    "help_at_home": "Confirm meals or help for the days after.",
+    "power_outage": "Charge flashlights and a phone power bank.",
+}
+DAY_BEFORE_ALWAYS = "Charge the phone, and keep it close."
+DAY_BEFORE_CARD = "Put the fridge card where it's easy to see."
+
 
 def event_label(state: PlanState) -> str:
     needs = set(state.confirmed_needs)
@@ -72,8 +86,16 @@ def build(state: PlanState, today: date) -> dict:
     event = parse_day(state.event_date, today) if state.event_date else None
     out = {"label": event_label(state), "date": event.isoformat() if event else "",
            "countdown": countdown(event, today) if event else "", "steps": []}
+    out["day_before"] = None
     if not planned:
         return out
+    if event:
+        items = [DAY_BEFORE[n] for n in planned if n in DAY_BEFORE]
+        if state.card_path:
+            items.append(DAY_BEFORE_CARD)
+        items.append(DAY_BEFORE_ALWAYS)
+        on = event - timedelta(days=1)
+        out["day_before"] = {"date": on.isoformat(), "past": on < today, "items": items}
     chosen = [(need, d, text) for need in planned for d, text in STEPS.get(need, [])]
     chosen += [("", d, text) for d, text in ALWAYS]
     if state.card_path:

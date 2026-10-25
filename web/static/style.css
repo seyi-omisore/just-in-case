@@ -1599,3 +1599,8 @@ a.menu-home:is(:link, :visited), a.demo-exit:is(:link, :visited), .footer-help a
 .invite-hint .icon { flex: 0 0 auto; margin-top: .2rem; color: var(--primary); }
 .note-send { display: grid; gap: .45rem; margin-top: .6rem; }
 .note-send .helper-small { margin: 0; }
+.day-before { margin-top: 1rem; padding: .8rem; border: 2px solid var(--line); border-radius: 14px; background: var(--enamel); }
+.day-before-title { display: flex; gap: .4rem; align-items: center; margin: 0 0 .2rem; font-size: 1rem; }
+.day-before-list { list-style: none; margin: .4rem 0 .6rem; padding: 0; display: grid; gap: .35rem; }
+.day-before-list li { display: flex; gap: .45rem; align-items: flex-start; }
+.day-before-list .icon { flex: 0 0 auto; margin-top: .2rem; color: var(--success); }
