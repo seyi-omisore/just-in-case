@@ -1008,6 +1008,8 @@
       switch (m.type) {
         case "hello":
           sessionId = m.session;
+          // The privacy wording follows this visit: AI on only for the live agent.
+          document.documentElement.dataset.ai = m.mode === "live" ? "on" : "off";
           // Ruth's example says it is a made-up story. The live agent says clearly that it is AI.
           // The guided planner (the app's own rules, no AI) needs no label.
           $("demo-banner").hidden = m.mode === "guided";

@@ -618,9 +618,16 @@ async def check_for_updates(request, call_next):
     return response
 
 
+def ai_on() -> bool:
+    """Whether a new visit here would talk to the AI service (a key, not demo mode, under today's limit)."""
+    return not DEMO and has_ai_key()
+
+
 def render_page(name: str, agent_name: str = AGENT_NAME) -> str:
-    """A page with the agent's name filled in. The name lives in config.py, nowhere else."""
-    return (STATIC / name).read_text().replace("{{AGENT_NAME}}", htmlmod.escape(agent_name))
+    """A page with the agent's name filled in. The name lives in config.py, nowhere else.
+    data-ai says whether this visit talks to the AI service; the privacy wording follows it."""
+    return ((STATIC / name).read_text().replace("{{AGENT_NAME}}", htmlmod.escape(agent_name))
+            .replace("{{AI_MODE}}", "on" if ai_on() else "off"))
 
 
 @app.get("/")

@@ -1692,9 +1692,10 @@ def test_was_this_helpful_saves_only_the_answer_and_comment(tmp_path, monkeypatc
     assert 'body: JSON.stringify({ helpful: fbAnswer, comment: $("fb-comment").value.trim() })' in js
 
 
-def test_report_a_problem_opens_email_to_a_clearly_marked_placeholder():
+def test_report_a_problem_opens_email_to_the_whole_team():
     from just_in_case.config import REPORT_EMAIL
-    assert REPORT_EMAIL == "REPLACE-ME-team-email@example.com"           # placeholder until the team picks one
+    assert REPORT_EMAIL == ("oluwaseyi.omisore001@umb.edu,L.Kurzhiparambil001@umb.edu,"
+                            "Joan.Arches@umb.edu,Satoshi.Nagae001@umb.edu")          # all four of the team
     with client.websocket_connect("/ws") as ws:
         *_, plan = ruth_flow(ws)
     assert plan["report_email"] == REPORT_EMAIL
@@ -1804,3 +1805,21 @@ def test_ruths_example_shows_round_12_and_still_reaches_the_end():
     assert 'target: () => $("attention"), done: () => story.card },' in js
     assert 'show: () => { $("night-preview").open = true; }, target: () => $("night-preview"), done: () => story.summary },' in js
     assert 'target: () => $("pc-open"), done: () => $("review-mark").hidden },' in js
+
+
+# ---- Quick fixes for the hosted demo -----------------------------------------
+
+def test_privacy_wording_follows_whether_this_visit_uses_the_ai(monkeypatch):
+    import web.server as srv
+    page = client.get("/").text                                          # tests run in demo mode: no AI
+    assert '<html lang="en" data-ai="off">' in page
+    no_ai = "Right now, nothing you type is sent to any outside service."
+    assert page.count('class="when-no-ai">' + no_ai) == 3                 # FAQ, privacy page, footer
+    assert page.count('class="when-ai">What you type is sent to an AI service') == 3
+    monkeypatch.setattr(srv, "DEMO", False)
+    monkeypatch.setattr(srv, "has_ai_key", lambda: True)
+    assert 'data-ai="on"' in srv.render_page("index.html")
+    css = client.get("/static/style.css").text
+    assert 'html[data-ai="off"] .when-ai, html[data-ai="on"] .when-no-ai { display: none !important; }' in css
+    js = client.get("/static/app.js").text
+    assert 'document.documentElement.dataset.ai = m.mode === "live" ? "on" : "off";' in js   # Ruth's example: off

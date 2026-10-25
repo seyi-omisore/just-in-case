@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-ai="{{AI_MODE}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -341,7 +341,7 @@
       <details>
         <summary>Who can see my information?</summary>
         <p>Only you, unless you choose to share. We never sell data.</p>
-        <details class="more"><summary>Show details</summary><p>What you type is sent to an AI service so it can write replies. Nothing is kept after your visit unless you tap "Save my progress" (saved only on your device) or "Share with family" (your helper list only, with first names, deleted after 30 days).</p></details>
+        <details class="more"><summary>Show details</summary><p class="when-ai">What you type is sent to an AI service so it can write replies.</p><p class="when-no-ai">Right now, nothing you type is sent to any outside service. The guided planner and Ruth's example run on this site alone.</p><p>Nothing is kept after your visit unless you tap "Save my progress" (saved only on your device) or "Share with family" (your helper list only, with first names, deleted after 30 days).</p></details>
       </details>
       <details>
         <summary>I'm not good with technology. Can I still use it?</summary>
@@ -531,7 +531,7 @@
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> Who can see it</h2>
         <p>Only you, unless you share a list. People with your link see first names and tasks only.</p>
-        <details class="more"><summary>Show details</summary><p>What you type is sent to an AI service so it can reply. That service is OpenRouter, which passes your words to an AI model, and their own privacy rules apply. Please do not type bank details or account numbers.</p><p>The guided planner and Ruth's example use no AI, so nothing you type there goes to an AI service.</p><p>Anyone who has your share link can open it, so send it only to people you trust. Your private link, which can remove names or stop sharing, is separate.</p><p>If you use Speak, your browser may send your voice to its maker to turn it into text. This site also loads a font from Google, so Google can see that your browser visited.</p></details>
+        <details class="more"><summary>Show details</summary><p class="when-ai">What you type is sent to an AI service so it can reply. That service is OpenRouter, which passes your words to an AI model, and their own privacy rules apply. The guided planner and Ruth's example use no AI.</p><p class="when-no-ai">Right now, nothing you type is sent to any outside service. The guided planner and Ruth's example run on this site alone.</p><p>Please do not type bank details or account numbers.</p><p>Anyone who has your share link can open it, so send it only to people you trust. Your private link, which can remove names or stop sharing, is separate.</p><p>If you use Speak, your browser may send your voice to its maker to turn it into text. This site also loads a font from Google, so Google can see that your browser visited.</p></details>
       </div>
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> How long we keep it</h2>
@@ -1336,7 +1336,7 @@
       <section aria-labelledby="f-privacy">
         <h2 id="f-privacy"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> Privacy</h2>
         <p>Nothing is kept after your visit unless you save or share. We never sell data.</p>
-        <details class="more"><summary>Show details</summary><p>What you type is sent to an AI service to write replies.</p></details>
+        <details class="more"><summary>Show details</summary><p class="when-ai">What you type is sent to an AI service to write replies.</p><p class="when-no-ai">Right now, nothing you type is sent to any outside service. The guided planner and Ruth's example run on this site alone.</p></details>
         <p><a href="#privacy">Read our privacy page</a></p>
       </section>
       <section aria-labelledby="f-access">
