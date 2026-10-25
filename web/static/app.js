@@ -609,7 +609,7 @@
     if (bottom <= room) return;                                   // already on screen with the heading
     window.scrollBy({ top: Math.max(0, Math.min(bottom - room, top - bar - 12)), behavior: "instant" });
   }
-  // After the person answers, Haven's next question starts at the top of the page too.
+  // After the person answers, the agent's next question starts at the top of the page too.
   // (Ruth's example moves the page itself, one step at a time.)
   function newQuestion() {
     if (!answered || EXAMPLE) return;
