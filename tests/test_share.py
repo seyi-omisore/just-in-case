@@ -208,3 +208,19 @@ def test_family_page_shows_status_and_stepping_back_clears_confirmed():
         page = client.get(f"/api/share/{sid}").json()["tasks"][0]
         ws.send_json({"type": "share_delete"})
     assert after["confirmed"] is False and page["status"] == "open"
+
+
+def test_helper_can_add_their_own_task_to_their_calendar_with_no_account():
+    from fastapi.testclient import TestClient
+    from web.server import app
+    c = TestClient(app)
+    import pathlib
+    page = (pathlib.Path(__file__).resolve().parent.parent / "web" / "static" / "share.html").read_text()
+    js = c.get("/static/share.js").text
+    assert 'if (mine[t.id]) { const cal = helperCalendarButton(t, who); if (cal) li.appendChild(cal); }' in js   # own task only
+    assert "BEGIN:VCALENDAR" in js and 'a.download = "helping.ics"' in js
+    assert "if (!day || day < new Date(new Date().toDateString())) return null;" in js   # unreadable or past date: no button
+    start = js.index("// ---- \"Add to my calendar\" for a helper's own task")
+    block = js[start:js.index("async function api(path, body)")]
+    assert "fetch(" not in block                                  # made in the browser, never sent anywhere
+    assert 'id="i-calendar"' in page

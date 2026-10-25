@@ -37,6 +37,56 @@
   const saveClaims = (c) => { try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (_) {} };
   const status = (t) => { $("share-status").textContent = t || ""; };
 
+  // ---- "Add to my calendar" for a helper's own task --------------------------
+  // The file is made here, in the helper's browser. No account, no app, nothing sent to our server.
+  // Only dates we can read for sure get a button (the same rules as the main page).
+  const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august",
+                  "september", "october", "november", "december"];
+  function readTaskDate(text) {
+    const s = String(text || "").trim().toLowerCase(), now = new Date();
+    let y = null, m = null, d = null, hit;
+    if ((hit = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s))) [y, m, d] = [+hit[1], +hit[2], +hit[3]];
+    else if ((hit = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/.exec(s))) [m, d, y] = [+hit[1], +hit[2], hit[3] ? +hit[3] : null];
+    else if ((hit = /^([a-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?$/.exec(s))) {
+      const word = hit[1] === "sept" ? "sep" : hit[1];
+      m = MONTHS.findIndex((n) => n.startsWith(word)) + 1;
+      if (!m || !(word === MONTHS[m - 1] || word.length === 3)) return null;
+      d = +hit[2]; y = hit[3] ? +hit[3] : null;
+    } else return null;
+    if (y !== null && y < 100) y += 2000;
+    if (y === null) {
+      y = now.getFullYear();
+      if (new Date(y, m - 1, d) < new Date(now.getFullYear(), now.getMonth(), now.getDate())) y += 1;
+    }
+    const date = new Date(y, m - 1, d);
+    if (date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+    return date;
+  }
+  function helperICS(title, day, details) {
+    const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+    const ymd = (x) => x.getFullYear() + String(x.getMonth() + 1).padStart(2, "0") + String(x.getDate()).padStart(2, "0");
+    const end = new Date(day); end.setDate(end.getDate() + 1);
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+    const uid = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)) + "@justincase";
+    return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Just in Case//Helper list//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+      "BEGIN:VEVENT", `UID:${uid}`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${ymd(day)}`, `DTEND;VALUE=DATE:${ymd(end)}`,
+      `SUMMARY:${esc(title)}`, `DESCRIPTION:${esc(details)}`, "TRANSP:TRANSPARENT", "END:VEVENT", "END:VCALENDAR"].join("\r\n") + "\r\n";
+  }
+  function helperCalendarButton(t, who) {
+    const day = readTaskDate(t.date);
+    if (!day || day < new Date(new Date().toDateString())) return null;
+    const b = el("button", "btn btn-quiet share-small"); b.type = "button";
+    b.append(icon("calendar"), document.createTextNode("Add to my calendar"));
+    b.onclick = () => {
+      const title = (who ? `Helping ${who}: ` : "Helping: ") + t.task + (t.time ? `, ${t.time}` : "");
+      const url = URL.createObjectURL(new Blob([helperICS(title, day, "From a Just in Case helper list. Thank you for helping.")], { type: "text/calendar" }));
+      const a = el("a"); a.href = url; a.download = "helping.ics";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    return b;
+  }
+
   async function api(path, body) {
     const opts = body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {};
     const r = await fetch(`/api/share/${shareId}${path}`, opts);
@@ -73,6 +123,7 @@
       if (t.person) {
         const p = el("p", "share-who"); p.append(avatar(t.person), document.createTextNode(`${t.person} is helping`));
         li.appendChild(p);
+        if (mine[t.id]) { const cal = helperCalendarButton(t, who); if (cal) li.appendChild(cal); }   // only the helper's own task
         const token = mine[t.id] || (data.owner ? ownerToken : "");
         if (token) {
           const b = el("button", "btn btn-quiet share-small"); b.type = "button";
