@@ -676,6 +676,19 @@
         li.insertBefore(ul, panel);   // warnings (waitlist, escort rule, no phone) stay visible, never behind a tap
       }
       if (item.why) { const w = el("p", "tag-why"); w.append(icon("info"), document.createTextNode(item.why)); panel.appendChild(w); }
+      if (item.plan_b) {   // a friend gives the ride: a checked service stays ready as Plan B
+        const pb = el("div", "plan-b");
+        pb.appendChild(el("p", "plan-b-title", "Plan B"));
+        pb.appendChild(el("p", null, `If your helper can't make it, call ${item.plan_b.name}.`));
+        if (item.plan_b.phone) {
+          const a = el("a"); a.href = "tel:" + item.plan_b.phone.replace(/[^0-9]/g, "");
+          a.append(icon("phone"), document.createTextNode(item.plan_b.phone)); pb.appendChild(a);
+        } else if (item.plan_b.url) {
+          const a = el("a"); a.href = item.plan_b.url; a.target = "_blank"; a.rel = "noopener";
+          a.append(icon("info"), document.createTextNode("Website")); pb.appendChild(a);
+        }
+        panel.appendChild(pb);
+      }
       if (item.why_this) {   // "Why this?": one plain sentence, built from the services list and the person's answers
         const d = el("details", "more why-this");
         d.append(el("summary", null, "Why this?"), el("p", null, item.why_this));

@@ -1762,3 +1762,17 @@ def test_plans_changed_over_the_live_connection_sends_drafts_not_messages():
     js = client.get("/static/app.js").text
     assert 'case "plans_changed": showPlanUpdates(m); break;' in js
     assert '$("pc-open").hidden = !tl.date;' in js
+
+
+def test_plan_b_keeps_a_checked_service_ready_when_a_friend_gives_the_ride():
+    from just_in_case.directory import Directory
+    from just_in_case.state import PlanItem, PlanState
+    from web.server import plan_b
+    d, st = Directory(), PlanState()
+    friend = PlanItem("ride_home_after_procedure", "person", None, "Leo")
+    b = plan_b(friend, st, d)
+    assert b["name"] == "FriendshipWorks Medical Escort" and b["phone"] == "617-482-1510" and b["cost"] == "free"
+    assert plan_b(PlanItem("ride_home_after_procedure", "service", "svc_fw_escort", ""), st, d) is None   # already a service
+    assert plan_b(PlanItem("pet_care_during_stay", "person", None, "Doris"), st, d) is None              # rides only
+    js = client.get("/static/app.js").text
+    assert "If your helper can't make it, call ${item.plan_b.name}." in js

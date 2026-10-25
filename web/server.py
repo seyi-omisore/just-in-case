@@ -73,6 +73,20 @@ SHARES.purge_expired()
 # Plain-language descriptions for the activity feed
 # ---------------------------------------------------------------------------
 
+# Plan B: when a friend is giving the ride home, keep the best matching service ready.
+PLAN_B_NEEDS = {"ride_home_after_procedure"}
+
+
+def plan_b(item, state, directory) -> dict | None:
+    if item.need not in PLAN_B_NEEDS or item.route != "person":
+        return None
+    found = directory.find_services(item.need, state.town)   # free first, from the checked list only
+    if not found:
+        return None
+    s = directory.by_id[found[0]["id"]]
+    return {"name": s["name"], "phone": s.get("phone", ""), "url": s.get("url", ""), "cost": s["cost"]}
+
+
 def need_label(key: str) -> str:
     return NEEDS.get(key, key.replace("_", " "))
 
@@ -209,6 +223,7 @@ class Session:
                 "url": ref.get("url", ""), "what": ref.get("what") or ref.get("how_to_use", ""),
                 "flags": i.flags, "why": NEED_WHY.get(i.need, ""), "user_ok": i.user_ok,
                 "why_this": why_this(i, state, d),   # one plain sentence, from facts only
+                "plan_b": plan_b(i, state, d),
                 "checked": ref.get("last_verified", "") if i.route == "service" else "",
             })
         covered = {i.need for i in state.items if i.route != "blank" and i.user_ok}
