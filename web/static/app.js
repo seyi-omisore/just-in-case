@@ -691,6 +691,7 @@
     const card = $("card-link");
     cardUrl = plan.card;
     card.hidden = !plan.card;
+    walletUrl = plan.wallet; $("wallet-print").hidden = !plan.wallet;
     planPrintUrl = plan.plan_print;
     $("plan-print").hidden = !plan.plan_print;
     summaryUrl = plan.summary_print;
@@ -1342,6 +1343,13 @@
     if (!cardUrl) return;
     $("card-dialog-title").textContent = "Your fridge card"; frame.title = "Your fridge card"; $("card-print-label").textContent = "Print card";
     frame.src = cardUrl + "?t=" + Date.now();
+    dialog.showModal();
+  });
+  let walletUrl = null;
+  $("wallet-print").addEventListener("click", () => {
+    if (!walletUrl) return;
+    $("card-dialog-title").textContent = "Your wallet card"; frame.title = "Your wallet card"; $("card-print-label").textContent = "Print wallet card";
+    frame.src = walletUrl + "?t=" + Date.now();
     dialog.showModal();
   });
   let planPrintUrl = null;

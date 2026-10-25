@@ -275,3 +275,48 @@ def render_card_html(lines: list[str]) -> str:
  {"".join(parts)}
  <button class="print" onclick="window.print()">Print this card</button>
 </body></html>"""
+
+
+def render_wallet_html(card: dict) -> str:
+    """A wallet-size card (3.375 x 2.125 inches), front and back, to cut out and fold.
+
+    Only what is already on the approved fridge card: the same checked details, and only the
+    sections the person ticked. Front: 911, the name, contacts. Back: medications and allergies.
+    """
+    e = html.escape
+    name = card.get("name") or ""
+    contacts = "".join(f"<li>{e(c['name'])}{' (' + e(c['relationship']) + ')' if c.get('relationship') else ''}: "
+                       f"<b>{e(c['phone'])}</b></li>" for c in (card.get("contacts") or [])[:3])
+    meds = "".join(f"<li>{e(m)}</li>" for m in (card.get("medications") or [])[:6])
+    allergies = "".join(f"<li>{e(a)}</li>" for a in (card.get("allergies") or [])[:6])
+    front = (f'<p class="e911">{e(EMERGENCY_LINE.upper())}</p>'
+             + (f'<p class="name">{e(name)}</p>' if name else "")
+             + (f'<p class="h">People to contact</p><ul>{contacts}</ul>' if contacts else ""))
+    back = ((f'<p class="h">My medications</p><ul>{meds}</ul>' if meds else "")
+            + (f'<p class="h">My allergies</p><ul>{allergies}</ul>' if allergies else "")
+            + ('<p class="small">As I listed them. Questions go to my care team.</p>' if meds else "")
+            + ('' if (meds or allergies) else f'<p class="h">{e(EMERGENCY_LINE)}</p>'))
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="light only"><meta name="darkreader-lock">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallet card</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+ @page {{ size: letter; margin: .5in; }}
+ body {{ font-family: "Atkinson Hyperlegible", Verdana, Arial, sans-serif; color: #000; background: #fff; margin: 16px; }}
+ .how {{ font-size: 14pt; max-width: 7in; }}
+ .pair {{ display: flex; flex-wrap: wrap; gap: 0; margin: 16px 0; }}
+ .side {{ width: 3.375in; height: 2.125in; box-sizing: border-box; padding: .12in .14in; border: 1.5px dashed #555;
+          overflow: hidden; font-size: 9.5pt; line-height: 1.25; }}
+ .e911 {{ margin: 0 0 .05in; padding: .04in .06in; background: #000; color: #fff; font-weight: 700; font-size: 10pt; text-align: center; }}
+ .name {{ margin: 0 0 .04in; font-weight: 700; font-size: 12pt; }}
+ .h {{ margin: .03in 0 .02in; font-weight: 700; text-transform: uppercase; font-size: 7.5pt; letter-spacing: .02em; }}
+ ul {{ margin: 0; padding-left: .14in; }}
+ .small {{ margin: .04in 0 0; font-size: 7pt; }}
+ .print {{ font: inherit; font-size: 14pt; font-weight: 700; padding: .1in .35in; min-height: 48px; border: 0; border-radius: 10px; background: #1F6F78; color: #fff; }}
+ @media print {{ .how, .print {{ display: none; }} body {{ margin: 0; }} }}
+</style></head><body>
+<p class="how">Print, cut along the dashed line, and fold in the middle so the front and back face out.</p>
+<div class="pair"><section class="side" aria-label="Front">{front}</section><section class="side" aria-label="Back">{back}</section></div>
+<button class="print" onclick="window.print()">Print wallet card</button>
+</body></html>"""

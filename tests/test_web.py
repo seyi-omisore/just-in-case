@@ -1634,3 +1634,23 @@ def test_plan_checkins_are_one_optional_repeating_calendar_event():
     assert 'const CHECKIN_RULE = "FREQ=MONTHLY;INTERVAL=3";' in js
     assert '...(rrule ? [`RRULE:${rrule}`] : []),' in js
     assert '$("checkins-cal").hidden = $("checkins-note").hidden = !plan.ready;' in js
+
+
+def test_wallet_card_uses_only_the_approved_card_details():
+    assert client.get("/wallet/not-a-visit").status_code == 404                 # no card: no wallet card
+    with client.websocket_connect("/ws") as ws:
+        *_, plan = ruth_flow(ws)                                              # contacts only: Samantha Lee
+        sid = plan["wallet"].rsplit("/", 1)[1]
+        page = client.get(plan["wallet"]).text
+    assert "IN AN EMERGENCY, CALL 911." in page and "Samantha Lee" in page and "617-555-0142" in page
+    assert "My medications" not in page and "My allergies" not in page and "Fifi" not in page   # not ticked: not on it
+    assert "width: 3.375in; height: 2.125in" in page
+    assert client.get(f"/wallet/{sid}").status_code == 404                     # gone when the visit ends
+    assert 'id="wallet-print" class="btn btn-quiet btn-block" hidden' in client.get("/").text
+
+
+def test_wallet_card_escapes_what_was_typed():
+    from just_in_case.card import render_wallet_html
+    page = render_wallet_html({"name": "<b>Ruth</b>", "contacts": [{"name": "Leo<script>", "phone": "617-555-0142"}],
+                               "medications": ["Eye drops"], "allergies": []})
+    assert "<script>" not in page and "&lt;script&gt;" in page and "My medications" in page

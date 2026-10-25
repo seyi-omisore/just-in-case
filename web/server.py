@@ -233,6 +233,7 @@ class Session:
             "invite_words": {"link_line": LINK_LINE, "you_send": YOU_SEND_LINE,
                              "invite_subject": INVITE_SUBJECT, "reminder_subject": REMINDER_SUBJECT},
             "card": f"/card/{self.id}" if state.card_path else None,
+            "wallet": f"/wallet/{self.id}" if state.card_path else None,
             "plan_print": f"/plan/{self.id}" if state.items else None,
             "summary_available": any(i["user_ok"] for i in items),          # the button may show
             "summary_print": f"/summary/{self.id}" if self.summary_ok and any(i["user_ok"] for i in items) else None,
@@ -630,6 +631,17 @@ async def family_updates():
     return JSONResponse([{**{k: s[k] for k in ("name", "url", "cost", "how_to_use")},
                           "last_verified": d.by_id[s["id"]]["last_verified"],
                           "separate": separate_service_line(s["name"])} for s in d.find_services("family_updates", "Boston")])
+
+
+@app.get("/wallet/{sid}")
+async def wallet(sid: str):
+    """The wallet card: only the approved fridge card details. Made on request, never saved."""
+    from just_in_case.card import render_wallet_html
+    s = SESSIONS.get(sid)
+    card = getattr(s.agent.box, "card", None) if s and s.agent else None
+    if not card or not s.agent.state.card_path:
+        return JSONResponse({"error": "No card yet"}, status_code=404)
+    return HTMLResponse(render_wallet_html(card))
 
 
 @app.get("/card/{sid}")
