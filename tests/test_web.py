@@ -1360,3 +1360,27 @@ def test_the_live_agent_is_told_when_to_offer_an_updates_service():
     text = " ".join(SYSTEM_PROMPT.split())
     assert 'call find_services(need="family_updates")' in text and "separate service with its own privacy settings" in text
     assert "Do not add it to the plan unless they ask" in text and "suggest the helper list" in text
+
+
+# ---- Round 8, part 3: a warmer Read aloud voice -----------------------------------------
+
+def test_read_aloud_prefers_premium_and_enhanced_voices_and_keeps_the_users_choice():
+    import json, re, subprocess, shutil
+    js = client.get("/static/app.js").text
+    quality = js[js.index("const voiceQuality"):js.index("const voiceScore")]
+    score = js[js.index("const voiceScore"):js.index("};", js.index("const voiceScore")) + 2]
+    novelty = re.search(r"const NOVELTY = (/.+?/i);", js).group(1)
+    if not shutil.which("node"):          # no JavaScript runner here: check the order in the code itself
+        assert quality.index("premium") < quality.index("enhanced") < quality.index("natural|neural")
+        assert "online \\(natural\\)" in quality
+    else:
+        voices = [{"name": n, "lang": l} for n, l in (("Samantha", "en-US"), ("Ava (Premium)", "en-US"),
+                  ("Samantha (Enhanced)", "en-US"), ("Microsoft Aria Online (Natural) - English (United States)", "en-US"),
+                  ("Daniel", "en-GB"), ("Zoe (Premium)", "en-US"))]
+        prog = f"const NOVELTY = {novelty}; {quality} {score} const v = {json.dumps(voices)};" \
+               "console.log(JSON.stringify(v.sort((a, b) => voiceScore(b) - voiceScore(a)).map((x) => x.name)));"
+        order = json.loads(subprocess.run(["node", "-e", prog], capture_output=True, text=True).stdout)
+        assert order[:2] == ["Ava (Premium)", "Zoe (Premium)"] and order[-1] == "Daniel"
+    assert 'chosenVoice = voices.find((v) => v.voiceURI === saved) || voices.slice().sort(byScore)[0];' in js   # the choice wins
+    assert "SPEEDS = [0.7, 0.8, 0.9, 1.0, 1.1]" in js and "u.pitch = 1.1" in js and "speedIdx = 2" in js       # warm: 0.9, a bit higher
+    assert "zoe" in js[js.index("const FEMALE_NAMES"):js.index("const MALE_NAMES")]

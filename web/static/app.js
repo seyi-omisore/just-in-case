@@ -226,11 +226,16 @@
   };
   // A warm voice: the most natural one this device has, a little slower and a little higher.
   const NOVELTY = /albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|fred|junior|ralph|kathy/i;
+  // The most natural voices come first, when this device has them: Premium (like Ava or Zoe Premium on Apple
+  // devices), then Enhanced (like Samantha Enhanced) and Microsoft's "Online (Natural)" voices in Edge,
+  // then the usual voices. A voice the person picks in Settings is remembered and always wins.
+  const voiceQuality = (name) => /premium/i.test(name) ? 400
+    : /enhanced/i.test(name) || /online \(natural\)/i.test(name) ? 300
+    : /natural|neural/i.test(name) ? 200 : 0;
   const voiceScore = (v) => {
     if (NOVELTY.test(v.name)) return -1;
-    let s = 0;
+    let s = voiceQuality(v.name);
     if (/^en[-_]US/i.test(v.lang)) s += 100; else if (/^en/i.test(v.lang)) s += 60;
-    if (/enhanced|premium|natural|neural/i.test(v.name)) s += 50;
     if (/online|google|microsoft/i.test(v.name)) s += 25;
     if (v.default) s += 5;
     return s;
@@ -241,7 +246,7 @@
                     "en-IE": "Irish", "en-ZA": "South African", "en-CA": "Canadian", "en-NZ": "New Zealand" };
   // Female or male only when the voice says so, or its name is on these lists (Apple, Google, Microsoft).
   // A name that is not here is never guessed. It is just "Voice 1", "Voice 2".
-  const FEMALE_NAMES = /\b(samantha|karen|moira|tessa|fiona|veena|victoria|allison|ava|susan|serena|kate|nicky|zira|aria|jenny|michelle|sonia|libby|maisie|natasha|annette|clara|neerja|emily|hazel|linda|catherine|heera|heather|leah|molly|mia)\b/i;
+  const FEMALE_NAMES = /\b(zoe|samantha|karen|moira|tessa|fiona|veena|victoria|allison|ava|susan|serena|kate|nicky|zira|aria|jenny|michelle|sonia|libby|maisie|natasha|annette|clara|neerja|emily|hazel|linda|catherine|heera|heather|leah|molly|mia)\b/i;
   const MALE_NAMES = /\b(daniel|rishi|alex|tom|aaron|oliver|lee|arthur|gordon|evan|nathan|david|mark|guy|ryan|thomas|christopher|eric|roger|steffan|brian|davis|jason|tony|liam|william|connor|james|george|richard|prabhat|ravi|mitchell|luke)\b/i;
   const genderOf = (v) => {
     const f = /\bfemale\b/i.test(v.name) || FEMALE_NAMES.test(v.name);
