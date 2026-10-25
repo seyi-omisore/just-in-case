@@ -31,9 +31,10 @@ MAX_BUDGET_USD = float(os.getenv("JIC_MAX_BUDGET_USD", "0.50"))
 STALE_AFTER_DAYS = 365
 # Plans stay small: at most this many people across the whole plan.
 MAX_HELPERS = 3
-# "Report a problem with this service" goes here. PLACEHOLDER until the team picks a real address:
-# example.com is reserved, so no message can reach anyone by accident.
-REPORT_EMAIL = "REPLACE-ME-team-email@example.com"
+# "Report a problem with this service" opens an email to the whole team.
+TEAM_EMAILS = ("oluwaseyi.omisore001@umb.edu", "L.Kurzhiparambil001@umb.edu",
+               "Joan.Arches@umb.edu", "Satoshi.Nagae001@umb.edu")
+REPORT_EMAIL = ",".join(TEAM_EMAILS)
 # Months until the card says "review this plan".
 REVIEW_AFTER_MONTHS = 4
 
