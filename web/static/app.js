@@ -1042,6 +1042,10 @@
         case "suggest": addSuggestion(m); break;
         case "timeline_error": $("timeline-error").textContent = m.text; break;
         case "plans_changed": showPlanUpdates(m); break;
+        case "mode":   // today's AI limit was reached: the guided planner took over, with no outside service
+          document.documentElement.dataset.ai = m.mode === "live" ? "on" : "off";
+          if (m.mode === "guided") $("demo-banner").hidden = true;
+          break;
         case "error": addMessage("agent", m.text, "msg-error"); setBusy(false); break;
       }
     };

@@ -31,6 +31,8 @@ MAX_BUDGET_USD = float(os.getenv("JIC_MAX_BUDGET_USD", "0.50"))
 STALE_AFTER_DAYS = 365
 # Plans stay small: at most this many people across the whole plan.
 MAX_HELPERS = 3
+# AI replies per day for the whole site (hosted copy with a key). After that, the guided planner.
+AI_DAILY_LIMIT = int(os.getenv("JIC_AI_DAILY_LIMIT", "200") or 200)
 # "Report a problem with this service" opens an email to the whole team.
 TEAM_EMAILS = ("oluwaseyi.omisore001@umb.edu", "L.Kurzhiparambil001@umb.edu",
                "Joan.Arches@umb.edu", "Satoshi.Nagae001@umb.edu")

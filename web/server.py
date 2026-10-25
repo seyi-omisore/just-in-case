@@ -29,7 +29,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from just_in_case.config import DATA_DIR, OUTPUT_DIR
-from just_in_case.config import AGENT_NAME, REPORT_EMAIL, has_ai_key
+from just_in_case.config import AGENT_NAME, AI_DAILY_LIMIT, REPORT_EMAIL, has_ai_key
+from just_in_case.daily_limit import DailyLimit
 from just_in_case.prompts import GREETING
 from just_in_case.why import why_this
 from just_in_case import attention
@@ -63,6 +64,10 @@ STARTED_WITH = code_fingerprint()
 DEMO = os.getenv("JIC_DEMO") == "1"
 
 app = FastAPI(title="Just in Case")
+AI_LIMIT = DailyLimit(AI_DAILY_LIMIT)   # AI replies per day, all visitors together
+LIMIT_LINE = (f"{AGENT_NAME} has reached today's limit for AI replies, so the guided planner will take it "
+              "from here. It uses the same checked services and rules, and your plan is kept. "
+              "What would you like to work on next?")
 SESSIONS: dict[str, "Session"] = {}
 SHARES = ShareStore(OUTPUT_DIR / "shared")
 SHARE_OWNERS: dict[str, "Session"] = {}  # share id -> the owner's open visit
@@ -480,9 +485,39 @@ class Session:
                 pass
         shutil.rmtree(self.out_dir, ignore_errors=True)
 
+    async def switch_to_guided(self) -> None:
+        """Today's AI limit is reached: carry the plan over to the guided planner (no AI)."""
+        from web.demo_agent import DemoAgent
+        saved = self.agent.box.export()
+        ids = [t["id"] for t in self.agent.state.helper_tasks]
+        try:
+            await self.agent.__aexit__(None, None, None)
+        except Exception:
+            pass
+        self.mode, self.demo = "guided", True
+        self.agent = DemoAgent(self.approver, trace=self.on_trace, on_tool=self.on_tool,
+                               out_dir=self.out_dir, mode="guided")
+        await self.agent.__aenter__()
+        self.agent.box.restore(saved)
+        st = self.agent.state
+        if len(st.helper_tasks) == len(ids):   # same task numbers, so shared-list links still match
+            for t, i in zip(st.helper_tasks, ids):
+                t["id"] = i
+            st.next_task_id = max(ids, default=0) + 1
+        if hasattr(self.agent, "turn") and st.items:
+            self.agent.turn = 3
+        self.emit({"type": "mode", "mode": "guided"})
+
     async def handle_say(self, text: str):
         async with self.lock:
             self.emit({"type": "busy", "on": True})
+            if self.mode == "live" and not AI_LIMIT.take():
+                await self.switch_to_guided()
+                self.agent.state.user_said.append(text)
+                self.emit({"type": "agent", "text": LIMIT_LINE})
+                self.emit({"type": "plan", "plan": self.plan()})
+                self.emit({"type": "busy", "on": False})
+                return
             def on_text(t: str) -> None:
                 self.maybe_recap()
                 self.emit({"type": "agent", "text": t.removeprefix(f"\n{AGENT_NAME}: ")})
@@ -620,7 +655,7 @@ async def check_for_updates(request, call_next):
 
 def ai_on() -> bool:
     """Whether a new visit here would talk to the AI service (a key, not demo mode, under today's limit)."""
-    return not DEMO and has_ai_key()
+    return not DEMO and has_ai_key() and not AI_LIMIT.reached()
 
 
 def render_page(name: str, agent_name: str = AGENT_NAME) -> str:
@@ -888,7 +923,7 @@ def visit_mode(example: bool) -> str:
     """Ruth's example when asked for; otherwise the live agent if an AI key is set up, else the guided planner."""
     if example:
         return "example"
-    return "guided" if DEMO or not has_ai_key() else "live"
+    return "guided" if DEMO or not has_ai_key() or AI_LIMIT.reached() else "live"
 
 
 @app.websocket("/ws")

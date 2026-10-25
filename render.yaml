@@ -34,3 +34,5 @@ services:
         sync: false   # Render asks for it when you create the site
       - key: SITE_PASSWORD
         sync: false   # the password your teammates type to get in
+      - key: JIC_AI_DAILY_LIMIT
+        value: "200"  # AI replies per day for everyone; after that, the guided planner

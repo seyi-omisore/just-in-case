@@ -1884,3 +1884,50 @@ def test_readme_names_the_hosted_storage_limit():
     readme = (pathlib.Path(__file__).resolve().parent.parent / "README.md").read_text()
     assert "the server's disk is wiped whenever the site restarts" in readme
     assert "scheduled reminders are future work" not in readme
+
+
+def test_daily_ai_limit_counts_and_rolls_over_each_day():
+    from datetime import date
+    from just_in_case.daily_limit import DailyLimit
+    day = [date(2026, 10, 25)]
+    lim = DailyLimit(2, today=lambda: day[0])
+    assert lim.take() and lim.take() and not lim.take() and lim.reached()
+    day[0] = date(2026, 10, 26)
+    assert not lim.reached() and lim.take()                              # a new day starts again
+
+
+def test_when_the_daily_limit_is_reached_the_guided_planner_takes_over_and_keeps_the_plan(monkeypatch):
+    import just_in_case.agent as agent_mod
+    import web.server as srv
+    from just_in_case.daily_limit import DailyLimit
+    from web.demo_agent import DemoAgent
+
+    class FakeLive(DemoAgent):   # stands in for the AI agent, so the test costs nothing
+        def __init__(self, approver, trace=print, on_tool=None, out_dir=None):
+            super().__init__(approver, trace=trace, on_tool=on_tool, out_dir=out_dir, mode="guided")
+
+    monkeypatch.setattr(agent_mod, "JustInCaseAgent", FakeLive)
+    monkeypatch.setattr(srv, "DEMO", False)
+    monkeypatch.setattr(srv, "has_ai_key", lambda: True)
+    monkeypatch.setattr(srv, "AI_LIMIT", DailyLimit(1))
+    assert 'data-ai="on"' in srv.render_page("index.html")
+    with client.websocket_connect("/ws") as ws:
+        assert until(ws, "hello")["mode"] == "live"
+        ws.send_json({"type": "table", "action": "add", "row": {"task": "Feed Fifi", "person": "Doris"}})
+        until(ws, "plan")
+        ws.send_json({"type": "table", "action": "add", "row": {"task": "Get groceries"}})
+        ids = [t["id"] for t in until(ws, "plan")["plan"]["tasks"]]
+        ws.send_json({"type": "table", "action": "delete", "row": {"id": ids[0]}})   # a gap in the task numbers
+        until(ws, "plan")
+        ws.send_json({"type": "say", "text": "Hello"})                    # uses today's one AI reply
+        until(ws, "agent")
+        ws.send_json({"type": "say", "text": "What else should I plan?"})   # over the limit
+        assert until(ws, "mode")["mode"] == "guided"
+        assert until(ws, "agent")["text"] == srv.LIMIT_LINE
+        plan = until(ws, "plan")["plan"]
+        assert [t["id"] for t in plan["tasks"]] == ids[1:]                  # same task numbers: share links still match
+    assert 'data-ai="off"' in srv.render_page("index.html")                # new visits start in the guided planner
+    with client.websocket_connect("/ws") as ws:
+        assert until(ws, "hello")["mode"] == "guided"
+    js = client.get("/static/app.js").text
+    assert 'case "mode":' in js
