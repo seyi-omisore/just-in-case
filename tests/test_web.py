@@ -824,7 +824,9 @@ def test_chat_names_the_agent_for_everyone_including_screen_readers():
 def test_the_footer_has_no_team_section():
     page = client.get("/").text
     footer = page[page.index('class="site-footer"'):page.index("</footer>")]
-    assert 'id="f-team"' not in footer and "Kurzhiparambil" not in footer and "Microcredential" not in footer
+    assert 'id="f-team"' not in footer and "Microcredential" not in footer
+    # Names appear only in "Contact us" (added by request), never as a separate team section.
+    assert footer.count("Kurzhiparambil") == footer[footer.index('id="f-contact"'):].count("Kurzhiparambil")
     assert 'href="#who"' not in footer
     for kept in ('id="f-help"', 'id="f-privacy"', 'id="f-access"', 'href="tel:911"', 'href="#privacy"'):
         assert kept in footer                                       # help numbers, privacy, and accessibility stay
@@ -1859,3 +1861,19 @@ def test_faq_says_haven_gives_no_medical_advice():
     assert "<summary>Does Haven give medical advice?</summary>" in faq
     assert "<p>No. Haven helps you plan.</p>" in faq
     assert "<p>For questions about your health or medications, please ask your care team.</p>" in faq
+
+
+def test_footer_contact_us_lists_all_four_with_email_and_linkedin():
+    import pathlib
+    share = (pathlib.Path(__file__).resolve().parent.parent / "web" / "static" / "share.html").read_text()
+    for page in (client.get("/").text, share):
+        foot = page[page.index('<footer class="site-footer">'):]
+        assert '<h2 id="f-contact">' in foot and "Contact us</h2>" in foot
+        for name, email, link in [
+                ("Oluwaseyi Omisore", "oluwaseyi.omisore001@umb.edu", "https://www.linkedin.com/in/oluwaseyi-omisore-cs"),
+                ("Leya Jacob Kurzhiparambil", "L.Kurzhiparambil001@umb.edu", "https://www.linkedin.com/in/leya-jacob/"),
+                ("Joan Arches", "Joan.Arches@umb.edu", "https://www.linkedin.com/in/joanarches/"),
+                ("Satoshi Nagae", "Satoshi.Nagae001@umb.edu", "https://www.linkedin.com/in/snagae/")]:
+            assert f'<a href="mailto:{email}" aria-label="Email {name}">Email</a>' in foot
+            assert f'<a href="{link}" target="_blank" rel="noopener noreferrer" aria-label="{name} on LinkedIn (opens in a new tab)">' in foot
+    assert ".footer-contact a { display: inline-flex; align-items: center; min-height: 48px;" in client.get("/static/style.css").text
