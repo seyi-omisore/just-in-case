@@ -1441,3 +1441,43 @@ def test_home_points_new_visitors_to_the_about_page():
             "answers to common questions, and Ruth's example.</p>") in home
     css = client.get("/static/style.css").text
     assert ".about-pointer a { display: inline-block; min-height: 48px;" in css   # tap target floor
+
+
+# ---- Optional site password (hosted copy with the AI key) -------------------
+
+def test_no_password_set_means_the_site_is_open(monkeypatch):
+    monkeypatch.delenv("SITE_PASSWORD", raising=False)
+    assert client.get("/").status_code == 200
+    assert client.get("/login", follow_redirects=False).status_code == 303   # nothing to sign in to
+
+
+def test_site_password_guards_pages_api_and_live_chat(monkeypatch):
+    from fastapi.testclient import TestClient
+    from starlette.websockets import WebSocketDisconnect
+    import pytest
+    monkeypatch.setenv("SITE_PASSWORD", "team-secret")
+    c = TestClient(app)
+    r = c.get("/", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/login"
+    assert c.get("/api/config").status_code == 401
+    assert c.get("/static/app.js").status_code == 401
+    with pytest.raises(WebSocketDisconnect):
+        with c.websocket_connect("/ws") as ws:
+            ws.receive_json()
+    page = c.get("/login").text
+    assert "In an emergency, call 911." in page and 'type="password"' in page and "min-height: 48px" in page
+
+
+def test_wrong_password_is_refused_and_right_one_signs_in(monkeypatch):
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("SITE_PASSWORD", "team-secret")
+    c = TestClient(app)
+    bad = c.post("/login", data={"password": "guess"}, follow_redirects=False)
+    assert bad.status_code == 401 and "did not match" in bad.text and "jic_pass" not in bad.cookies
+    ok = c.post("/login", data={"password": "team-secret"}, follow_redirects=False)
+    assert ok.status_code == 303 and ok.headers["location"] == "/"
+    assert "team-secret" not in ok.headers.get("set-cookie", "")        # the cookie never holds the password itself
+    assert "httponly" in ok.headers["set-cookie"].lower()
+    assert c.get("/").status_code == 200 and c.get("/api/config").status_code == 200
+    with c.websocket_connect("/ws?example=1") as ws:                     # signed in: the live chat opens
+        assert ws.receive_json()["type"] in ("hello", "plan", "activity", "busy")

@@ -463,6 +463,98 @@ class Session:
 # Routes
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Optional site password (for a hosted copy that uses the AI key)
+# ---------------------------------------------------------------------------
+# Set SITE_PASSWORD on the host to make every page ask for it first. Leave it
+# unset on your own computer, or for the public copy with no AI key.
+
+AUTH_COOKIE = "jic_pass"
+
+
+def site_password() -> str:
+    return os.getenv("SITE_PASSWORD", "").strip()
+
+
+def _pass_token(password: str) -> str:
+    import hashlib
+    return hashlib.sha256(f"just-in-case:{password}".encode()).hexdigest()
+
+
+def signed_in(cookies) -> bool:
+    import hmac
+    pw = site_password()
+    return not pw or hmac.compare_digest(cookies.get(AUTH_COOKIE, ""), _pass_token(pw))
+
+
+LOGIN_OPEN = ("/login", "/static/style.css", "/favicon.ico")
+
+
+def login_page(wrong: bool = False) -> str:
+    note = '<p class="login-wrong" role="alert">That password did not match. Please try again.</p>' if wrong else ""
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow">
+<title>Sign in</title>
+<style>
+ body {{ font-family: "Atkinson Hyperlegible", Verdana, Arial, sans-serif; font-size: 18px; background: #F7F4EE; color: #1E2A2E;
+        margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; box-sizing: border-box; }}
+ main {{ background: #fff; border-radius: 16px; padding: 28px; max-width: 26rem; width: 100%; box-sizing: border-box;
+        box-shadow: 0 2px 10px rgba(0,0,0,.08); }}
+ h1 {{ font-size: 1.5rem; margin: 0 0 .5rem; }} p {{ line-height: 1.5; }}
+ label {{ display: block; font-weight: 700; margin: 1rem 0 .4rem; }}
+ input {{ width: 100%; min-height: 48px; font: inherit; padding: 0 12px; border: 2px solid #5B6B70; border-radius: 10px; box-sizing: border-box; }}
+ input:focus, button:focus {{ outline: 3px solid #1F6F78; outline-offset: 2px; }}
+ button {{ margin-top: 1rem; min-height: 48px; width: 100%; font: inherit; font-weight: 700; border: 0; border-radius: 10px;
+          background: #1F6F78; color: #fff; cursor: pointer; }}
+ .login-wrong {{ color: #9B2C1F; font-weight: 700; }}
+ .e911 {{ font-weight: 700; }}
+</style></head><body><main>
+<h1>Just in Case</h1>
+<p>This copy is for our team. Please type the password you were given.</p>
+{note}
+<form method="post" action="/login">
+ <label for="pw">Password</label>
+ <input id="pw" name="password" type="password" autocomplete="current-password" required autofocus>
+ <button type="submit">Sign in</button>
+</form>
+<p class="e911">In an emergency, call 911.</p>
+</main></body></html>"""
+
+
+@app.middleware("http")
+async def require_site_password(request, call_next):
+    if site_password() and request.url.path not in LOGIN_OPEN and not signed_in(request.cookies):
+        if request.url.path == "/" or request.url.path.startswith(("/share/", "/card/", "/plan/", "/table/", "/summary/")):
+            return Response(status_code=303, headers={"Location": "/login"})
+        return JSONResponse({"error": "Please sign in first."}, status_code=401)
+    return await call_next(request)
+
+
+@app.get("/login")
+async def login_form():
+    if not site_password():
+        return Response(status_code=303, headers={"Location": "/"})
+    return HTMLResponse(login_page())
+
+
+@app.post("/login")
+async def login_submit(request: Request):
+    import hmac
+    from urllib.parse import parse_qs
+    pw = site_password()
+    if not pw:
+        return Response(status_code=303, headers={"Location": "/"})
+    tried = parse_qs((await request.body()).decode("utf-8", "replace")).get("password", [""])[0]
+    if not hmac.compare_digest(tried.encode(), pw.encode()):
+        await asyncio.sleep(1)  # slows down guessing
+        return HTMLResponse(login_page(wrong=True), status_code=401)
+    secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+    resp = Response(status_code=303, headers={"Location": "/"})
+    resp.set_cookie(AUTH_COOKIE, _pass_token(pw), max_age=30 * 86400, httponly=True,
+                    samesite="lax", secure=secure)
+    return resp
+
+
 @app.middleware("http")
 async def check_for_updates(request, call_next):
     """Pages and their files are re-checked on each visit (a quick 304 when unchanged),
@@ -691,6 +783,9 @@ def visit_mode(example: bool) -> str:
 
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
+    if not signed_in(ws.cookies):  # the page's live connection needs the password too
+        await ws.close(code=1008)
+        return
     await ws.accept()
     s = Session(ws, mode=visit_mode(ws.query_params.get("example") == "1"))
     SESSIONS[s.id] = s

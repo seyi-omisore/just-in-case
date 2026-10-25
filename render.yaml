@@ -1,0 +1,36 @@
+# Hosting on Render (render.com), free plan. Two copies of the same code:
+#
+#   just-in-case-demo  Public link. No AI key: the guided planner, Ruth's example,
+#                      and the tour. Costs nothing, so it is safe to show around.
+#   just-in-case-live  The live AI agent, behind a password. Uses the OpenRouter
+#                      key, so set a credit limit on that key at openrouter.ai.
+#
+# Secrets (the key and the password) are typed into Render's dashboard, never here.
+# Render rebuilds both sites each time main is pushed to GitHub.
+
+services:
+  - type: web
+    name: just-in-case-demo
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python serve.py --demo --host 0.0.0.0 --port $PORT --no-browser
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+
+  - type: web
+    name: just-in-case-live
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python serve.py --host 0.0.0.0 --port $PORT --no-browser
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: OPENROUTER_API_KEY
+        sync: false   # Render asks for it when you create the site
+      - key: SITE_PASSWORD
+        sync: false   # the password your teammates type to get in
