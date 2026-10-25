@@ -1877,3 +1877,10 @@ def test_footer_contact_us_lists_all_four_with_email_and_linkedin():
             assert f'<a href="mailto:{email}" aria-label="Email {name}">Email</a>' in foot
             assert f'<a href="{link}" target="_blank" rel="noopener noreferrer" aria-label="{name} on LinkedIn (opens in a new tab)">' in foot
     assert ".footer-contact a { display: inline-flex; align-items: center; min-height: 48px;" in client.get("/static/style.css").text
+
+
+def test_readme_names_the_hosted_storage_limit():
+    import pathlib
+    readme = (pathlib.Path(__file__).resolve().parent.parent / "README.md").read_text()
+    assert "the server's disk is wiped whenever the site restarts" in readme
+    assert "scheduled reminders are future work" not in readme

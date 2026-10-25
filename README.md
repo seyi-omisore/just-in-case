@@ -89,9 +89,13 @@ built-in voice reads each caption quietly. Only Ruth's made-up details appear in
 
 - Services were copied from official websites on 2026-10-21 and are being re-confirmed. Always call to confirm.
 - One area (Boston) only.
-- Check-ins over time are shown as a review date on the card; scheduled reminders are future work.
+- Check-ins are the person's own calendar events (an optional repeating event every 3 months). The app itself never sends reminders.
 - It is a planning tool. It does not detect falls or monitor anyone.
 - Shared helper lists are saved as small files on the server (with the user's consent) and deleted after 30 days.
+- On the free hosted demo (Render), the server's disk is wiped whenever the site restarts: on every redeploy and when it
+  wakes up after about 15 minutes without visitors. Shared helper lists and "Was this helpful?" answers are lost then,
+  so a shared link can stop working before its 30 days are up. A real pilot would keep them in a small database
+  or on a paid persistent disk.
 
 ## AI use disclosure
 
