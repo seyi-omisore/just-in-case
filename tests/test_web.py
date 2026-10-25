@@ -1733,3 +1733,14 @@ def test_ruths_example_shows_why_this_and_the_wallet_card():
     js = client.get("/static/app.js").text
     assert 'target: () => planEl.querySelector(".why-this summary"), done: () => story.card }' in js
     assert '{ text: "She can print a wallet card too, with the same details.", next: true, target: () => $("wallet-print"), done: () => story.summary }' in js
+
+
+def test_plan_carries_what_needs_attention_and_the_page_shows_one_button_each():
+    with client.websocket_connect("/ws") as ws:
+        *_, plan = ruth_flow(ws)
+    assert isinstance(plan["attention"], list) and plan["all_set"].startswith("You're all set.")
+    page = client.get("/").text
+    assert 'id="attention" class="attention"' in page
+    js = client.get("/static/app.js").text
+    assert 'openInvite = { id: a.task_id, kind: "reminder", text: null, focus: true };' in js   # Send a reminder
+    assert 'b.href = "tel:" + a.phone.replace(/[^0-9]/g, "");' in js                             # Call to apply / confirm

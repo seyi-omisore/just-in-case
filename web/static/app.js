@@ -702,6 +702,7 @@
     planPrintUrl = plan.plan_print;
     $("plan-print").hidden = !plan.plan_print;
     planEmail = plan.plan_email; $("plan-email").hidden = !plan.plan_email;
+    renderAttention(plan);
     $("feedback").hidden = EXAMPLE || !plan.plan_email;   // at the end, once something is in the plan (not in Ruth's example)
     summaryUrl = plan.summary_print;
     $("summary-print").hidden = !plan.summary_available;   // only after something is in the plan, and only if you ask
@@ -1633,6 +1634,38 @@
   $("season-lead").textContent = season.lead; $("season-ask").textContent = season.ask;
   $("season-link").href = "#plan-" + season.need;
   $("season-tip").querySelector("use").setAttribute("href", "#i-" + season.icon);
+  // ---- What needs attention: the server's list of real gaps, each with one button ----
+  function renderAttention(plan) {
+    const list = plan.attention;
+    $("attention").hidden = !list;
+    if (!list) return;
+    const ul = $("attention-list"); ul.replaceChildren();
+    $("attention-ok").hidden = list.length > 0;
+    $("attention-ok-text").textContent = plan.all_set;
+    $("attention-title").querySelector("span").textContent = list.length ? "What needs attention" : "Your plan";
+    for (const a of list) {
+      const li = el("li", "attention-item attention-" + a.kind);
+      li.append(icon(a.kind === "unconfirmed" ? "person" : a.kind === "waitlist" ? "wait" : "info"), el("span", null, a.text));
+      let b;
+      if ((a.kind === "waitlist" || a.kind === "old_info") && a.phone && a.phone !== "see website") {
+        b = el("a", "btn btn-quiet btn-small attention-btn"); b.href = "tel:" + a.phone.replace(/[^0-9]/g, "");
+      } else {
+        b = el("button", "btn btn-quiet btn-small attention-btn"); b.type = "button";
+        b.onclick = () => {
+          if (a.kind === "unconfirmed") {   // the Round 10 send panel, with the reminder draft
+            $("helper-more").open = true;
+            openInvite = { id: a.task_id, kind: "reminder", text: null, focus: true };
+            renderTasks(lastPlanForInvites);
+            const row = [...document.querySelectorAll("#helper-rows .invite-panel")][0];
+            if (row) row.scrollIntoView({ block: "center" });
+          } else openPlanPart(a.need);
+        };
+      }
+      b.append(icon(a.kind === "unconfirmed" ? "bell" : a.kind === "uncovered" ? "search" : "phone"), document.createTextNode(a.action));
+      li.appendChild(b);
+      ul.appendChild(li);
+    }
+  }
   function openPlanPart(need) {
     const tag = planEl.querySelector(`.tag[data-need="${need}"]`);
     if (tag) {

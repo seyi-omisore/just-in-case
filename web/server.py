@@ -32,6 +32,7 @@ from just_in_case.config import DATA_DIR, OUTPUT_DIR
 from just_in_case.config import AGENT_NAME, REPORT_EMAIL, has_ai_key
 from just_in_case.prompts import GREETING
 from just_in_case.why import why_this
+from just_in_case import attention
 from just_in_case.card import plan_email_text
 from just_in_case.invites import (INVITE_SUBJECT, LINK_LINE, REMINDER_SUBJECT, YOU_SEND_LINE,
                                   drafts_for)
@@ -236,6 +237,9 @@ class Session:
             "card": f"/card/{self.id}" if state.card_path else None,
             "wallet": f"/wallet/{self.id}" if state.card_path else None,
             "report_email": REPORT_EMAIL,
+            # What needs attention: real gaps only, checked by code each time the plan is shown.
+            "attention": attention.check(state, d, self.agent.box.today) if state.confirmed_needs else None,
+            "all_set": attention.ALL_SET,
             # "Email my plan": plain text for the person's own email app. No medications or allergies.
             "plan_email": plan_email_text(state, d) if any(i.user_ok for i in state.items) else None,
             "plan_print": f"/plan/{self.id}" if state.items else None,

@@ -1619,3 +1619,12 @@ a.menu-home:is(:link, :visited), a.demo-exit:is(:link, :visited), .footer-help a
 .delete-zone .helper-small { margin: 0; }
 .settings-dialog .delete-zone .btn.btn-stop { border-color: var(--alert-icon); color: var(--ink); }
 .delete-zone .btn-stop .icon { color: var(--alert-icon); }
+.attention { margin: 0 0 1rem; padding: .8rem .9rem; border: 2px solid var(--line); border-radius: 16px; background: var(--enamel); }
+.attention-title { display: flex; gap: .45rem; align-items: center; margin: 0 0 .4rem; font-size: 1.02rem; }
+.attention-title .icon { color: var(--primary); }
+.attention-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.attention-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .3rem .5rem; align-items: start; }
+.attention-item > .icon { margin-top: .2rem; color: var(--ink-soft); }
+.attention-btn { grid-column: 2; justify-self: start; min-height: 48px; display: inline-flex; align-items: center; gap: .35rem; text-decoration: none; }
+.attention-ok { display: flex; gap: .45rem; align-items: flex-start; margin: 0; }
+.attention-ok .icon { color: var(--success); margin-top: .2rem; }

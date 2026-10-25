@@ -1024,3 +1024,32 @@ def test_why_this_is_built_from_facts_and_easy_to_read():
             assert reading_grade(why_this(PlanItem(need, "service", s["id"], ""), st, d)) <= 8, (s["id"], need)
     for p in d.preparations:
         assert reading_grade(why_this(PlanItem(p["needs"][0], "preparation", p["id"], ""), st, d)) <= 8, p["id"]
+
+
+# ---- Round 12: the agent watches over the plan ----------------------------
+
+def test_what_needs_attention_lists_only_real_gaps():
+    from datetime import date
+    from just_in_case import attention
+    from just_in_case.directory import Directory
+    from just_in_case.state import PlanItem, PlanState
+    d, today = Directory(), date(2026, 10, 25)
+    st = PlanState()
+    st.confirmed_needs = ["ride_home_after_procedure", "transportation", "power_outage", "pet_care_during_stay"]
+    st.items = [PlanItem("ride_home_after_procedure", "service", "svc_fw_escort", "FW", user_ok=True),
+                PlanItem("transportation", "service", "svc_mbta_ride", "RIDE", user_ok=True),
+                PlanItem("power_outage", "blank", None, "Not covered yet")]
+    st.helper_tasks = [{"id": 1, "task": "Feed Fifi", "person": "Doris Chen", "date": "", "time": ""},
+                       {"id": 2, "task": "Drive me home", "person": "Leo", "confirmed": True, "date": "", "time": ""},
+                       {"id": 3, "task": "Get groceries", "person": "", "date": "", "time": ""}]           # open: not a gap
+    kinds = [(a["kind"], a.get("need") or a.get("task_id")) for a in attention.check(st, d, today)]
+    assert ("uncovered", "power_outage") in kinds and ("uncovered", "pet_care_during_stay") in kinds
+    assert ("waitlist", "transportation") in kinds and ("unconfirmed", 1) in kinds
+    assert ("unconfirmed", 2) not in kinds and ("unconfirmed", 3) not in kinds
+    assert not any(k == "old_info" for k, _ in kinds)                     # every service was checked recently
+    later = date(2027, 6, 1)
+    assert any(a["kind"] == "old_info" and a["need"] == "ride_home_after_procedure" for a in attention.check(st, d, later))
+    clean = PlanState(); clean.confirmed_needs = ["ride_home_after_procedure"]
+    clean.items = [PlanItem("ride_home_after_procedure", "service", "svc_fw_escort", "FW", user_ok=True)]
+    assert attention.check(clean, d, today) == []
+    assert attention.ALL_SET == "You're all set. Nothing needs your attention right now."
