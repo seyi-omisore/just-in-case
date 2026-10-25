@@ -669,6 +669,11 @@
         li.insertBefore(ul, panel);   // warnings (waitlist, escort rule, no phone) stay visible, never behind a tap
       }
       if (item.why) { const w = el("p", "tag-why"); w.append(icon("info"), document.createTextNode(item.why)); panel.appendChild(w); }
+      if (item.why_this) {   // "Why this?": one plain sentence, built from the services list and the person's answers
+        const d = el("details", "more why-this");
+        d.append(el("summary", null, "Why this?"), el("p", null, item.why_this));
+        panel.appendChild(d);
+      }
       planEl.appendChild(li);
     }
 

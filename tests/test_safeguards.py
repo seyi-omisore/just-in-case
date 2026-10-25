@@ -1005,3 +1005,22 @@ def test_day_before_checklist_only_lists_parts_the_user_said_yes_to():
                            "Charge the phone, and keep it close."]
     for line in timeline.DAY_BEFORE.values():
         assert reading_grade(line) <= 8
+
+
+def test_why_this_is_built_from_facts_and_easy_to_read():
+    from just_in_case.directory import Directory
+    from just_in_case.safeguards import reading_grade
+    from just_in_case.state import NEEDS, PlanItem, PlanState
+    from just_in_case.why import why_this
+    d, st = Directory(), PlanState()
+    st.helper_notes = [{"helpers": ["Doris"], "role": "", "text": ""}]
+    assert why_this(PlanItem("ride_home_after_procedure", "service", "svc_fw_escort", ""), st, d) == \
+        "It's free, and it serves Boston. It helps with getting home after a procedure."
+    assert "waitlist" in why_this(PlanItem("transportation", "service", "svc_mbta_ride", ""), st, d)
+    assert why_this(PlanItem("pet_care_during_stay", "person", None, ""), st, d) == "You said you'd feel comfortable asking Doris."
+    assert why_this(PlanItem("power_outage", "blank", None, ""), st, d).startswith("Nothing on our list fits this yet")
+    for s in d.services:                       # every service, every need it covers: grade 8 or lower
+        for need in s["needs"]:
+            assert reading_grade(why_this(PlanItem(need, "service", s["id"], ""), st, d)) <= 8, (s["id"], need)
+    for p in d.preparations:
+        assert reading_grade(why_this(PlanItem(p["needs"][0], "preparation", p["id"], ""), st, d)) <= 8, p["id"]

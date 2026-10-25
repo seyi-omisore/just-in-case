@@ -31,6 +31,7 @@ from fastapi.staticfiles import StaticFiles
 from just_in_case.config import DATA_DIR, OUTPUT_DIR
 from just_in_case.config import AGENT_NAME, has_ai_key
 from just_in_case.prompts import GREETING
+from just_in_case.why import why_this
 from just_in_case.invites import (INVITE_SUBJECT, LINK_LINE, REMINDER_SUBJECT, YOU_SEND_LINE,
                                   drafts_for)
 from just_in_case import timeline
@@ -205,6 +206,7 @@ class Session:
                 "name": name, "phone": ref.get("phone", ""),
                 "url": ref.get("url", ""), "what": ref.get("what") or ref.get("how_to_use", ""),
                 "flags": i.flags, "why": NEED_WHY.get(i.need, ""), "user_ok": i.user_ok,
+                "why_this": why_this(i, state, d),   # one plain sentence, from facts only
                 "checked": ref.get("last_verified", "") if i.route == "service" else "",
             })
         covered = {i.need for i in state.items if i.route != "blank" and i.user_ok}
