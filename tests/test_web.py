@@ -2152,3 +2152,31 @@ def test_dated_items_show_add_to_calendar():
     assert "calendarButton(" in plan_part                                                  # plan parts
     assert "calendarButton(s.text, s.date" in js                                           # timeline steps
     assert "box.appendChild(calendarButton(t.task, iso" in js                              # helper list rows
+
+
+# ---- Round 14, Part 1: scrolling and layout on phones --------------------------------
+
+def test_phones_get_a_one_line_emergency_bar_with_both_numbers_tappable():
+    for url in ("/", "/share/anything"):
+        page = client.get(url).text
+        bar = page[page.index('class="safety-strip"'):page.index("</div>", page.index('class="safety-strip"'))]
+        assert 'class="safety-compact"' in bar
+        assert 'Emergency: <a href="tel:911">911</a>. Support: call or text <a href="tel:988">988</a>.' in bar
+        assert "In an emergency, call 911." in bar                      # the full words stay for bigger screens
+    css = client.get("/static/style.css").text
+    phone = css[css.index("/* ---- Round 14: the emergency bar"):]
+    assert "@media (max-width: 640px)" in phone and ".safety-strip .safety-911, .safety-strip .safety-988 { display: none; }" in phone
+    assert ".safety-compact span { white-space: nowrap; }" in phone and "min(var(--fs, 20px) * .8, 16px)" in phone
+    assert ".safety-strip { position: sticky; top: 0; z-index: 30; }" in css   # still always visible
+
+
+def test_every_move_starts_at_the_top_and_tips_sit_beside_their_target():
+    js = client.get("/static/app.js").text
+    assert "function showTopThen(...targets)" in js
+    assert "window.scrollBy({ top: Math.max(0, Math.min(bottom - room, top - bar - 12))" in js   # never past the top
+    assert 'else { window.scrollTo(0, 0); if (focus)' in js                       # tabs and screens
+    assert "$(\"step-back\").onclick = () => { view -= 1; renderView(); announceStep(); showStep(); };" in js
+    assert js.count("newQuestion();") == 2                                         # Haven's next question, message or checkpoint
+    tip = js[js.index("function showTip"):js.index("function startTour")]
+    assert "above > below" in tip and 'tourTip.classList.add("tip-above")' in tip and "showTopThen(tourTip, tourTarget)" in tip
+    assert "scrollIntoView" not in tip

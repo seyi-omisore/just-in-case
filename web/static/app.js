@@ -19,7 +19,7 @@
     } else if (last) last.answered = true;
     return pages.length - 1;
   }
-  let ws, sessionId, busy = false, seenItems = new Set(), cardUrl = null;
+  let ws, sessionId, busy = false, seenItems = new Set(), cardUrl = null, answered = false;
   const openItems = new Set();  // plan items you opened stay open when the plan redraws
   const USPS_HOLD = "https://holdmail.usps.com/holdmail/";
 
@@ -152,6 +152,7 @@
     messages.appendChild(li);
     scrollChat();
     if (who === "agent" && !extraClass) lastAgent = text;
+    if (who === "agent") newQuestion();
     if (extraClass !== "msg-error") chatHistory.push({ who, text, cls: extraClass || "" });
   }
 
@@ -479,6 +480,7 @@
         doneText = names.length ? "You picked: " + names.join(", ") : "You picked just the emergency lines";
       }
       ws.send(JSON.stringify(msg));
+      answered = true;   // the next question starts at the top
       if (pages[+li.dataset.page]) pages[+li.dataset.page].answered = true;
       actions.remove();
       // An approved note: the send buttons open right here. The person sends it from their own phone or email.
@@ -502,6 +504,7 @@
     li.append(head, body, actions);
     messages.appendChild(li);
     scrollChat();
+    newQuestion();
     yes.focus({ preventScroll: true });
     typing.hidden = true;  // waiting for her answer, not thinking
   }
@@ -592,6 +595,26 @@
   // reveal() opens any closed section around an element, so buttons and the story can always reach it.
   function reveal(node) {
     for (let d = node; d; d = d.parentElement) if (d.tagName === "DETAILS" && !d.open) d.open = true;
+  }
+  // ---- One scroll rule for every move: start at the top, so the page heading shows first. ----
+  // If what we point to is lower down, scroll just enough to show it too, never past its top
+  // (which would hide it under the emergency bar).
+  function showTopThen(...targets) {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    const boxes = targets.filter((t) => t && t.isConnected && t.getClientRects().length).map((t) => t.getBoundingClientRect());
+    if (!boxes.length) return;
+    const top = Math.min(...boxes.map((b) => b.top)), bottom = Math.max(...boxes.map((b) => b.bottom));
+    const bar = document.querySelector(".safety-strip").getBoundingClientRect().height;
+    const room = window.innerHeight - 12;
+    if (bottom <= room) return;                                   // already on screen with the heading
+    window.scrollBy({ top: Math.max(0, Math.min(bottom - room, top - bar - 12)), behavior: "instant" });
+  }
+  // After the person answers, Haven's next question starts at the top of the page too.
+  // (Ruth's example moves the page itself, one step at a time.)
+  function newQuestion() {
+    if (!answered || EXAMPLE) return;
+    answered = false;
+    requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "instant" }));
   }
   const FOLDS_KEY = "jic-folds";   // which sections were open, in this browser only
   const folds = [...document.querySelectorAll("details.fold")];
@@ -1218,6 +1241,7 @@
     stopListening();
     $("mic-status").textContent = "";
     addMessage("user", text);
+    answered = true;
     $("starters").hidden = true;
     $("example-open").hidden = true;
     ws.send(JSON.stringify({ type: "say", text }));
@@ -2043,9 +2067,11 @@
     const words = [...messages.querySelectorAll("[data-active]")].map((li) => li.innerText.trim()).join(" ");
     $("step-announce").textContent = `Step ${view + 1}. ${words}`.slice(0, 400);
   }
-  $("step-back").onclick = () => { view -= 1; renderView(); announceStep(); };
+  // Back and Next: the top of the page, where the heading and the step's question are.
+  const showStep = () => window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  $("step-back").onclick = () => { view -= 1; renderView(); announceStep(); showStep(); };
   $("step-next").onclick = () => {
-    if (view < pages.length - 1) { view += 1; renderView(); announceStep(); return; }
+    if (view < pages.length - 1) { view += 1; renderView(); announceStep(); showStep(); return; }
     if (!input.value.trim()) { $("step-hint").textContent = "Type your answer above, then tap Next."; input.focus(); return; }
     send(input.value);
   };
@@ -2318,7 +2344,7 @@
     if (t !== story.mark) {
       if (story.mark) story.mark.classList.remove("story-next");
       story.mark = t;
-      if (t) { reveal(t); t.classList.add("story-next"); t.scrollIntoView({ block: "center" }); }
+      if (t) { reveal(t); t.classList.add("story-next"); showTopThen(t); }
     }
   }
   $("story-next").addEventListener("click", () => { story.at = Math.min(story.at + 1, STORY.length - 1); storyTick(); });
@@ -2368,8 +2394,15 @@
     row.append(skip, next);
     tourTip.append(count, el("p", "tour-text", step.text()), row);
     tourTip.addEventListener("keydown", (e) => { if (e.key === "Escape") endTour(); });
-    (step.after || step.target)().after(tourTip);
-    tourTip.scrollIntoView({ block: "center" });
+    const anchor = (step.after || step.target)();
+    anchor.after(tourTip);
+    // Above or below its target, whichever has more room, so it never covers the button it points to.
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    const r = tourTarget.getBoundingClientRect(), bar = document.querySelector(".safety-strip").getBoundingClientRect().height;
+    const tipH = tourTip.getBoundingClientRect().height;
+    const below = window.innerHeight - r.bottom, above = r.top - bar;
+    if (!step.after && above > below && above > tipH + 16) { tourTarget.before(tourTip); tourTip.classList.add("tip-above"); }
+    showTopThen(tourTip, tourTarget);
     if (focus) tourTip.focus({ preventScroll: true });
   }
   function startTour(focus) {
@@ -2398,7 +2431,7 @@
     $("more-menu").open = false;
     if (name === "plan" && !connected) { connected = true; connect(); }
     if (seePlan) { $("plan-section").scrollIntoView(); $("plan-section").focus({ preventScroll: true }); }
-    else if (focus) { window.scrollTo(0, 0); $("panel-" + name).focus({ preventScroll: true }); }
+    else { window.scrollTo(0, 0); if (focus) $("panel-" + name).focus({ preventScroll: true }); }   // every new screen starts at its heading
   }
   $("more-menu").addEventListener("click", (e) => { if (e.target.closest("a")) $("more-menu").open = false; });
   window.addEventListener("hashchange", () => { endTour(); showTab(location.hash.slice(1), true); });

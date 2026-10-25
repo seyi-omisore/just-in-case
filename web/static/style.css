@@ -1740,3 +1740,23 @@ html[data-ai="off"] .when-ai, html[data-ai="on"] .when-no-ai { display: none !im
 html[data-theme="contrast"] .pick-btn { border-color: var(--ink); color: var(--ink); }
 /* One calendar button, not two: our big button replaces the browser's small one inside the box. */
 .pick-row > input[type="date"]:not(.pick-native)::-webkit-calendar-picker-indicator { display: none; }
+
+/* ---- Round 14: the emergency bar is one short line on phones, still pinned to the top ---- */
+.safety-compact { display: none; margin: 0; align-items: center; gap: .4rem; }
+.safety-compact .icon { color: var(--strip-icon); width: 1.2em; height: 1.2em; flex: none; }
+.safety-compact a { color: var(--strip-ink); font-weight: 700; font-size: 1.1em; text-underline-offset: 3px;
+  display: inline-block; padding: .75rem .6rem; margin: -.75rem -.6rem; }   /* a big tap area, without a taller or wider bar */
+@media (max-width: 640px) {
+  .safety-strip { padding: .5rem .75rem; font-size: min(var(--fs, 20px) * .8, 16px); }
+  .safety-compact span { white-space: nowrap; }   /* one line; the size above keeps it inside a 390-pixel screen */
+  .safety-strip .safety-911, .safety-strip .safety-988 { display: none; }
+  .safety-compact { display: flex; }
+}
+/* A tour tip above its target points down. */
+.tour-tip.tip-above::before { top: auto; bottom: -9px; }
+/* Large text on a phone: the header buttons wrap onto a second row instead of running off the screen. */
+@media (max-width: 640px) { .header-actions { flex-wrap: wrap; justify-content: flex-end; min-width: 0; max-width: 100%; } }
+/* A long name at the largest text size breaks onto the next line instead of running off a phone screen. */
+.team-text :is(.team-name, .team-program, .team-role) { overflow-wrap: break-word; }
+.team-text { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 640px) { .team-list > li { grid-template-columns: minmax(0, 1fr); } }   /* phones: initials above the name */
