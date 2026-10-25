@@ -29,7 +29,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from just_in_case.config import DATA_DIR, OUTPUT_DIR
-from just_in_case.config import AGENT_NAME
+from just_in_case.config import AGENT_NAME, has_ai_key
 from just_in_case.prompts import GREETING
 from just_in_case import timeline
 from just_in_case.encouragement import encouragement
@@ -108,10 +108,11 @@ def describe_trace(line: str) -> tuple[str, str] | None:
 class Session:
     summary_ok = False  # nothing is made until the person says yes
 
-    def __init__(self, ws: WebSocket, demo: bool = False):
+    def __init__(self, ws: WebSocket, mode: str = "live"):
         self.id = uuid.uuid4().hex
         self.ws = ws
-        self.demo = demo  # the scripted Ruth example: same tools and gate, no AI
+        self.mode = mode              # "live" (the AI agent), "guided" (no AI), or "example" (Ruth's story, no AI)
+        self.demo = mode != "live"     # no AI: the same tools and approval gate, run by the app's own rules
         self.out: asyncio.Queue = asyncio.Queue()
         self.pending: dict[str, asyncio.Future] = {}
         self.agent = None
@@ -409,7 +410,7 @@ class Session:
         if self.demo:
             from web.demo_agent import DemoAgent
             self.agent = DemoAgent(self.approver, trace=self.on_trace, on_tool=self.on_tool,
-                                   out_dir=self.out_dir)
+                                   out_dir=self.out_dir, mode=self.mode)
         else:
             from just_in_case.agent import JustInCaseAgent
             self.agent = JustInCaseAgent(approver=self.approver, trace=self.on_trace,
@@ -481,7 +482,7 @@ async def index():
 
 @app.get("/api/config")
 async def config():
-    return JSONResponse({"demo": DEMO, "greeting": GREETING, "agent_name": AGENT_NAME,
+    return JSONResponse({"demo": DEMO, "ai": not DEMO and has_ai_key(), "greeting": GREETING, "agent_name": AGENT_NAME,
                          "needs_restart": code_fingerprint() != STARTED_WITH})
 
 
@@ -666,11 +667,17 @@ async def summary_print(sid: str):
     return HTMLResponse(render_summary_html(s.agent.state, s.agent.box.dir, s.agent.box.today))
 
 
+def visit_mode(example: bool) -> str:
+    """Ruth's example when asked for; otherwise the live agent if an AI key is set up, else the guided planner."""
+    if example:
+        return "example"
+    return "guided" if DEMO or not has_ai_key() else "live"
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
-    # "See an example" opens /ws?example=1: this visit runs the Ruth demo, even on a live server.
-    s = Session(ws, demo=DEMO or ws.query_params.get("example") == "1")
+    s = Session(ws, mode=visit_mode(ws.query_params.get("example") == "1"))
     SESSIONS[s.id] = s
 
     async def writer():
@@ -681,7 +688,7 @@ async def ws_endpoint(ws: WebSocket):
     tasks: set[asyncio.Task] = set()
     try:
         await s.start()
-        s.emit({"type": "hello", "session": s.id, "demo": s.demo, "greeting": GREETING, "agent_name": AGENT_NAME})
+        s.emit({"type": "hello", "session": s.id, "demo": s.demo, "mode": s.mode, "greeting": GREETING, "agent_name": AGENT_NAME})
         while True:
             msg = await ws.receive_json()
             if msg.get("type") == "say" and str(msg.get("text", "")).strip():

@@ -91,9 +91,9 @@
 
   <div id="demo-banner" class="demo-row" role="note" hidden>
     <p class="demo-label">
-      <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
-      <strong>Demo mode</strong>
-      <span>A set story about Ruth. No AI is used.</span>
+      <svg class="icon" aria-hidden="true"><use id="demo-icon" href="#i-play"/></svg>
+      <strong id="demo-title">Ruth's example.</strong>
+      <span id="demo-text">A made-up story, with no AI.</span>
     </p>
     <a id="example-exit" class="demo-exit" href="/#plan" hidden>
       <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg> Start my own plan
@@ -181,7 +181,7 @@
       <span><strong id="season-lead">Winter is coming.</strong> <span id="season-ask">Is your power outage plan ready?</span>
         <a id="season-link" href="#plan-power_outage">Check it</a></span>
     </p>
-    <p class="home-links"><a href="#tour" class="tour-link">Show me how</a></p>
+    <p class="home-links"><a href="#tour" class="tour-link">Show me how</a> <a href="/?example=1#plan" class="tour-link">See Ruth's example</a></p>
   </section>
 
   <section id="panel-help" class="panel help" data-panel="help" tabindex="-1" aria-labelledby="help-title" hidden>
@@ -208,7 +208,7 @@
             <svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg> Make my plan
           </a>
           <a id="example-open" class="btn btn-quiet btn-big" href="/?example=1#plan">
-            <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See an example
+            <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See Ruth's example
           </a>
         </div>
         <ul class="trust-checks" aria-label="Our promises">
@@ -311,7 +311,7 @@
       <p>{{AGENT_NAME}} finds her a free ride home and helps with her mail and her cat. Ruth says yes or no to each step.</p>
       <details class="more"><summary>Show details</summary><p>In the example, {{AGENT_NAME}} finds a free volunteer escort, suggests a key lockbox and USPS Hold Mail, and helps her write a gentle note to her friend Doris about feeding Fifi. Ruth says yes or no to each step.</p></details>
       <a class="btn btn-quiet" href="/?example=1#plan">
-        <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Watch Ruth's example
+        <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> See Ruth's example
       </a>
     </article>
 
@@ -527,7 +527,7 @@
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> Who can see it</h2>
         <p>Only you, unless you share a list. People with your link see first names and tasks only.</p>
-        <details class="more"><summary>Show details</summary><p>What you type is sent to an AI service so it can reply. That service is OpenRouter, which passes your words to an AI model, and their own privacy rules apply. Please do not type bank details or account numbers.</p><p>Anyone who has your share link can open it, so send it only to people you trust. Your private link, which can remove names or stop sharing, is separate.</p><p>If you use Speak, your browser may send your voice to its maker to turn it into text. This site also loads a font from Google, so Google can see that your browser visited.</p></details>
+        <details class="more"><summary>Show details</summary><p>What you type is sent to an AI service so it can reply. That service is OpenRouter, which passes your words to an AI model, and their own privacy rules apply. Please do not type bank details or account numbers.</p><p>The guided planner and Ruth's example use no AI, so nothing you type there goes to an AI service.</p><p>Anyone who has your share link can open it, so send it only to people you trust. Your private link, which can remove names or stop sharing, is separate.</p><p>If you use Speak, your browser may send your voice to its maker to turn it into text. This site also loads a font from Google, so Google can see that your browser visited.</p></details>
       </div>
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> How long we keep it</h2>

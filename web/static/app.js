@@ -365,7 +365,7 @@
     return btn;
   }
 
-  // ---- "See an example": plays Ruth's side of the scripted demo ----------
+  // ---- "See Ruth's example": plays Ruth's side of the story ----------------
   // The page only types Ruth's lines. Every checkpoint still waits for a real tap.
   const EXAMPLE = new URLSearchParams(location.search).get("example") === "1";
   let lastAgent = "", exampleTimer = null;
@@ -849,6 +849,10 @@
       switch (m.type) {
         case "hello":
           sessionId = m.session; $("demo-banner").hidden = !m.demo;
+          if (m.mode === "guided") {   // a visitor's own plan, made with the app's rules: say clearly that no AI is used
+            $("demo-title").textContent = "Guided planner."; $("demo-text").textContent = "No AI is used.";
+            $("demo-icon").setAttribute("href", "#i-check");
+          }
           $("table-download").href = `/table/${sessionId}.csv`;
           setBusy(false);
           if (!messages.children.length) addMessage("agent", m.greeting);

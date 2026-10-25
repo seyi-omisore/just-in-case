@@ -762,7 +762,7 @@ def test_demo_understands_many_ways_to_say_you_are_leaving_and_never_repeats_its
         for text in ("hmm", "blah"):                      # nothing the demo knows
             ws.send_json({"type": "say", "text": text})
             replies.append(until(ws, "agent")["text"])
-        assert replies[0] != replies[1] and "only knows a few topics" in replies[1]
+        assert replies[0] != replies[1] and "This planner can help with" in replies[1]   # says what it can plan
 
 
 # ---- The agent's name ----------------------------------------------------------------
@@ -1237,3 +1237,87 @@ def test_the_tour_narration_uses_a_calm_premium_voice_and_a_captioned_copy_exist
     assert "Two narration lines overlap" in src and 'info.count("Audio:") == (1 if wav else 0)' in src
     assert (root / "web" / "static" / "img" / "tour-narration.wav").exists()
     assert (root / "web" / "static" / "img" / "tour-captioned.mp4").stat().st_size < 10 * 1024 * 1024
+
+
+# ---- Round 8, part 1: Make my own plan -------------------------------------------------
+
+def test_each_visit_gets_the_right_mode(monkeypatch):
+    import web.server as srv
+    assert srv.visit_mode(example=True) == "example"                      # Ruth's story, even with a key
+    monkeypatch.setattr(srv, "DEMO", False)
+    monkeypatch.setattr(srv, "has_ai_key", lambda: False)
+    assert srv.visit_mode(example=False) == "guided"                      # no key: the guided planner
+    monkeypatch.setattr(srv, "has_ai_key", lambda: True)
+    assert srv.visit_mode(example=False) == "live"                        # a key: the live agent, as today
+    monkeypatch.setattr(srv, "DEMO", True)
+    assert srv.visit_mode(example=False) == "guided"                      # --demo: never AI
+
+
+def test_has_ai_key_reads_the_env_without_stopping(monkeypatch):
+    from just_in_case.config import has_ai_key
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    assert has_ai_key() is False
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-paste-your-key-here")
+    assert has_ai_key() is False                                          # the placeholder is not a key
+    monkeypatch.setenv("OPENROUTER_API_KEY", "not-a-real-key-just-for-this-test")
+    assert has_ai_key() is True
+
+
+def test_the_guided_planner_builds_a_visitors_own_plan_from_the_rules():
+    import json
+    from just_in_case.config import DATA_DIR
+    listed = {s["name"] for s in json.loads((DATA_DIR / "services.json").read_text())["services"]}
+    with client.websocket_connect("/ws") as ws:
+        hello = until(ws, "hello")
+        assert hello["mode"] == "guided" and hello["demo"] is True
+        ws.send_json({"type": "say", "text": "I worry about a winter power outage, and who would feed my cat."})
+        needs = approve(ws)
+        assert [n["key"] for n in needs["data"]["needs"]] == ["pet_care_during_stay", "power_outage"]
+        q = until(ws, "agent")["text"]
+        ws.send_json({"type": "say", "text": "I'd rather not bother anyone."})
+        choose = until(ws, "approval")
+        ws.send_json({"type": "answer", "id": choose["id"], "ok": True, "choice": []})
+        approve(ws)                                                       # the card
+        words = until(ws, "agent")["text"]
+        plan = until(ws, "plan")["plan"]
+    items = {i["need"]: i for i in plan["items"]}
+    assert items["power_outage"]["route"] == "service" and items["power_outage"]["name"] in listed   # only from the list
+    assert items["pet_care_during_stay"]["route"] == "preparation"         # a free pet sheet before paid pet sitters
+    assert all(i["user_ok"] is False for i in plan["items"])               # nothing counts until the visitor says yes
+    for text in (q, words):
+        assert "Ruth" not in text and "demo" not in text.lower()
+
+
+def test_ruths_example_is_named_and_reachable_from_home_and_about():
+    page = client.get("/").text
+    home = page[page.index('id="panel-home"'):page.index('id="panel-help"')]
+    about = page[page.index('id="panel-about"'):page.index('id="panel-features"')]
+    assert '<a href="/?example=1#plan" class="tour-link">See Ruth\'s example</a>' in home
+    assert "See Ruth's example" in about and "See an example" not in page
+    assert 'href="#plan"' in home                                         # Make my plan starts the visitor's own plan
+    js = client.get("/static/app.js").text
+    assert '$("demo-title").textContent = "Guided planner."; $("demo-text").textContent = "No AI is used.";' in js
+    privacy = page[page.index('id="panel-privacy"'):page.index('id="panel-who"')]
+    assert "The guided planner and Ruth's example use no AI" in privacy
+
+
+def test_serve_starts_without_an_ai_key():
+    import os, socket, subprocess, sys, time, urllib.request, json, pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]
+    env = {k: v for k, v in os.environ.items() if k not in ("JIC_DEMO",)}
+    env["OPENROUTER_API_KEY"] = ""
+    proc = subprocess.Popen([sys.executable, "serve.py", "--port", str(port), "--no-browser"], cwd=root, env=env,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    try:
+        for _ in range(40):
+            try:
+                cfg = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{port}/api/config", timeout=1).read())
+                break
+            except OSError:
+                assert proc.poll() is None, proc.stdout.read()                # it must not stop for a missing key
+                time.sleep(0.25)
+        assert cfg["ai"] is False and cfg["demo"] is False
+    finally:
+        proc.terminate(); proc.wait(timeout=10)
