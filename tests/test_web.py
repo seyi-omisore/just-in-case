@@ -1823,3 +1823,31 @@ def test_privacy_wording_follows_whether_this_visit_uses_the_ai(monkeypatch):
     assert 'html[data-ai="off"] .when-ai, html[data-ai="on"] .when-no-ai { display: none !important; }' in css
     js = client.get("/static/app.js").text
     assert 'document.documentElement.dataset.ai = m.mode === "live" ? "on" : "off";' in js   # Ruth's example: off
+
+
+def test_features_show_four_groups_and_who_we_are_shows_all_four_with_roles():
+    import re
+    page = client.get("/").text
+    feats = page[page.index('id="panel-features"'):]
+    groups = re.findall(r'<h2 id="fcat-\w+" class="fcat-title">([^<]+)</h2>', feats)
+    assert groups == ["Make a plan", "Stay safe", "Get help", "Share with people you trust"]
+    who = page[page.index('id="panel-who"'):]
+    who = who[:who.index("</section>")]
+    names = re.findall(r'<h2 class="team-name">([^<]+)</h2>', who)
+    assert names == ["Leya Jacob Kurzhiparambil", "Oluwaseyi Omisore", "Joan Arches", "Satoshi Nagae"]
+    for card in who.split('<h2 class="team-name">')[1:]:
+        assert 'class="team-role"' in card                                  # every member has a role
+
+
+def test_tour_video_files_ship_with_the_site_and_stream():
+    import subprocess
+    tracked = subprocess.run(["git", "ls-files", "web/static/img"], capture_output=True, text=True).stdout.split()
+    for f in ("tour.mp4", "tour.vtt", "tour-poster.jpg"):
+        assert f"web/static/img/{f}" in tracked                             # in GitHub, so the host deploys it
+    r = client.get("/static/img/tour.mp4")
+    assert r.status_code == 200 and r.headers["content-type"] == "video/mp4" and len(r.content) > 100_000
+    part = client.get("/static/img/tour.mp4", headers={"Range": "bytes=0-1023"})
+    assert part.status_code == 206 and len(part.content) == 1024             # Safari on iPhone needs this
+    assert client.get("/static/img/tour.vtt").status_code == 200
+    page = client.get("/").text
+    assert '<source src="/static/img/tour.mp4" type="video/mp4">' in page and 'id="tour-fallback"' in page
