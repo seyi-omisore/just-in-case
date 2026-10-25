@@ -3,18 +3,21 @@
 Run, after the app changes:   python scripts/make_tour_video.py
 Needs (once):                 pip install -r requirements-video.txt
 Records with Google Chrome if you have it, or Playwright's Chromium.
-Narration uses the Mac's built-in voice (say). Add --no-voice to leave it out.
+Narration uses the Mac's built-in voices (say): Ava (Premium) if it is installed, then Zoe (Premium),
+then the best other English voice. Add --no-voice to leave it out.
 
 It starts the app in demo mode, plays Ruth's guided story at phone size inside a
 phone frame, keeps only the main moments, and writes into web/static/img/:
     tour.mp4          the video, under 10 MB
     tour.vtt          the captions, with their timings
     tour-poster.jpg   the opening screen, shown before the video plays
+    tour-captioned.mp4  the same video with the captions drawn in, for slides
 """
 
 import argparse
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -30,7 +33,18 @@ W, H = 480, 1040            # the recording page: the phone, with a caption area
 PHONE_W, PHONE_H = 390, 844
 HOLD = 2.6                  # seconds on each main moment
 MAX_MB = 10
-VOICES = ("(Premium)", "(Enhanced)", "Samantha", "Daniel")   # the most natural voice this Mac has
+# Calm and warm, like the app's Read aloud: the most natural voice first.
+VOICES = ("Ava (Premium)", "Zoe (Premium)", "(Premium)", "(Enhanced)", "Samantha", "Daniel")
+RATE = 158                  # words a minute: about 90% of the Mac's usual 175
+PAUSE = 0.4                 # seconds of quiet between sentences
+CAPTIONS = ["Meet Haven, your planning helper.", "Tell Haven what's coming up.", "Answer one question at a time.",
+            "Your plan builds as you go.", "Do one next step at a time.", "Print your fridge card.",
+            "Share a summary, if you choose.", "Plan today. Rest easier tomorrow."]
+# Burned-in captions for tour-captioned.mp4: dark bold words in the caption area under the phone.
+# ffmpeg sizes captions on a 288-pixel-tall canvas, so pixel sizes are scaled to it.
+_PX = 288 / H
+CAPTION_STYLE = (f"FontName=Verdana,FontSize={22 * _PX:.1f},Bold=1,PrimaryColour=&H0033291F,BorderStyle=1,Outline=0,"
+                 f"Shadow=0,Alignment=2,MarginV={round(44 * _PX)}")
 
 FRAME = """<!doctype html><html><head><meta charset="utf-8"><style>
   html, body { margin: 0; height: 100%; background: #EDE8E1; font-family: "Atkinson Hyperlegible", Verdana, sans-serif; }
@@ -94,8 +108,9 @@ def vtt_time(t: float) -> str:
 class Tour:
     """Plays Ruth's guided story and remembers when each main moment starts and ends."""
 
-    def __init__(self, page, steps: int):
+    def __init__(self, page, steps: int, speech: dict[str, float]):
         self.page, self.steps, self.t0 = page, steps, time.monotonic()
+        self.speech = speech        # how long each caption takes to say, so no moment ends mid-sentence
         self.segments: list[tuple[float, float, str]] = []
         self.app = page.frame_locator("#app")
 
@@ -111,6 +126,9 @@ class Tour:
                 self.start = tour.now()
 
             def __exit__(self, *exc):
+                left = tour.speech.get(caption, 0) + 0.9 - (tour.now() - self.start)
+                if left > 0:
+                    tour.hold(left)
                 tour.segments.append((self.start, tour.now(), caption))
         return Moment()
 
@@ -131,7 +149,8 @@ class Tour:
         box = target.bounding_box()
         self.page.evaluate("([x, y]) => showTap(x, y)", [box["x"] + box["width"] / 2, box["y"] + box["height"] / 2])
         self.page.wait_for_timeout(650)
-        target.click()
+        if target.is_visible():      # Ruth's example may have tapped her first sentence by itself already
+            target.click()
 
     def yes_until(self, done: str, timeout: float = 60):
         """Tap the ringed Yes on each checkpoint until `done` (a selector) shows. Not part of the video."""
@@ -159,14 +178,12 @@ class Tour:
             head.click()
 
 
-def record(base: str, work: Path) -> tuple[Path, list[tuple[float, float, str]]]:
+def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[tuple[float, float, str]]]:
     from playwright.sync_api import sync_playwright
     frame = work / "frame.html"
     frame.write_text(FRAME.replace("__W__", str(W)).replace("__H__", str(H)).replace("__PW__", str(PHONE_W))
                      .replace("__PH__", str(PHONE_H)).replace("__APP__", f"{base}/?example=1#plan"))
-    captions = ["Meet Haven, your planning helper.", "Tell Haven what's coming up.", "Answer one question at a time.",
-                "Your plan builds as you go.", "Do one next step at a time.", "Print your fridge card.",
-                "Share a summary, if you choose.", "Plan today. Rest easier tomorrow."]
+    captions = CAPTIONS
     with sync_playwright() as p:
         try:
             browser = p.chromium.launch(channel="chrome")
@@ -178,7 +195,7 @@ def record(base: str, work: Path) -> tuple[Path, list[tuple[float, float, str]]]
         context.add_init_script(f"""if (location.origin === {json.dumps(base)}) {{
             localStorage.setItem("jic-theme-v2", "light"); localStorage.setItem("jic-tour-done", "1"); }}""")
         page = context.new_page()
-        tour = Tour(page, len(captions))
+        tour = Tour(page, len(captions), speech)
         page.goto(frame.as_uri())
         tour.wait(".starter")
 
@@ -241,13 +258,26 @@ def record(base: str, work: Path) -> tuple[Path, list[tuple[float, float, str]]]
     return video, tour.segments
 
 
-def narration(segments, starts, work: Path, voice: str) -> list[tuple[Path, float]]:
-    clips = []
-    for i, ((_, _, text), at) in enumerate(zip(segments, starts)):
-        clip = work / f"say-{i}.aiff"
-        subprocess.run(["say", "-v", voice, "-r", "165", "-o", str(clip), text], check=True)
-        clips.append((clip, at + 0.3))
-    return clips
+def seconds(ffmpeg: str, clip: Path) -> float:
+    info = subprocess.run([ffmpeg, "-i", str(clip)], capture_output=True, text=True).stderr
+    h, m, sec = re.search(r"Duration: (\d+):(\d+):([\d.]+)", info).groups()
+    return int(h) * 3600 + int(m) * 60 + float(sec)
+
+
+def speak(work: Path, voice: str, ffmpeg: str) -> dict[str, list[tuple[Path, float, float]]]:
+    """Each sentence as its own clip, so there is a short, calm pause between sentences.
+    Returns, for each caption: (clip, start within the caption, length)."""
+    out = {}
+    for i, text in enumerate(CAPTIONS):
+        at, clips = 0.4, []
+        for j, sentence in enumerate(re.split(r"(?<=[.!?])\s+", text)):
+            clip = work / f"say-{i}-{j}.aiff"
+            subprocess.run(["say", "-v", voice, "-r", str(RATE), "-o", str(clip), sentence], check=True)
+            d = seconds(ffmpeg, clip)
+            clips.append((clip, at, d))
+            at += d + PAUSE
+        out[text] = clips
+    return out
 
 
 def make(segments, video: Path, clips, ffmpeg: str, crf: int, out: Path) -> None:
@@ -259,14 +289,18 @@ def make(segments, video: Path, clips, ffmpeg: str, crf: int, out: Path) -> None
                      f"fade=t=in:st=0:d=0.3:color=0xEDE8E1,fade=t=out:st={max(d - 0.3, 0):.3f}:d=0.3:color=0xEDE8E1[v{i}]")
     graph = ";".join(parts) + ";" + "".join(f"[v{i}]" for i in range(len(segments))) + f"concat=n={len(segments)}:v=1:a=0[v]"
     maps = ["-map", "[v]"]
-    if clips:
-        for clip, _ in clips:
-            inputs += ["-i", str(clip)]
-        delays = ";".join(f"[{k + 1}:a]adelay={int(at * 1000)}|{int(at * 1000)}[a{k}]" for k, (_, at) in enumerate(clips))
-        graph += ";" + delays + ";" + "".join(f"[a{k}]" for k in range(len(clips))) + \
-            f"amix=inputs={len(clips)}:normalize=0,volume=0.7[a]"
-        maps += ["-map", "[a]", "-c:a", "aac", "-b:a", "64k"]
     total = sum(b - a for a, b, _ in segments)
+    if clips:
+        for clip, _, _ in clips:
+            inputs += ["-i", str(clip)]
+        # A soft edge on every sentence (no clicks), then one even, comfortable level,
+        # with a gentle fade in at the start and out at the end.
+        each = ";".join(f"[{k + 1}:a]afade=t=in:d=0.05,afade=t=out:st={max(d - 0.12, 0):.3f}:d=0.12,"
+                        f"adelay={int(at * 1000)}|{int(at * 1000)}[a{k}]" for k, (_, at, d) in enumerate(clips))
+        graph += (";" + each + ";" + "".join(f"[a{k}]" for k in range(len(clips))) +
+                  f"amix=inputs={len(clips)}:normalize=0,loudnorm=I=-18:TP=-2:LRA=11,aresample=44100,"
+                  f"afade=t=in:st=0:d=0.6,afade=t=out:st={max(total - 0.9, 0):.3f}:d=0.9[a]")
+        maps += ["-map", "[a]", "-c:a", "aac", "-b:a", "96k"]
     subprocess.run([ffmpeg, "-y", "-loglevel", "error", *inputs, "-filter_complex", graph, *maps, "-t", f"{total:.3f}",
                     "-c:v", "libx264", "-preset", "slow", "-crf", str(crf), "-pix_fmt", "yuv420p", "-r", "30",
                     "-movflags", "+faststart", str(out)], check=True)
@@ -293,13 +327,15 @@ def main() -> None:
             sys.exit("The demo app did not start.")
         with tempfile.TemporaryDirectory() as tmp:
             work = Path(tmp)
-            print("Recording Ruth's example...")
-            video, segments = record(base, work)
+            spoken = speak(work, voice, ffmpeg) if voice else {}
+            speech = {text: (c[-1][1] + c[-1][2]) for text, c in spoken.items()}
+            print(f"Recording Ruth's example (narration: {voice or 'none'})...")
+            video, segments = record(base, work, speech)
             starts, t = [], 0.0
             for a, b, _ in segments:
                 starts.append(t)
                 t += b - a
-            clips = narration(segments, starts, work, voice) if voice else []
+            clips = [(clip, s + at, d) for s, (_, _, text) in zip(starts, segments) for clip, at, d in spoken.get(text, [])]
             OUT.mkdir(parents=True, exist_ok=True)
             mp4 = OUT / "tour.mp4"
             for crf in (28, 32, 36):                 # smaller until it is under 10 MB
@@ -311,9 +347,15 @@ def main() -> None:
             (OUT / "tour.vtt").write_text("WEBVTT\n\n" + "\n".join(cues))
             subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-ss", "1.2", "-i", str(mp4), "-frames:v", "1", "-q:v", "3",
                             str(OUT / "tour-poster.jpg")], check=True)
+            # For slides: the same video with the captions drawn in. Run from the image folder, so the
+            # caption file's name needs no escaping in the filter.
+            subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", "tour.mp4", "-vf",
+                            f"subtitles=tour.vtt:original_size={W}x{H}:force_style='{CAPTION_STYLE}'",
+                            "-c:v", "libx264", "-preset", "slow", "-crf", str(crf), "-pix_fmt", "yuv420p", "-c:a", "copy",
+                            "-movflags", "+faststart", "tour-captioned.mp4"], check=True, cwd=OUT)
         size = mp4.stat().st_size / 1024 / 1024
         print(f"Done: {t:.0f} seconds, {size:.1f} MB, narration: {voice or 'none'}.")
-        print(f"Saved tour.mp4, tour.vtt, and tour-poster.jpg in {OUT.relative_to(ROOT)}/")
+        print(f"Saved tour.mp4, tour-captioned.mp4, tour.vtt, and tour-poster.jpg in {OUT.relative_to(ROOT)}/")
     finally:
         server.terminate()
         server.wait(timeout=10)

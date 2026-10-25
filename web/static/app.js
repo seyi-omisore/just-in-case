@@ -1236,7 +1236,11 @@
 
   // Warn if the code was updated (git pull) but the server was not restarted.
   const checkRestart = () => fetch("/api/config").then((r) => r.json())
-    .then((c) => { $("restart-banner").hidden = c.needs_restart === false; })  // missing = older server.catch(() => {});
+    .then((c) => {
+      $("restart-banner").hidden = c.needs_restart === false;   // missing = older server
+      // The demo runs without an AI key, so it restarts with --demo; the live app does not.
+      $("restart-cmd").textContent = c.demo ? "python serve.py --demo" : "python serve.py";
+    }).catch(() => {});
   checkRestart(); setInterval(checkRestart, 60000);
 
   // ---- simple view controls: Back, Next, progress dots, Show details ---------

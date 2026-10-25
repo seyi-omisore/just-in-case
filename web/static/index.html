@@ -86,7 +86,7 @@
 
   <div id="restart-banner" class="restart-banner" role="alert" hidden>
     <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
-    <p><strong>Just in Case was updated.</strong> In the terminal, press Control+C, then run <code>python serve.py</code> again, then reload this page.</p>
+    <p><strong>Just in Case was updated.</strong> In the terminal, press Control+C, then run <code id="restart-cmd">python serve.py</code> again, then reload this page.</p>
   </div>
 
   <div id="demo-banner" class="demo-row" role="note" hidden>
@@ -140,6 +140,7 @@
           <g class="a-leaf a-leaf1"><ellipse cx="276" cy="110" rx="3.4" ry="1.8" style="fill:var(--ill-pot)"/></g>
           <g class="a-leaf a-leaf2"><ellipse cx="300" cy="114" rx="3.4" ry="1.8" style="fill:var(--ill-sun)"/></g>
           <g class="a-leaf a-leaf3"><ellipse cx="311" cy="107" rx="3.4" ry="1.8" style="fill:var(--ill-pot)"/></g>
+          <g transform="translate(-40 9)"><g class="a-cat"><g class="a-cat-step"><g class="a-cat-pose"><g class="flip" transform="translate(278 0) scale(-1 1)"><path d="M146 99q9-2 7-11" style="fill:none;stroke:var(--ill-cat);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/><ellipse cx="138" cy="96" rx="9" ry="7" style="fill:var(--ill-cat)"/><circle cx="131" cy="88" r="5.5" style="fill:var(--ill-cat)"/><path d="M126.5 86l1-6.5 4 4zM131.5 83.5l4-4.5 .5 6.5z" style="fill:var(--ill-cat)"/></g></g></g></g></g>
           <path d="M62 74 56 92" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
           <path d="M54 90 51 113" style="fill:none;stroke:var(--ill-cane);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/>
           <rect x="63" y="98" width="5" height="15" rx="2" style="fill:var(--ill-leg)"/>
@@ -148,7 +149,6 @@
           <path d="M78 72 90 56" style="fill:none;stroke:var(--ill-skin);stroke-width:4;stroke-linecap:round;stroke-linejoin:round"/>
           <circle cx="69" cy="57" r="9.5" style="fill:var(--ill-hair)"/>
           <circle cx="71" cy="61" r="8" style="fill:var(--ill-skin)"/>
-          <g transform="translate(-38 9)"><g class="a-cat"><g class="a-cat-step"><path d="M146 99q9-2 7-11" style="fill:none;stroke:var(--ill-cat);stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/><ellipse cx="138" cy="96" rx="9" ry="7" style="fill:var(--ill-cat)"/><circle cx="131" cy="88" r="5.5" style="fill:var(--ill-cat)"/><path d="M126.5 86l1-6.5 4 4zM131.5 83.5l4-4.5 .5 6.5z" style="fill:var(--ill-cat)"/></g></g></g>
         </g>
       </svg>
       <button type="button" id="scene-btn" class="scene-btn"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> <span>Play scene</span></button>

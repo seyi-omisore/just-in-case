@@ -1205,3 +1205,30 @@ def test_the_tour_script_records_ruths_example_at_phone_size_in_light():
         assert part in src, part
     readme = (pathlib.Path(__file__).resolve().parent.parent / "README.md").read_text()
     assert "python scripts/make_tour_video.py" in readme
+
+
+def test_the_cat_faces_right_and_walks_left_to_right_from_behind_the_woman():
+    page = client.get("/").text
+    scene = page[page.index('<g id="ill-home">'):page.index("</svg>", page.index('<g id="ill-home">'))]
+    cat, woman = scene.index('class="a-cat"'), scene.index('<path d="M62 74 56 92"')
+    assert cat < woman                                                        # drawn first, so it starts behind her
+    assert 'scale(-1 1)' in scene[cat:woman]                                  # facing the way it walks
+    css = client.get("/static/style.css").text
+    assert "@keyframes walk { 0% { transform: translateX(-34px); } 80%, 100% { transform: none; } }" in css   # left to right
+
+
+def test_the_update_banner_names_the_command_that_matches_how_the_app_runs():
+    page = client.get("/").text
+    assert '<code id="restart-cmd">python serve.py</code>' in page
+    js = client.get("/static/app.js").text
+    assert '$("restart-cmd").textContent = c.demo ? "python serve.py --demo" : "python serve.py";' in js
+    assert "}).catch(() => {});" in js                                   # a failed check never shows an error
+    assert client.get("/api/config").json()["demo"] is True              # the tests run the demo, so: --demo
+
+def test_the_tour_narration_uses_a_calm_premium_voice_and_a_captioned_copy_exists():
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    src = (root / "scripts" / "make_tour_video.py").read_text()
+    assert 'VOICES = ("Ava (Premium)", "Zoe (Premium)", "(Premium)", "(Enhanced)"' in src
+    assert "RATE = 158" in src and "PAUSE = 0.4" in src and "afade=t=in" in src and "loudnorm" in src
+    assert (root / "web" / "static" / "img" / "tour-captioned.mp4").stat().st_size < 10 * 1024 * 1024
