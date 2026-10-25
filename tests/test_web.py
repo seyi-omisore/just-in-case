@@ -1727,3 +1727,9 @@ def test_delete_everything_removes_saved_plan_contacts_and_shared_lists():
     sid, owner = share["url"].rsplit("/", 1)[1], share["owner_url"].split("owner=")[1]
     assert client.post(f"/api/share/{sid}/delete", json={"owner": owner}).json() == {"deleted": True}
     assert client.get(f"/api/share/{sid}").status_code == 404
+
+
+def test_ruths_example_shows_why_this_and_the_wallet_card():
+    js = client.get("/static/app.js").text
+    assert 'target: () => planEl.querySelector(".why-this summary"), done: () => story.card }' in js
+    assert '{ text: "She can print a wallet card too, with the same details.", next: true, target: () => $("wallet-print"), done: () => story.summary }' in js
