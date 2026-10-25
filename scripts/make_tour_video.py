@@ -41,7 +41,8 @@ SPEED = 0.9                 # about 90% of the voice's usual pace, set with the 
 PAUSE = 0.4                 # seconds of quiet between sentences
 AUDIO_RATE = 48000          # Hz, for the narration file and the video
 CAPTIONS = ["Meet Haven, your planning helper.", "Tell Haven what's coming up.", "Answer one question at a time.",
-            "Your plan builds as you go.", "Haven writes the invite. You send it.", "Do one next step at a time.", "Print your fridge card.",
+            "Your plan builds as you go.", "Haven writes the invite. You send it.",
+            "Friends pick what fits. Haven tells you.", "Do one next step at a time.", "Print your fridge card.",
             "Share a summary, if you choose.", "Plan today. Rest easier tomorrow."]
 # Burned-in captions for tour-captioned.mp4: dark bold words in the caption area under the phone.
 # ffmpeg sizes captions on a 288-pixel-tall canvas, so pixel sizes are scaled to it.
@@ -277,8 +278,22 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
                 "e => { e.scrollIntoView({ block: 'start' }); window.scrollBy({ top: -150, behavior: 'smooth' }); }")
             tour.hold(3.4)
         tour.app.locator("#helper-rows .invite-panel .btn-quiet.btn-small").click()   # close it, off camera
+        tour.story_next()                          # My people: Doris and Leo, each with a saved invite
+        tour.story_next()                          # two tasks her people could help with
+        tour.story_next()                          # Invite my people, one person at a time
+        while "invite my people" in tour.app.locator("#story-text").inner_text().lower():
+            tour.app.locator(".story-next").first.click()   # each tap, off camera: share, send, "Yes, I sent it", next
+            page.wait_for_timeout(700)
+        tour.snap(wait=1.5)                        # Leo and Doris answer on her shared list
         tour.story_next()
-        with tour.moment(captions[5]):            # the Next step card
+        with tour.moment(captions[5]):            # What's new: who can help, and a time that doesn't fit
+            tour.calm_scroll("#whats-new")
+            tour.hold(3.0)
+        tour.story_next()                          # Leo's time fits
+        tour.tap("#whats-new .news-helping .btn-primary")   # she marks his ride as confirmed
+        page.wait_for_timeout(700)
+        tour.snap(wait=1.5)
+        with tour.moment(captions[6]):            # the Next step card
             tour.calm_scroll("#next-step")
             tour.hold(1.4)
             tour.tap("#next-done")
@@ -289,7 +304,7 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
             tour.snap()
         tour.close_tags()
         tour.story_next(); tour.story_next(); tour.story_next()   # "Why this?", "What needs attention", then the fridge card step
-        with tour.moment(captions[6]):            # the fridge card
+        with tour.moment(captions[7]):            # the fridge card
             tour.tap("#card-link")
             tour.wait("#card-dialog[open]")
             tour.hold(1.4)
@@ -300,7 +315,7 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
         tour.app.locator("#card-close").click()
         tour.snap(wait=2)                          # the wallet card step
         tour.story_next(); tour.story_next()       # the night-before preview, then the readiness summary step
-        with tour.moment(captions[7]):            # the readiness summary
+        with tour.moment(captions[8]):            # the readiness summary
             tour.tap("#summary-print")
             tour.wait("#summary-dialog[open]")
             tour.hold(1.2)
@@ -313,7 +328,7 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
         tour.reveal("#review-mark")
         tour.app.locator("#review-mark").click()
         tour.wait("#story-own")
-        with tour.moment(captions[8]):            # the end of Ruth's story
+        with tour.moment(captions[9]):            # the end of Ruth's story
             tour.wait("#ready-ill")
             tour.calm_scroll("#ready-ill")
             tour.hold(2.4)

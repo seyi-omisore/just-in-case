@@ -22,6 +22,26 @@ For every need, the agent follows a fixed decision ladder:
 Three human checkpoints pause the agent for approval: the list of needs, any note
 to a friend, and the card. Haven writes the message. You send it from your own phone or email.
 
+### Helpers choose what fits their schedule
+
+1. **My people** (optional, can be skipped): the person adds people one at a time (first name, how they
+   know them, and a phone or email if they like). Haven drafts a short invite for each one, from fixed,
+   checked wording. The person can edit or delete it. People and invites are saved only in the person's
+   browser, never on the server, and "Delete everything" removes them.
+2. **Invite my people**: the person picks who to invite. Each one gets the same link to the shared helper
+   list, sent one person at a time with Send by text or Send by email, then "Next person". Nothing is sent
+   without the person's tap. They can add their own number to the link (after the `#`, which never reaches
+   the server) so helpers can text back.
+3. **On the shared page**, a helper picks one or more open tasks and, for each one, the days and times that
+   work (weekdays or weekends, mornings or afternoons, or any time) and an optional note. First names only.
+4. **What's new**: each time the plan is shown, code (not the AI) compares each offer with the task's date
+   and time. "Leo can help with: drive me home, Nov 24. Weekday afternoons work for Leo." A time that doesn't
+   fit is said plainly, with "Ask someone else" and "Change the time". Two offers let the person choose and
+   send a thank-you to the others. A task with no offers a few days before its date gets a reminder and a
+   checked service as a backup. It sits at the top of "What needs attention", so there is one place to look.
+5. Every date and time box has a **calendar or clock button** (typing still works), and every dated item
+   has **Add to calendar** (a standard .ics file made in the browser).
+
 See [docs/workflow.md](docs/workflow.md) for the diagram and [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) for running and testing.
 
 ## Safeguards enforced in code (not just in the prompt)
@@ -71,7 +91,7 @@ The About tab shows a 1-minute tour of Ruth's made-up example. After the app cha
 ```bash
 pip install -r requirements-video.txt    # once: Playwright and an ffmpeg program, inside .venv
 python -m playwright install ffmpeg      # once: the small helper Playwright records with
-python scripts/make_tour_video.py        # about a minute; add --no-voice to leave out narration
+python scripts/make_tour_video.py        # a few minutes; add --no-voice to leave out narration
 ```
 
 It starts the app in demo mode (Light theme, phone size), plays Ruth's guided story, keeps the main
@@ -92,6 +112,7 @@ built-in voice reads each caption quietly. Only Ruth's made-up details appear in
 - Check-ins are the person's own calendar events (an optional repeating event every 3 months). The app itself never sends reminders.
 - It is a planning tool. It does not detect falls or monitor anyone.
 - Shared helper lists are saved as small files on the server (with the user's consent) and deleted after 30 days.
+  They hold each task, its date and time, and each helper's first name, free days and times, and note.
 - On the free hosted demo (Render), the server's disk is wiped whenever the site restarts: on every redeploy and when it
   wakes up after about 15 minutes without visitors. Shared helper lists and "Was this helpful?" answers are lost then,
   so a shared link can stop working before its 30 days are up. A real pilot would keep them in a small database
