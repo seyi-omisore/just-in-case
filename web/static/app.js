@@ -1077,10 +1077,14 @@
           exampleNext();
           break;
         case "saved": storeSave(m.state); break;
-        case "restored":
+        case "restored": {
           addMessage("agent", "Welcome back. Here's where we left off. What would you like to do next?");
+          // Look at the shared list again for new sign-ups, with the private link this browser kept.
+          const mine = readShares(); const last = mine[mine.length - 1];
+          if (last) ws.send(JSON.stringify({ type: "share_reconnect", id: last.id, owner: last.owner }));
           if (m.skipped.length) addMessage("agent", "A few parts could not be reopened, so they were left out: " + m.skipped.join(", ") + ". We can add them again.");
           break;
+        }
         case "agent": addMessage("agent", m.text); break;
         case "recap": addMessage("agent", m.text, "msg-recap"); break;
         case "ready": addMessage("agent", m.text, "msg-ready"); break;
@@ -1093,6 +1097,7 @@
         case "suggest": addSuggestion(m); break;
         case "timeline_error": $("timeline-error").textContent = m.text; break;
         case "plans_changed": showPlanUpdates(m); break;
+        case "thank_you": showThankYous(m); break;
         case "mode":   // today's AI limit was reached: the guided planner took over, with no outside service
           document.documentElement.dataset.ai = m.mode === "live" ? "on" : "off";
           if (m.mode === "guided") $("demo-banner").hidden = true;
@@ -1616,6 +1621,7 @@
     box.hidden = !wizard; box.replaceChildren();
     if (!wizard || !plan) return;
     if (wizard.at >= wizard.ids.length) {
+      if (EXAMPLE) story.invited = true;
       box.appendChild(el("p", "invite-title", wizard.sent ? `All done. You sent ${wizard.sent} ${wizard.sent === 1 ? "message" : "messages"}.` : "All done."));
       box.appendChild(el("p", "helper-small", `${AGENT} will tell you here when someone signs up.`));
       const close = el("button", "btn btn-quiet btn-small"); close.type = "button"; close.textContent = "Close";
@@ -2018,14 +2024,15 @@
   $("season-tip").querySelector("use").setAttribute("href", "#i-" + season.icon);
   // ---- What needs attention: the server's list of real gaps, each with one button ----
   function renderAttention(plan) {
-    const list = plan.attention;
-    $("attention").hidden = !list;
-    if (!list) return;
+    const list = plan.attention, news = plan.whats_new || [];
+    $("attention").hidden = !list && !news.length;
+    if ($("attention").hidden) return;
+    renderWhatsNew(plan, news);
     const ul = $("attention-list"); ul.replaceChildren();
-    $("attention-ok").hidden = list.length > 0;
+    $("attention-ok").hidden = (list || []).length > 0 || news.length > 0 || !list;
     $("attention-ok-text").textContent = plan.all_set;
-    $("attention-title").querySelector("span").textContent = list.length ? "What needs attention" : "Your plan";
-    for (const a of list) {
+    $("attention-title").querySelector("span").textContent = (list || []).length || news.length ? "What needs attention" : "Your plan";
+    for (const a of list || []) {
       const li = el("li", "attention-item attention-" + a.kind);
       li.append(icon(a.kind === "unconfirmed" ? "person" : a.kind === "waitlist" ? "wait" : "info"), el("span", null, a.text));
       let b;
@@ -2048,6 +2055,90 @@
       ul.appendChild(li);
     }
   }
+  // ---- What's new: helpers' replies, gathered by the server from the shared list ----
+  // Every button opens the right place or asks the person to choose. Nothing is sent by the app.
+  function smallBtn(ic, words, onclick, primary) {
+    const b = el("button", "btn btn-small attention-btn " + (primary ? "btn-primary" : "btn-quiet")); b.type = "button";
+    b.append(icon(ic), document.createTextNode(words)); b.onclick = onclick;
+    return b;
+  }
+  function inviteTaskReminder(taskText) {
+    // Remind the people already invited (or everyone in My people) about one task, one at a time.
+    reveal($("fold-people"));
+    pickedPeople.clear();
+    const invited = people.filter((p) => p.invited);
+    for (const p of (invited.length ? invited : people)) pickedPeople.add(p.id);
+    renderInvitePeople();
+    if (!people.length) { $("person-form").elements.name.focus(); return; }
+    startWizard("reminder", taskText);
+  }
+  function renderWhatsNew(plan, news) {
+    $("whats-new").hidden = !news.length;
+    const ul = $("whats-new-list"); ul.replaceChildren();
+    const task = (id) => (plan.tasks || []).find((t) => t.id === id);
+    for (const n of news) {
+      const li = el("li", "attention-item news-" + n.kind);
+      li.append(icon(n.kind === "mismatch" ? "info" : n.kind === "none" || n.kind === "soon" ? "wait" : "person"), el("span", null, n.text));
+      if (n.note) li.appendChild(el("p", "helper-small news-note", `${n.name}'s note: “${n.note}”`));
+      const row = el("div", "news-actions");
+      if (n.kind === "helping") {
+        row.appendChild(smallBtn("check", "Mark confirmed", () => sendTable("confirm", { id: n.task_id, confirmed: true }), true));
+      } else if (n.kind === "fits_now") {
+        row.appendChild(smallBtn("check", `Choose ${n.name}`, () => ws.send(JSON.stringify({ type: "choose_helper", task_id: n.task_id, offer_id: n.offer_id })), true));
+      } else if (n.kind === "choose") {
+        for (const c of n.choices) {
+          const b = smallBtn("person", `Choose ${c.name}`, () => ws.send(JSON.stringify({ type: "choose_helper", task_id: n.task_id, offer_id: c.offer_id })), c.fits);
+          b.setAttribute("aria-label", `Choose ${c.name}. ${c.works}${c.fits ? "" : " This time may not fit."}`);
+          row.appendChild(b);
+          row.appendChild(el("p", "helper-small news-choice", c.works + (c.fits ? "" : " This time may not fit.") + (c.note ? ` “${c.note}”` : "")));
+        }
+      } else if (n.kind === "mismatch") {
+        row.appendChild(smallBtn("people", "Ask someone else", () => {
+          reveal($("fold-people")); $("fold-people").scrollIntoView({ block: "start" });
+          const first = $("invite-pick").querySelector("input"); if (first) first.focus({ preventScroll: true });
+        }));
+        row.appendChild(smallBtn("pencil", "Change the time", () => { const t = task(n.task_id); if (t) startEdit(t); }));
+      } else if (n.kind === "soon") {
+        row.appendChild(smallBtn("bell", "Send a reminder", () => inviteTaskReminder(n.task), true));
+        if (n.backup) {
+          li.appendChild(el("p", "helper-small news-backup", `Or, as a backup, ${n.backup.name} can help.`));
+          if (n.backup.phone && n.backup.phone !== "see website") {
+            const a = el("a", "btn btn-quiet btn-small attention-btn"); a.href = "tel:" + n.backup.phone.replace(/[^0-9]/g, "");
+            a.append(icon("phone"), document.createTextNode("Call " + n.backup.phone)); row.appendChild(a);
+          } else if (n.backup.url) {
+            const a = el("a", "btn btn-quiet btn-small attention-btn"); a.href = n.backup.url; a.target = "_blank"; a.rel = "noopener";
+            a.append(icon("info"), document.createTextNode("Website")); row.appendChild(a);
+          }
+        }
+      }
+      if (row.children.length) li.appendChild(row);
+      ul.appendChild(li);
+    }
+  }
+  // After choosing between offers: a thank-you for each of the others, sent from the person's own phone or email.
+  function showThankYous(m) {
+    const box = $("thanks-drafts"); box.replaceChildren(); box.hidden = false;
+    box.appendChild(el("p", "pc-done", `Done. The others who offered to help with "${m.task}" can get a thank-you.`));
+    for (const d of m.drafts) {
+      const card = el("div", "invite-panel");
+      card.appendChild(el("p", "invite-title", `Thank ${d.to.split(" ")[0]}`));
+      const ta = el("textarea"); ta.rows = 6; ta.value = d.text; ta.setAttribute("aria-label", "Thank-you message (you can change it)");
+      card.appendChild(ta);
+      const sent = el("p", "helper-small"); sent.setAttribute("role", "status");
+      const who = people.find((p) => firstWord(p.name).toLowerCase() === firstWord(d.to).toLowerCase());
+      card.appendChild(sendControls({
+        text: () => ta.value, subject: (lastPlanForInvites && lastPlanForInvites.invite_words.thanks_subject) || "Thank you",
+        contact: () => (who && who.contact) || "",
+        onSent: () => { sent.textContent = "Thank you. Marked as sent."; },
+      }));
+      card.append(sent, el("p", "helper-small invite-you-send", `${AGENT} writes the message. You send it from your own phone or email.`));
+      box.appendChild(card);
+    }
+    const close = el("button", "btn btn-quiet btn-small"); close.type = "button"; close.textContent = "Done";
+    close.onclick = () => { box.hidden = true; box.replaceChildren(); };
+    box.appendChild(close);
+    reveal(box); box.scrollIntoView({ block: "start" });
+  }
   function openPlanPart(need) {
     const tag = planEl.querySelector(`.tag[data-need="${need}"]`);
     if (tag) {
@@ -2063,9 +2154,26 @@
 
   // ---- Ruth's example: a guided story -------------------------------------------
   // Ruth's words are typed for her. Every yes is still a real tap: the guide rings the button to tap.
-  const story = { at: 0, shown: -1, mark: null, card: false, summary: false, done: false };
+  const story = { at: 0, shown: -1, mark: null, card: false, summary: false, done: false, invited: false };
   const isoIn = (days) => { const d = new Date(); d.setDate(d.getDate() + days);
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);   // Ruth's procedure is on a weekday
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const shortDay = (iso) => { const d = isoToLocal(iso); return MONTHS[d.getMonth()].slice(0, 3) + " " + d.getDate(); };   // "Nov 24"
+  function storyRow(task, date, time) {   // Ruth's words typed into the helper table's own form
+    const f = $("task-form");
+    f.elements.task.value = task; f.elements.date.value = date; f.elements.time.value = time;
+    f.requestSubmit();
+  }
+  const wizardButton = () => {   // the one button to tap next in Invite my people
+    if ($("consent-dialog").open) return $("consent-yes");
+    const wz = $("invite-wizard");
+    if (wz.hidden) return $("invite-people");
+    const ask = wz.querySelector(".send-ask:not([hidden]) .btn-primary");
+    if (ask) return ask;
+    if (/Marked as sent/.test(wz.textContent) || !wz.querySelector(".send-row .send-btn")) return wz.querySelector(".wizard-next") || wz.querySelector("button");
+    return wz.querySelector(".send-row .send-btn");
+  };
+  const rideConfirmed = () => ((lastPlanForInvites && lastPlanForInvites.tasks) || []).some((t) => /drive/i.test(t.task) && t.confirmed);
   function yesOn(need) {   // the "Yes, add this" button on a plan part, opened so it can be seen
     const tag = [...planEl.querySelectorAll(".tag")].find((t) => t.querySelector(".tag-answer") && (!need || t.dataset.need === need));
     if (!tag) return null;
@@ -2101,6 +2209,26 @@
         reveal($("fold-people"));
       },
       target: () => $("people-list") },
+    { text: "She adds two things her people could help with, on the day of her procedure.", next: true,
+      show: () => {
+        reveal($("helper-more"));
+        const tasks = (lastPlanForInvites && lastPlanForInvites.tasks) || [];
+        const day = shortDay($("event-date").value || isoIn(30));
+        if (!tasks.some((t) => /drive/i.test(t.task))) storyRow("Drive me home after my procedure", day, "3 pm");
+        setTimeout(() => { if (!((lastPlanForInvites && lastPlanForInvites.tasks) || []).some((t) => /groceries/i.test(t.task)))
+          storyRow("Pick up groceries", day, "3 pm"); }, 600);
+      },
+      target: () => $("helper-table") },
+    { text: "She taps Invite my people. One at a time, she sends each message from her own phone or email.",
+      show: () => { for (const p of people) pickedPeople.add(p.id); renderInvitePeople(); reveal($("fold-people")); },
+      target: wizardButton, done: () => story.invited },
+    { text: "Leo and Doris answer on her shared list. Each picks the days and times that work for them.", next: true,
+      show: () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "example_replies" })); },
+      target: () => $("whats-new") },
+    { text: `${AGENT} gathers the replies. Doris is free mornings, but the groceries are at 3 pm, so ${AGENT} asks what Ruth would like.`, next: true,
+      target: () => $("whats-new-list").querySelector(".news-mismatch") || $("whats-new") },
+    { text: "Leo's time fits. Ruth marks his ride as confirmed.",
+      target: () => $("whats-new-list").querySelector(".news-helping .btn-primary"), done: rideConfirmed },
     { text: "Her next step card has Call now. When the ride is booked, she taps Done.", target: () => $("next-done"), done: () => story.done },
     { text: "Ruth says yes to the rest of her plan.", target: () => yesOn(), done: () => !planEl.querySelector(".tag-answer") },
     { text: "Every part is covered. A calm picture shows that her plan is ready.", next: true, target: () => $("ready-ill") },

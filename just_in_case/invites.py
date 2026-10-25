@@ -33,6 +33,25 @@ PEOPLE_TEMPLATE = (f"Hi {NAME_SLOT},\n\n"
                    "No pressure at all. It's completely fine if you can't, and there's no need to reply.")
 
 
+# A reminder for My people, a few days before a task no one has offered to help with yet.
+TASK_SLOT = "{task}"
+PEOPLE_REMINDER = (f"Hi {NAME_SLOT},\n\n"
+                   f"A friendly reminder about my helper list. I still need a hand with this: {TASK_SLOT}.\n\n"
+                   "If it fits your schedule, you can add your name. If not, that's completely fine, "
+                   "and there's no need to reply.")
+THANKS_SUBJECT = "Thank you"
+
+
+def thank_you_text(name: str, task: str) -> str:
+    """When more than one person offered: a short thank-you for each one the person did not pick."""
+    first = name.strip().split(" ")[0] if name.strip() else ""
+    task = task.strip().rstrip(".")
+    return (f"{'Hi ' + first + ',' if first else 'Hi,'}\n\n"
+            f"Thank you so much for offering to help with this: {task[:1].lower() + task[1:]}. "
+            "Someone else is covering it this time.\n\n"
+            "It means a lot that you offered. No need to reply.")
+
+
 def people_invite_text(name: str) -> str:
     first = name.strip().split(" ")[0] if name.strip() else ""
     return PEOPLE_TEMPLATE.replace(NAME_SLOT, first) if first else PEOPLE_TEMPLATE.replace(f" {NAME_SLOT}", "")

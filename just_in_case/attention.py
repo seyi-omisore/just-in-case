@@ -42,6 +42,8 @@ def check(state: PlanState, directory: Directory, today: date) -> list[dict]:
     for t in state.helper_tasks:
         if t.get("confirmed") and t.get("person"):
             continue
+        if t.get("offers"):
+            continue   # a helper replied on the shared list: it is in What's new instead
         if t.get("person") or t.get("invited"):
             who = t["person"].split(" ")[0] if t.get("person") else "Your helper"
             out.append({"kind": "unconfirmed", "task_id": t["id"],

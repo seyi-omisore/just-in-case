@@ -33,10 +33,10 @@ from just_in_case.config import AGENT_NAME, AI_DAILY_LIMIT, REPORT_EMAIL, has_ai
 from just_in_case.daily_limit import DailyLimit
 from just_in_case.prompts import GREETING
 from just_in_case.why import why_this
-from just_in_case import attention
+from just_in_case import attention, replies
 from just_in_case.card import plan_email_text
-from just_in_case.invites import (INVITE_SUBJECT, LINK_LINE, PEOPLE_TEMPLATE, REMINDER_SUBJECT, YOU_SEND_LINE,
-                                  drafts_for)
+from just_in_case.invites import (INVITE_SUBJECT, LINK_LINE, PEOPLE_REMINDER, PEOPLE_TEMPLATE, REMINDER_SUBJECT,
+                                  THANKS_SUBJECT, YOU_SEND_LINE, drafts_for)
 from just_in_case import timeline
 from just_in_case.encouragement import encouragement
 from just_in_case.next_step import pick_next_step
@@ -255,7 +255,10 @@ class Session:
             # Said they don't want to be a burden: no nudges to invite anyone. The buttons stay, quietly.
             "quiet_invites": state.worried_about_burden,
             "invite_words": {"link_line": LINK_LINE, "you_send": YOU_SEND_LINE,
-                             "invite_subject": INVITE_SUBJECT, "reminder_subject": REMINDER_SUBJECT},
+                             "invite_subject": INVITE_SUBJECT, "reminder_subject": REMINDER_SUBJECT,
+                             "people_reminder": PEOPLE_REMINDER, "thanks_subject": THANKS_SUBJECT},
+            # What's new: helpers' replies on the shared list, gathered by code each time the plan is shown.
+            "whats_new": replies.whats_new(state, d, self.agent.box.today, bool(self.share_id)),
             "card": f"/card/{self.id}" if state.card_path else None,
             "wallet": f"/wallet/{self.id}" if state.card_path else None,
             "report_email": REPORT_EMAIL,
@@ -436,6 +439,58 @@ class Session:
         self.agent.box.refresh_card()
         self.emit({"type": "activity", "kind": "heart", "text": activity})
         self.emit({"type": "plan", "plan": self.plan()})
+
+    def choose_helper(self, task_id, offer_id) -> None:
+        from just_in_case.tools import ToolError
+        try:
+            drafts = self.agent.box.user_choose_helper(task_id, offer_id)
+        except ToolError as e:
+            self.emit({"type": "table_error", "text": str(e)})
+            return
+        t = next(t for t in self.agent.state.helper_tasks if t["id"] == task_id)
+        self.emit({"type": "activity", "kind": "human", "text": f"You chose {t['person'].split(' ')[0]} for: {t['task']}"})
+        self.sync_share()
+        if drafts:
+            self.emit({"type": "thank_you", "task": t["task"], "drafts": drafts})
+        self.emit({"type": "plan", "plan": self.plan()})
+
+    def share_reconnect(self, share_id: str, owner: str) -> None:
+        """A saved plan reopened: look at its shared list again for new sign-ups (owner link only)."""
+        if self.share_id:
+            return
+        try:
+            rec = SHARES.get(share_id)
+        except ShareError:
+            return
+        if not SHARES.is_owner(rec, owner):
+            return
+        tasks, used = self.agent.state.helper_tasks, set()
+        for t in tasks:   # line the plan's rows up with the shared rows, by task
+            row = next((r for r in rec["tasks"] if r["id"] not in used and r["task"] == t["task"][:120]), None)
+            if row is None:
+                return    # the lists no longer match: leave it, the person can share again
+            used.add(row["id"]); t["id"] = row["id"]
+        if tasks:
+            self.agent.state.next_task_id = max(t["id"] for t in tasks) + 1
+        self.share_id, self.owner_token, self.share_expires = rec["id"], owner, rec["expires"]
+        SHARE_OWNERS[rec["id"]] = self
+        self.apply_share(rec, "Checked your shared helper list for new sign-ups")
+
+    def example_replies(self) -> None:
+        """Ruth's example only: Leo and Doris answer on her shared list, through the same sign-up code."""
+        if self.mode != "example" or not self.share_id:
+            return
+        today = self.agent.box.today
+        for name, words, days, times, note in (("Leo", "drive", "weekdays", "afternoons", "Happy to drive."),
+                                               ("Doris", "groceries", "any", "mornings", "Mornings are best for me.")):
+            row = next((t for t in self.agent.state.helper_tasks if words in t["task"].lower() and not t.get("person")), None)
+            if row:
+                try:
+                    rec, _ = SHARES.claim(self.share_id, row["id"], name, days, times, note, today=today)
+                except ShareError:
+                    continue
+                r = next(x for x in rec["tasks"] if x["id"] == row["id"])
+                self.apply_share(rec, f"{name} signed up to help: {r['task']}" if r["person"] else f"{name} offered to help: {r['task']}")
 
     def plans_changed(self, new_date: str, new_time: str) -> None:
         from just_in_case.tools import ToolError
@@ -966,6 +1021,15 @@ async def ws_endpoint(ws: WebSocket):
                 s.share_create(msg.get("consent"), str(msg.get("label", "")))
             elif msg.get("type") == "share_delete":
                 s.share_delete()
+            elif msg.get("type") == "choose_helper":
+                try:
+                    s.choose_helper(int(msg.get("task_id")), int(msg.get("offer_id")))
+                except (TypeError, ValueError):
+                    pass
+            elif msg.get("type") == "share_reconnect":
+                s.share_reconnect(str(msg.get("id", ""))[:80], str(msg.get("owner", ""))[:80])
+            elif msg.get("type") == "example_replies":
+                s.example_replies()
             elif msg.get("type") == "plans_changed":
                 s.plans_changed(str(msg.get("date", "")), str(msg.get("time", "")))
             elif msg.get("type") == "note_sent":   # the person says they sent a note from their own phone or email

@@ -968,7 +968,7 @@ def test_one_seasonal_tip_on_home_links_to_that_part_of_the_plan():
     assert "Winter is coming." in home and "Is your power outage plan ready?" in home
     assert '<a id="season-link" href="#plan-power_outage">Check it</a>' in home
     js = client.get("/static/app.js").text
-    season = js[js.index("const SEASON"):js.index("// ---- first-time tour")]
+    season = js[js.index("const SEASON"):js.index("// ---- What needs attention")]   # the tip's own code
     assert '"power_outage"' in season and '"mail_while_away"' in season       # only parts the app can plan
     assert "send(" not in season                                             # it never sends anything for you
     from just_in_case.safeguards import pressure_phrases
@@ -2031,3 +2031,91 @@ def test_my_number_rides_after_the_hash_and_never_reaches_the_server():
         if "ws.send(" in line or "fetch(" in line:
             assert "myNumber" not in line and "people" not in line and "contact" not in line, line
     assert "k === MY_NUMBER_KEY" in js                                     # Delete everything removes it
+
+
+# ---- Round 13, Part 3: Haven gathers the replies -----------------------------------
+
+def _shared_owner(ws, rows):
+    until(ws, "hello")
+    for r in rows:
+        ws.send_json({"type": "table", "action": "add", "row": r})
+        until(ws, "plan")
+    ws.send_json({"type": "share_create", "consent": True, "label": "Ruth"})
+    share = until(ws, "plan")["plan"]["share"]
+    sid = share["url"].split("/")[-1]
+    return sid, share["owner_url"].split("owner=")[1], client.get(f"/api/share/{sid}").json()["tasks"]
+
+
+def test_two_offers_let_the_person_choose_and_thank_the_other():
+    with client.websocket_connect("/ws") as ws:
+        sid, _, tasks = _shared_owner(ws, [{"task": "Feed Fifi", "time": "3 pm"}])
+        tid = tasks[0]["id"]
+        client.post(f"/api/share/{sid}/claim", json={"task_id": tid, "name": "Doris", "times": "mornings"})   # doesn't fit
+        until(ws, "plan")
+        client.post(f"/api/share/{sid}/claim", json={"task_id": tid, "name": "Marion", "times": "afternoons"})  # fits
+        plan = until(ws, "plan")["plan"]
+        news = [n for n in plan["whats_new"] if n["task_id"] == tid][0]
+        assert news["kind"] == "choose" and [c["fits"] for c in news["choices"]] == [False, True]
+        doris = news["choices"][0]["offer_id"]
+        ws.send_json({"type": "choose_helper", "task_id": tid, "offer_id": doris})   # the person decides, even against the times
+        thanks = until(ws, "thank_you")
+        assert [d["to"] for d in thanks["drafts"]] == ["Marion"] and "Thank you so much for offering" in thanks["drafts"][0]["text"]
+        plan = until(ws, "plan")["plan"]
+        assert plan["tasks"][0]["person"] == "Doris"
+        assert [n["kind"] for n in plan["whats_new"]] == ["helping"]
+        assert client.get(f"/api/share/{sid}").json()["tasks"][0]["person"] == "Doris"   # the shared list follows
+        ws.send_json({"type": "table", "action": "confirm", "row": {"id": tid, "confirmed": True}})
+        plan = until(ws, "plan")["plan"]
+        assert plan["whats_new"] == [] and plan["tasks"][0]["confirmed"] is True
+        ws.send_json({"type": "share_delete"})
+
+
+def test_a_reopened_plan_checks_its_shared_list_for_new_sign_ups():
+    with client.websocket_connect("/ws") as ws:
+        sid, owner, tasks = _shared_owner(ws, [{"task": "Drive me home"}])
+        saved = None
+        ws.send_json({"type": "save"})
+        saved = until(ws, "saved")["state"]
+    client.post(f"/api/share/{sid}/claim", json={"task_id": tasks[0]["id"], "name": "Leo"})   # while she was away
+    with client.websocket_connect("/ws") as ws:
+        until(ws, "hello")
+        ws.send_json({"type": "restore", "state": saved})
+        until(ws, "restored")
+        ws.send_json({"type": "share_reconnect", "id": sid, "owner": "wrong"})        # only with the private link
+        ws.send_json({"type": "share_reconnect", "id": sid, "owner": owner})
+        act = until(ws, "activity")
+        assert "Checked your shared helper list" in act["text"]
+        plan = until(ws, "plan")["plan"]
+        assert plan["tasks"][0]["person"] == "Leo" and plan["share"] is not None
+        assert plan["whats_new"][0]["kind"] == "helping"
+        ws.send_json({"type": "share_delete"})
+    js = client.get("/static/app.js").text
+    assert 'ws.send(JSON.stringify({ type: "share_reconnect", id: last.id, owner: last.owner }))' in js
+
+
+def test_whats_new_sits_in_the_attention_card_and_every_button_waits_for_a_tap():
+    page = client.get("/").text
+    card = page[page.index('id="attention"'):page.index('id="quick-bar"')]
+    assert 'id="whats-new"' in card and "What's new" in card                 # one place to look
+    js = client.get("/static/app.js").text
+    news = js[js.index("function renderWhatsNew"):js.index("function showThankYous")]
+    for words in ('"Mark confirmed"', '"Ask someone else"', '"Change the time"', '"Send a reminder"', "`Choose ${c.name}`"):
+        assert words in news
+    thanks = js[js.index("function showThankYous"):js.index("function openPlanPart")]
+    assert "sendControls({" in thanks and "ws.send" not in thanks
+
+
+def test_ruths_example_has_two_friends_reply_with_different_times():
+    from web.server import Session
+    import inspect
+    src = inspect.getsource(Session.example_replies)
+    assert 'if self.mode != "example"' in src and "SHARES.claim(" in src       # only in Ruth's story, through the same code
+    js = client.get("/static/app.js").text
+    story = js[js.index("const STORY = ["):js.index("function storyTick")]
+    assert 'type: "example_replies"' in story and "Leo's time fits" in story and "Doris is free mornings" in story
+    with client.websocket_connect("/ws") as ws:                               # a visitor's own plan can't fake replies
+        sid, _, _ = _shared_owner(ws, [{"task": "Drive me home"}])
+        ws.send_json({"type": "example_replies"})
+        ws.send_json({"type": "save"})
+        assert client.get(f"/api/share/{sid}").json()["tasks"][0]["person"] == ""
+        ws.send_json({"type": "share_delete"})

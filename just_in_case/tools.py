@@ -449,6 +449,7 @@ class Toolbox:
                     if clean["person"].lower() != t["person"].lower():
                         t["confirmed"] = False  # a confirmation never moves to a new name
                         t["invited"] = False    # nor does an invite
+                        t.pop("chosen", None)   # nor a choice between offers
                     t.update(clean)
         elif action == "confirm":
             t = next((t for t in s.helper_tasks if t["id"] == row.get("id")), None)
@@ -474,6 +475,24 @@ class Toolbox:
         s.log(f"user edited helper table ({action})")
         self.refresh_card()
         return s.helper_tasks
+
+    def user_choose_helper(self, task_id, offer_id) -> list[dict]:
+        """More than one person offered (or the times didn't fit): the person picks who helps.
+        Returns a thank-you draft for each of the others. The person sends those, or not."""
+        from .invites import thank_you_text
+        t = next((t for t in self.state.helper_tasks if t["id"] == task_id), None)
+        if t is None:
+            raise ToolError("That row is not in your table anymore.")
+        offers = t.get("offers") or []
+        o = next((x for x in offers if x.get("id") == offer_id), None)
+        if o is None:
+            raise ToolError("That offer is not on your list anymore.")
+        if (t.get("person") or "").lower() != o["name"].lower():
+            t["confirmed"] = False
+        t["person"], t["invited"], t["chosen"] = o["name"], False, o["id"]
+        self.state.log("user chose who helps with a task")
+        self.refresh_card()
+        return [{"to": x["name"], "text": thank_you_text(x["name"], t["task"])} for x in offers if x["id"] != o["id"]]
 
     # ---- save and continue later ------------------------------------------
     def export(self) -> dict:

@@ -1715,3 +1715,13 @@ html[data-ai="off"] .when-ai, html[data-ai="on"] .when-no-ai { display: none !im
 .share-thanks-title { font-weight: 700; font-size: 1.1rem; margin: 0; }
 .share-thanks-list { margin: 0; padding-left: 1.1rem; display: grid; gap: .4rem; }
 .share-thanks .btn { justify-self: start; min-height: 48px; }
+
+/* ---- What's new (Round 13) ---- */
+.whats-new { margin-bottom: .6rem; }
+.whats-new-title { font-weight: 700; display: flex; gap: .4rem; align-items: center; margin: 0 0 .35rem; }
+.news-actions { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; width: 100%; margin-top: .3rem; }
+.news-actions .btn { min-height: 48px; }
+.news-choice { width: 100%; margin: 0 0 .2rem; }
+.news-note, .news-backup { width: 100%; margin: .2rem 0 0; }
+#thanks-drafts { margin-top: .6rem; }
+.attention-item > .news-actions, .attention-item > .news-note, .attention-item > .news-backup { grid-column: 2; width: auto; }

@@ -1165,3 +1165,42 @@ def test_availability_fits_only_when_days_and_times_match():
         ["mornings", "afternoons", "afternoons", "mornings", "evenings", "afternoons", "evenings", "mornings"]
     assert free_words("weekdays", "afternoons") == "weekday afternoons" and free_words("any", "any") == "any time"
     assert free_words("any", "mornings") == "mornings" and free_words("weekends", "any") == "weekends"
+
+
+def test_thank_you_and_reminder_notes_pass_the_note_checks():
+    from just_in_case.invites import PEOPLE_REMINDER, thank_you_text
+    from just_in_case.safeguards import check_helper_note
+    assert check_helper_note(thank_you_text("Doris Chen", "Pick up groceries")) is None
+    assert thank_you_text("Doris Chen", "Pick up groceries").startswith("Hi Doris,")
+    reminder = PEOPLE_REMINDER.replace("{name}", "Leo").replace("{task}", "Drive me home after my procedure")
+    assert check_helper_note(reminder) is None
+
+
+def test_whats_new_is_built_by_code_from_the_offers():
+    """Round 13: who can help, times that don't fit, two offers to choose from, and no offers close to the date."""
+    from datetime import date
+    from just_in_case.directory import Directory
+    from just_in_case.replies import whats_new
+    from just_in_case.state import PlanState
+    today = date(2026, 11, 20)
+    st = PlanState(town="Boston")
+    st.helper_tasks = [
+        {"id": 1, "task": "Drive me home", "date": "2026-11-23", "time": "3 pm", "person": "Leo", "confirmed": False,
+         "offers": [{"id": 1, "name": "Leo", "days": "weekdays", "times": "afternoons", "note": ""}]},
+        {"id": 2, "task": "Pick up groceries", "date": "2026-11-23", "time": "3 pm", "person": "", "confirmed": False,
+         "offers": [{"id": 1, "name": "Doris", "days": "any", "times": "mornings", "note": "Mornings only"}]},
+        {"id": 3, "task": "Feed Fifi", "date": "", "time": "", "person": "Leo", "confirmed": False,
+         "offers": [{"id": 1, "name": "Leo", "days": "any", "times": "any", "note": ""},
+                    {"id": 2, "name": "Marion", "days": "weekends", "times": "any", "note": ""}]},
+        {"id": 4, "task": "Drive me to my eye appointment", "date": "2026-11-22", "time": "", "person": "", "confirmed": False},
+        {"id": 5, "task": "Water the plants", "date": "", "time": "", "person": "Sam", "confirmed": True,
+         "offers": [{"id": 1, "name": "Sam", "days": "any", "times": "any", "note": ""}]},
+    ]
+    news = {n["task_id"]: n for n in whats_new(st, Directory(), today, shared=True)}
+    assert news[1]["kind"] == "helping" and news[1]["text"].endswith("Weekday afternoons work for Leo.")
+    assert news[2]["kind"] == "mismatch" and "Doris is free mornings, but this task is at 3 pm." in news[2]["text"]
+    assert news[2]["text"].endswith("Would you like to ask someone else, or change the time?")
+    assert news[3]["kind"] == "choose" and [c["name"] for c in news[3]["choices"]] == ["Leo", "Marion"]
+    assert news[4]["kind"] == "soon" and "in 2 days" in news[4]["text"] and news[4]["backup"]["name"]   # a checked service
+    assert 5 not in news                                                       # confirmed: nothing new
+    assert whats_new(st, Directory(), today, shared=False)[-1]["task_id"] != 6

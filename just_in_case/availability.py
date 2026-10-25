@@ -53,6 +53,28 @@ def fits(task: dict, days: str, times: str, today: date) -> bool:
     return not (part and times != "any" and part != times)
 
 
+DAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+
+def mismatch(task: dict, days: str, times: str, today: date) -> str | None:
+    """Why an offer does not fit, in plain words about the task: "at 3 pm", "on a Saturday". None if it fits."""
+    days, times = clean(days, times)
+    when = read_task_date(task.get("date", ""), today)
+    if when and days != "any" and (days == "weekdays") == (when.weekday() >= 5):
+        return f"on a {DAY_NAMES[when.weekday()]}"
+    part = part_of_day(task.get("time", ""))
+    if part and times != "any" and part != times:
+        t = task.get("time", "").strip()
+        return f"at {t}" if t[:1].isdigit() else f"in the {part.rstrip('s')}"
+    return None
+
+
+def free_phrase(days: str, times: str) -> str:
+    """For "Doris is free ___": "mornings", "on weekdays", "on weekday afternoons", "any time"."""
+    words = free_words(days, times)
+    return words if words in ("any time", "mornings", "afternoons") else "on " + words
+
+
 def free_words(days: str, times: str) -> str:
     """ "weekday afternoons", "mornings", "weekends", or "any time"."""
     days, times = clean(days, times)
