@@ -1511,7 +1511,7 @@ def test_plan_carries_checked_invite_drafts_and_the_share_link_only_when_shared(
         assert plan["invite_words"]["you_send"] == "Haven writes the message. You send it from your own phone or email."
         assert plan["share"] is None       # the page adds the list link only once the person has shared it
     js = client.get("/static/app.js").text
-    assert 'if (kind === "invite" && plan.share) text +=' in js
+    assert 'return text ? text + listLink(plan) : "";' in js          # the link goes on every kind of message, once shared
     assert 'b.append(icon(kind === "invite" ? "send" : "bell")' in js
 
 
@@ -2186,3 +2186,68 @@ def test_home_safe_thank_you_note_passes_the_note_checks():
     assert check_helper_note(note) is None and note.startswith("Hi Doris,") and "home safe" in note
     js, story = _moments()
     assert "function homeSafe()" in js and "showThankYous(" in js[js.index("function homeSafe()"):js.index("const MOMENTS")]
+
+
+
+# ---- Following up on a text the person sent ------------------------------------------
+
+def test_every_text_carries_the_list_link_or_asks_to_share_first():
+    js = client.get("/static/app.js").text
+    opener = js[js.index("function openInvitePanel"):js.index("function contactParts")]
+    assert 'if (lastPlanForInvites && !lastPlanForInvites.share && !EXAMPLE)' in opener and '$("consent-dialog").showModal()' in opener
+    assert "they said no to sharing: the text can still go, without the link" in js
+    note = js[js.index("function noteSendBox"):js.index("function listLink")]
+    assert "text + listLink(lastPlanForInvites)" in note and "Add my helper list link" in note
+    with client.websocket_connect("/ws") as ws:
+        until(ws, "hello")
+        ws.send_json({"type": "table", "action": "add", "row": {"task": "Drive me home"}})
+        plan = until(ws, "plan")["plan"]
+    assert plan["invite_words"]["no_link"] == "Without your list link, Just in Case can't see their answer."
+
+
+def test_after_a_text_the_app_asks_how_they_replied_then_follows_up():
+    from datetime import date, timedelta
+    with client.websocket_connect("/ws") as ws:
+        until(ws, "hello")
+        ws.send_json({"type": "table", "action": "add", "row": {"task": "Drive me to my eye appointment"}})
+        tid = until(ws, "plan")["plan"]["tasks"][0]["id"]
+        ws.send_json({"type": "table", "action": "invited", "row": {"id": tid, "name": "David"}})
+        news = until(ws, "plan")["plan"]["whats_new"]
+        assert news[0]["kind"] == "asked" and news[0]["text"] == "You asked David about: drive me to my eye appointment. Did David reply?"
+        ws.send_json({"type": "table", "action": "reply", "row": {"id": tid, "answer": "not_yet"}})
+        assert until(ws, "plan")["plan"]["whats_new"] == []                       # quiet for now
+    # Two days later, no reply: a gentle follow-up and a checked service as a backup.
+    from just_in_case.directory import Directory
+    from just_in_case.replies import whats_new
+    from just_in_case.state import PlanState
+    st = PlanState(town="Boston")
+    st.helper_tasks = [{"id": 1, "task": "Drive me to my eye appointment", "date": "", "time": "", "person": "", "invited": True,
+                        "invited_name": "David", "invited_on": "2026-11-01", "not_yet": "2026-11-01"}]
+    n = whats_new(st, Directory(), date(2026, 11, 3), shared=True)[0]
+    assert n["kind"] == "no_reply" and "No reply from David yet" in n["text"] and n["backup"]["name"]
+    js = client.get("/static/app.js").text
+    news = js[js.index("function renderWhatsNew"):js.index("function showThankYous")]
+    for words in ('"Send a follow-up"', "`Yes, ${nm} can help`", "`${nm} can't`", '"No reply yet"', '"Ask someone else"'):
+        assert words in news
+
+
+def test_a_yes_confirms_and_a_no_says_thats_okay():
+    with client.websocket_connect("/ws") as ws:
+        until(ws, "hello")
+        for task in ("Feed Fifi", "Water the plants"):
+            ws.send_json({"type": "table", "action": "add", "row": {"task": task}})
+            until(ws, "plan")
+        plan = until(ws, "plan") if False else None
+        ws.send_json({"type": "save"})
+        ids = [t["id"] for t in until(ws, "saved")["state"]["tasks"]]
+        for i in ids:
+            ws.send_json({"type": "table", "action": "invited", "row": {"id": i, "name": "David Lee"}})
+            until(ws, "plan")
+        ws.send_json({"type": "table", "action": "reply", "row": {"id": ids[0], "answer": "yes"}})
+        t = until(ws, "plan")["plan"]["tasks"][0]
+        assert t["person"] == "David Lee" and t["confirmed"] is True and t["invited"] is False
+        ws.send_json({"type": "table", "action": "reply", "row": {"id": ids[1], "answer": "no"}})
+        news = until(ws, "plan")["plan"]["whats_new"]
+        assert news[-1]["kind"] == "declined" and news[-1]["text"].startswith("David can't help with: water the plants. That's okay.")
+        ws.send_json({"type": "table", "action": "declined_ok", "row": {"id": ids[1]}})
+        assert until(ws, "plan")["plan"]["whats_new"] == []

@@ -458,16 +458,39 @@ class Toolbox:
             if not t["person"]:
                 raise ToolError("Add who is helping before marking it confirmed.")
             t["confirmed"] = row.get("confirmed") is True
-        elif action in ("invited", "reminded"):
-            # The person tapped "Yes, I sent it" after sending from their own phone or email.
-            # We only record what they told us; the app never sends anything.
+        elif action in ("invited", "reminded", "followed_up", "reply", "declined_ok"):
+            # The person tapped "Yes, I sent it" after sending from their own phone or email, or told us
+            # how someone replied. We only record what they tell us; the app never sends or reads messages.
             t = next((t for t in s.helper_tasks if t["id"] == row.get("id")), None)
             if t is None:
                 raise ToolError("That row is not in your table anymore.")
+            today = self.today.isoformat()
             if action == "invited":
                 t["invited"] = True
-            else:
-                t["reminded"] = self.today.isoformat()
+                name = str(row.get("name") or "").strip()[:60] or t.get("person", "")
+                t["invited_name"], t["invited_on"] = name, today
+                t.pop("not_yet", None); t.pop("followed_up", None)
+            elif action == "reminded":
+                t["reminded"] = today
+            elif action == "followed_up":
+                t["followed_up"] = today
+            elif action == "declined_ok":
+                t["declined_seen"] = True
+            else:   # "reply": what the person says the helper answered
+                answer = row.get("answer")
+                name = t.get("invited_name") or t.get("person", "")
+                if answer == "yes":
+                    t["person"] = t.get("person") or name
+                    t["confirmed"], t["invited"] = bool(t["person"]), False
+                elif answer == "no":
+                    t.setdefault("declined", []).append(name)
+                    if t.get("person", "").lower() == name.lower():
+                        t["person"], t["confirmed"] = "", False
+                    t["invited"], t["invited_name"], t["declined_seen"] = False, "", False
+                elif answer == "not_yet":
+                    t["not_yet"] = today
+                else:
+                    raise ToolError("Unknown answer.")
         elif action == "delete":
             s.helper_tasks = [t for t in s.helper_tasks if t["id"] != row.get("id")]
         else:
@@ -550,6 +573,9 @@ class Toolbox:
                 self.user_edit_task("add", {k: t.get(k, "") for k in TASK_FIELDS})
                 row = s.helper_tasks[-1]
                 row["invited"] = t.get("invited") is True        # only true booleans count
+                for k in ("invited_name", "invited_on", "not_yet", "followed_up"):   # the follow-up, as it was
+                    if isinstance(t.get(k), str) and len(t[k]) <= 60:
+                        row[k] = t[k]
                 row["confirmed"] = t.get("confirmed") is True and bool(row["person"])
             attempt("a helper row", add_row)
         if saved.get("sections") is not None:

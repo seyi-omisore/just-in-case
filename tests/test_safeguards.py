@@ -1204,3 +1204,11 @@ def test_whats_new_is_built_by_code_from_the_offers():
     assert news[4]["kind"] == "soon" and "in 2 days" in news[4]["text"] and news[4]["backup"]["name"]   # a checked service
     assert 5 not in news                                                       # confirmed: nothing new
     assert whats_new(st, Directory(), today, shared=False)[-1]["task_id"] != 6
+
+
+
+def test_follow_up_text_passes_the_note_checks():
+    from just_in_case.invites import follow_up_text
+    from just_in_case.safeguards import check_helper_note
+    text = follow_up_text({"task": "drive me home", "date": "Nov 24", "time": "3 pm"}, "David Lee")
+    assert text.startswith("Hi David,") and "Drive me home, Nov 24, 3 pm" in text and check_helper_note(text) is None

@@ -135,6 +135,18 @@ def remind_now(row: dict, today: date) -> bool:
     return 0 <= (when - today).days <= REMIND_DAYS_BEFORE
 
 
+# No reply after this many days: the agent offers a gentle follow-up text, written from fixed wording.
+FOLLOW_UP_DAYS = 2
+FOLLOW_UP_SUBJECT = "Just checking in"
+
+
+def follow_up_text(row: dict, name: str) -> str:
+    first = name.strip().split(" ")[0] if name.strip() else ""
+    return (f"{'Hi ' + first + ',' if first else 'Hi,'}\n\n"
+            f"Just checking in about this:\n\n{_task(row)}{_when(row)}\n\n"
+            "No pressure at all. If you can't, that's completely fine, and there's no need to reply.")
+
+
 def update_text(name: str, event_words: str, when_words: str) -> str:
     """ "My plans changed": one short update for a helper. Same rules as every note."""
     first = name.strip().split(" ")[0] if name.strip() else ""
@@ -149,7 +161,9 @@ def drafts_for(tasks: list[dict], today: date | None = None) -> dict[int, dict]:
     out = {}
     for t in tasks:
         invite, reminder = invite_text(t), reminder_text(t)
-        out[t["id"]] = {"invite": invite, "reminder": reminder,
+        follow = follow_up_text(t, t.get("invited_name") or t.get("person", ""))
+        out[t["id"]] = {"invite": invite, "reminder": reminder, "follow_up": follow,
+                        "follow_up_ok": check_helper_note(follow) is None,
                         "invite_ok": check_helper_note(invite) is None,
                         "reminder_ok": check_helper_note(reminder) is None,
                         "remind_now": remind_now(t, today)}

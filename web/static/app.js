@@ -1358,11 +1358,24 @@
     b.append(icon(kind === "invite" ? "send" : "bell"), document.createTextNode(kind === "invite" ? "Invite" : "Send a reminder"));
     b.setAttribute("aria-expanded", String(open));
     b.setAttribute("aria-label", (kind === "invite" ? "Invite someone to help with: " : "Send a reminder about: ") + t.task);
-    b.onclick = () => {
-      openInvite = open ? null : { id: t.id, kind, text: null, focus: true };
-      if (lastPlanForInvites) renderTasks(lastPlanForInvites);
-    };
+    b.onclick = () => openInvitePanel(t.id, kind, open);
     return b;
+  }
+  // Every text carries the helper-list link, so the helper's answer can come back to What's new.
+  // Not shared yet: the usual consent box first. If the person says no, the panel opens without the link.
+  let inviteAfterConsent = null;
+  function openInvitePanel(id, kind, close) {
+    if (close) { openInvite = null; renderTasks(lastPlanForInvites); return; }
+    if (lastPlanForInvites && !lastPlanForInvites.share && !EXAMPLE) {
+      inviteAfterConsent = { id, kind };
+      $("consent-name").value = ""; $("consent-dialog").showModal();
+      return;
+    }
+    openInvite = { id, kind, text: null, focus: true };
+    reveal($("helper-more"));
+    if (lastPlanForInvites) renderTasks(lastPlanForInvites);
+    const panel = document.querySelector("#helper-rows .invite-panel");
+    if (panel) panel.scrollIntoView({ block: "center" });
   }
   // Text and email links open the person's own Messages or email app with the words filled in.
   // The app itself never sends anything: the person presses send there, or not.
@@ -1422,8 +1435,14 @@
     const names = (to || []).map((n) => String(n).toLowerCase());
     const theirTasks = () => ((lastPlanForInvites && lastPlanForInvites.tasks) || [])
       .filter((t) => t.person && names.includes(t.person.toLowerCase()));
+    if (!EXAMPLE && !(lastPlanForInvites && lastPlanForInvites.share)) {   // the list link, so their answer can come back
+      const add = el("button", "btn btn-quiet btn-small"); add.type = "button";
+      add.append(icon("heart"), document.createTextNode("Add my helper list link"));
+      add.onclick = () => { $("consent-name").value = ""; $("consent-dialog").showModal(); };
+      box.append(el("p", "helper-small no-link", "Without your list link, Just in Case can't see their answer."), add);
+    }
     box.appendChild(sendControls({
-      text: () => text,
+      text: () => text + listLink(lastPlanForInvites),
       subject: (lastPlanForInvites && lastPlanForInvites.invite_words.invite_subject) || "Could you help with something small?",
       contact: () => { const t = theirTasks().find((x) => contacts.get(x.id)); return t ? contacts.get(t.id) : ""; },
       onSent: () => {
@@ -1434,18 +1453,18 @@
     }));
     return box;
   }
+  function listLink(plan) { return plan && plan.share ? "\n\n" + plan.invite_words.link_line + " " + location.origin + plan.share.url : ""; }
   function draftFor(t, plan, kind) {
     const d = (plan.invites || {})[String(t.id)] || {};
-    let text = kind === "reminder" ? d.reminder : d.invite;
-    if (kind === "invite" && plan.share) text += "\n\n" + plan.invite_words.link_line + " " + location.origin + plan.share.url;
-    return text || "";
+    const text = kind === "reminder" ? d.reminder : kind === "follow_up" ? d.follow_up : d.invite;
+    return text ? text + listLink(plan) : "";
   }
   function invitePanel(t, plan) {
     const kind = openInvite.kind;
     const panel = el("div", "invite-panel");
     panel.setAttribute("role", "group");
-    const who = t.person ? t.person.split(" ")[0] : "someone";
-    const title = kind === "invite" ? `Invite ${who}` : `Remind ${who}`;
+    const who = (t.invited_name || t.person || "").split(" ")[0] || "someone";
+    const title = kind === "invite" ? `Invite ${who}` : kind === "follow_up" ? `Follow up with ${who}` : `Remind ${who}`;
     panel.setAttribute("aria-label", title);
     panel.appendChild(el("p", "invite-title", title));
     const id = "invite-text-" + t.id;
@@ -1461,13 +1480,23 @@
     cin.value = contacts.get(t.id) || "";
     cin.addEventListener("change", () => setContact(t.id, cin.value));
     panel.append(lab, ta, clab, cin, el("p", "helper-small", "Stays on this device only."));
+    // No name on the task: ask for their first name, so the follow-up can say "Did David reply?"
+    let nin = null;
+    if (kind === "invite" && !t.person) {
+      const nid = "invite-name-" + t.id;
+      const nlab = el("label", "invite-label", "Their first name (optional)"); nlab.htmlFor = nid;
+      nin = el("input"); nin.id = nid; nin.maxLength = 60; nin.autocomplete = "off";
+      panel.append(nlab, nin);
+    }
+    if (!plan.share) panel.appendChild(el("p", "helper-small no-link", plan.invite_words.no_link));
     panel.appendChild(sendControls({
       text: () => ta.value,
-      subject: kind === "invite" ? plan.invite_words.invite_subject : plan.invite_words.reminder_subject,
+      subject: kind === "invite" ? plan.invite_words.invite_subject : kind === "follow_up" ? plan.invite_words.follow_up_subject : plan.invite_words.reminder_subject,
       contact: () => cin.value,
-      onSent: () => {   // "Yes, I sent it": an invite marks the task Invited; a reminder notes the day
+      onSent: () => {   // "Yes, I sent it": an invite marks the task Invited; a reminder or follow-up notes the day
         openInvite = null;
-        sendTable(kind === "invite" ? "invited" : "reminded", { id: t.id });
+        if (kind === "invite") sendTable("invited", { id: t.id, name: nin ? nin.value.trim() : "" });
+        else sendTable(kind === "follow_up" ? "followed_up" : "reminded", { id: t.id });
       },
     }));
     panel.appendChild(el("p", "helper-small invite-you-send", plan.invite_words.you_send));
@@ -1757,6 +1786,10 @@
   // After the person says yes to sharing, the invites start as soon as the link exists.
   function inviteWhenShared(plan) {
     if (inviteAfterShare && plan.share) { inviteAfterShare = false; startWizard("invite"); }
+    if (inviteAfterConsent && plan.share) {
+      const w = inviteAfterConsent; inviteAfterConsent = null;
+      setTimeout(() => openInvitePanel(w.id, w.kind, false), 0);
+    }
   }
 
   // ---- helper updates: calm, non-urgent notices -------------------------
@@ -1808,7 +1841,14 @@
     }
   }
   $("share-open").addEventListener("click", () => { $("consent-name").value = ""; consent.showModal(); });
-  consent.addEventListener("close", () => { if (!sharingAsked) inviteAfterShare = false; sharingAsked = false; });
+  consent.addEventListener("close", () => {
+    if (!sharingAsked) inviteAfterShare = false;
+    if (inviteAfterConsent && !sharingAsked) {   // they said no to sharing: the text can still go, without the link
+      const w = inviteAfterConsent; inviteAfterConsent = null;
+      openInvite = { id: w.id, kind: w.kind, text: null, focus: true }; reveal($("helper-more")); renderTasks(lastPlanForInvites);
+    }
+    sharingAsked = false;
+  });
   let sharingAsked = false;
   $("consent-yes").addEventListener("click", () => {
     sharingAsked = true;
@@ -2155,16 +2195,40 @@
     if (!people.length) { $("person-form").elements.name.focus(); return; }
     startWizard("reminder", taskText);
   }
+  function backupLine(li, row, backup) {   // a checked service, as a backup
+    if (!backup) return;
+    li.appendChild(el("p", "helper-small news-backup", `Or, as a backup, ${backup.name} can help.`));
+    if (backup.phone && backup.phone !== "see website") {
+      const a = el("a", "btn btn-quiet btn-small attention-btn"); a.href = "tel:" + backup.phone.replace(/[^0-9]/g, "");
+      a.append(icon("phone"), document.createTextNode("Call " + backup.phone)); row.appendChild(a);
+    } else if (backup.url) {
+      const a = el("a", "btn btn-quiet btn-small attention-btn"); a.href = backup.url; a.target = "_blank"; a.rel = "noopener";
+      a.append(icon("info"), document.createTextNode("Website")); row.appendChild(a);
+    }
+  }
   function renderWhatsNew(plan, news) {
     $("whats-new").hidden = !news.length;
     const ul = $("whats-new-list"); ul.replaceChildren();
     const task = (id) => (plan.tasks || []).find((t) => t.id === id);
     for (const n of news) {
       const li = el("li", "attention-item news-" + n.kind);
-      li.append(icon(n.kind === "mismatch" ? "info" : n.kind === "none" || n.kind === "soon" ? "wait" : "person"), el("span", null, n.text));
+      li.append(icon(n.kind === "mismatch" || n.kind === "declined" ? "info" : ["none", "soon", "asked", "no_reply"].includes(n.kind) ? "wait" : "person"), el("span", null, n.text));
       if (n.note) li.appendChild(el("p", "helper-small news-note", `${n.name}'s note: “${n.note}”`));
       const row = el("div", "news-actions");
-      if (n.kind === "helping") {
+      const reply = (answer) => sendTable("reply", { id: n.task_id, answer });
+      const nm = n.name || "They";
+      if (n.kind === "asked" || n.kind === "no_reply") {
+        if (n.kind === "no_reply")
+          row.appendChild(smallBtn("send", "Send a follow-up", () => openInvitePanel(n.task_id, "follow_up", false), true));
+        row.appendChild(smallBtn("check", `Yes, ${nm} can help`, () => reply("yes"), n.kind === "asked"));
+        row.appendChild(smallBtn("dash", `${nm} can't`, () => reply("no")));
+        if (n.kind === "asked") row.appendChild(smallBtn("wait", "No reply yet", () => reply("not_yet")));
+        backupLine(li, row, n.backup);
+      } else if (n.kind === "declined") {
+        row.appendChild(smallBtn("people", "Ask someone else", () => openInvitePanel(n.task_id, "invite", false), true));
+        backupLine(li, row, n.backup);
+        row.appendChild(smallBtn("check", "OK", () => sendTable("declined_ok", { id: n.task_id })));
+      } else if (n.kind === "helping") {
         row.appendChild(smallBtn("check", "Mark confirmed", () => sendTable("confirm", { id: n.task_id, confirmed: true }), true));
       } else if (n.kind === "fits_now") {
         row.appendChild(smallBtn("check", `Choose ${n.name}`, () => ws.send(JSON.stringify({ type: "choose_helper", task_id: n.task_id, offer_id: n.offer_id })), true));

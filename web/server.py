@@ -35,7 +35,7 @@ from just_in_case.prompts import GREETING
 from just_in_case.why import why_this
 from just_in_case import attention, replies
 from just_in_case.card import plan_email_text
-from just_in_case.invites import (HOME_SAFE, INVITE_SUBJECT, LINK_LINE, PEOPLE_REMINDER, PEOPLE_TEMPLATE, REMINDER_SUBJECT,
+from just_in_case.invites import (FOLLOW_UP_SUBJECT, HOME_SAFE, INVITE_SUBJECT, LINK_LINE, PEOPLE_REMINDER, PEOPLE_TEMPLATE, REMINDER_SUBJECT,
                                   THANKS_SUBJECT, YOU_SEND_LINE, drafts_for)
 from just_in_case import timeline
 from just_in_case.encouragement import encouragement
@@ -256,7 +256,9 @@ class Session:
             "quiet_invites": state.worried_about_burden,
             "invite_words": {"link_line": LINK_LINE, "you_send": YOU_SEND_LINE,
                              "invite_subject": INVITE_SUBJECT, "reminder_subject": REMINDER_SUBJECT,
-                             "people_reminder": PEOPLE_REMINDER, "thanks_subject": THANKS_SUBJECT, "home_safe": HOME_SAFE},
+                             "people_reminder": PEOPLE_REMINDER, "thanks_subject": THANKS_SUBJECT, "home_safe": HOME_SAFE,
+                             "follow_up_subject": FOLLOW_UP_SUBJECT,
+                             "no_link": "Without your list link, Just in Case can't see their answer."},
             # What's new: helpers' replies on the shared list, gathered by code each time the plan is shown.
             "whats_new": replies.whats_new(state, d, self.agent.box.today, bool(self.share_id)),
             "card": f"/card/{self.id}" if state.card_path else None,
@@ -513,6 +515,9 @@ class Session:
                 "delete": "You removed a row from your helper table",
                 "confirm": "You updated whether a helper is confirmed",
                 "invited": "You sent an invite from your own phone or email",
+                "followed_up": "You sent a follow-up from your own phone or email",
+                "reply": "You noted how your helper replied",
+                "declined_ok": "You noted that",
                 "reminded": "You sent a reminder from your own phone or email"}.get(action, "You edited your table")})
         except ToolError as e:
             self.emit({"type": "table_error", "text": str(e)})

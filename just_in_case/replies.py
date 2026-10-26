@@ -9,7 +9,7 @@ from datetime import date
 
 from .availability import fits, free_words, mismatch, free_phrase
 from .directory import Directory
-from .invites import REMIND_DAYS_BEFORE, read_task_date
+from .invites import FOLLOW_UP_DAYS, REMIND_DAYS_BEFORE, read_task_date
 from .state import PlanState
 
 # Words in a task that point to a need with services, for a backup when no one has offered.
@@ -59,6 +59,13 @@ def _soon(t: dict, today: date) -> int | None:
     return days if 0 <= days <= REMIND_DAYS_BEFORE else None
 
 
+def _days_since(iso: str | None, today: date) -> int | None:
+    try:
+        return (today - date.fromisoformat(iso)).days if iso else None
+    except ValueError:
+        return None
+
+
 def _days_words(n: int) -> str:
     return "today" if n == 0 else "tomorrow" if n == 1 else f"in {n} days"
 
@@ -66,9 +73,31 @@ def _days_words(n: int) -> str:
 def whats_new(state: PlanState, directory: Directory, today: date, shared: bool) -> list[dict]:
     out: list[dict] = []
     for t in state.helper_tasks:
+        offers = t.get("offers") or []
+        # Someone said no (the person told us): calm words, and a way to ask someone else.
+        if t.get("declined") and not t.get("declined_seen") and not t.get("person"):
+            who = _first(t["declined"][-1]) or "Your helper"
+            out.append({"task_id": t["id"], "kind": "declined", "backup": backup_service(t, state, directory),
+                        "text": f"{who} can't help with: {_task(t)}. That's okay. Would you like to ask someone else?"})
+            continue
         if t.get("person") and t.get("confirmed"):
             continue
-        offers = t.get("offers") or []
+        # A text the person sent from their own phone. The app can't read the reply, so it asks.
+        if t.get("invited") and not offers:
+            name = _first(t.get("invited_name") or t.get("person", ""))
+            who = name or "your helper"
+            since = _days_since(t.get("followed_up") or t.get("invited_on"), today)
+            waited = since is not None and since >= FOLLOW_UP_DAYS   # a couple of days with no reply
+            base = {"task_id": t["id"], "name": name}
+            if waited:
+                out.append({**base, "kind": "no_reply", "backup": backup_service(t, state, directory),
+                            "text": f"No reply from {who} yet about: {_task(t)}. Would you like to send a gentle follow-up?"})
+            elif not t.get("not_yet"):
+                out.append({**base, "kind": "asked",
+                            "text": f"You asked {who} about: {_task(t)}. Did {who} reply?"})
+            continue
+        if t.get("person") and t.get("confirmed"):
+            continue
         person = t.get("person", "")
         base = {"task_id": t["id"]}
         chooser = len(offers) >= 2 and not t.get("chosen")
