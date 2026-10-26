@@ -1780,3 +1780,15 @@ html[data-theme="contrast"] .pick-btn { border-color: var(--ink); color: var(--i
 /* Home: Ruth's story, right under the main buttons and above "How it works" */
 .home-story { display: flex; justify-content: center; gap: .5rem; min-height: 56px; margin: .6rem auto 0; max-width: 32rem; font-weight: 700; }
 .home-links:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }
+
+/* ---- Plan tabs: more than one plan, side by side ---- */
+.plan-tabs { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; max-width: 100%; }
+.plan-tab-list { display: contents; }
+.plan-tab { min-height: 48px; padding: 0 1rem; border-radius: 999px; border: 2px solid var(--line); background: var(--paper);
+  color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; display: inline-flex; gap: .4rem; align-items: center; }
+.plan-tab[aria-current="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary, #fff); }
+.plan-tab:focus-visible { outline: 3px solid var(--focus, var(--primary)); outline-offset: 2px; }
+.plan-new { border-style: dashed; }
+.plan-tab-status { flex-basis: 100%; margin: 0; }
+.plan-tab-status:empty { display: none; }
+[data-theme="contrast"] .plan-tab[aria-current="true"] { background: #FFFF00; color: #000; border-color: #FFFF00; }

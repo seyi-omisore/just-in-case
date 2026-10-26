@@ -39,7 +39,13 @@ to a friend, and the card. Haven writes the message. You send it from your own p
    fit is said plainly, with "Ask someone else" and "Change the time". Two offers let the person choose and
    send a thank-you to the others. A task with no offers a few days before its date gets a reminder and a
    checked service as a backup. It sits at the top of "What needs attention", so there is one place to look.
-5. Every date and time box has a **calendar or clock button** (typing still works), and every dated item
+5. **Following up on a text**: every text carries the helper-list link (the consent box comes first if the list is not
+   shared yet). After "Yes, I sent it", What's new asks "Did David reply?" (Yes, can't, No reply yet). After two days
+   with no reply, Haven drafts a gentle follow-up from fixed wording and suggests a checked service as a backup. The app
+   never reads or sends texts: the person sends them and tells the app what happened.
+6. **More than one plan**: tabs on the plan screen, one per plan (named by what it is for), plus "+ New plan". Each plan
+   keeps its own chat, helper list, card, and shared list, and all of them are kept on the device when saving is on.
+7. Every date and time box has a **calendar or clock button** (typing still works), and every dated item
    has **Add to calendar** (a standard .ics file made in the browser).
 
 See [docs/workflow.md](docs/workflow.md) for the diagram and [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) for running and testing.

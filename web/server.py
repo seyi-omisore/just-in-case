@@ -92,6 +92,17 @@ def plan_b(item, state, directory) -> dict | None:
     return {"name": s["name"], "phone": s.get("phone", ""), "url": s.get("url", ""), "cost": s["cost"]}
 
 
+# A short name for each plan's tab, from the first thing it plans for.
+PLAN_TAB = {"ride_home_after_procedure": "Procedure", "check_in_after_procedure": "Procedure", "mail_while_away": "Going away",
+            "pet_care_during_stay": "Pet care", "power_outage": "Power outage", "spare_key_access": "Spare key",
+            "fall_at_home": "A fall at home", "home_repair": "Home repair", "transportation": "Rides",
+            "help_at_home": "Help at home", "family_updates": "Family updates"}
+
+
+def plan_title(state) -> str:
+    return PLAN_TAB.get(state.confirmed_needs[0], "") if state.confirmed_needs else ""
+
+
 def need_label(key: str) -> str:
     return NEEDS.get(key, key.replace("_", " "))
 
@@ -234,6 +245,7 @@ class Session:
         covered = {i.need for i in state.items if i.route != "blank" and i.user_ok}
         return {
             "items": items,
+            "title": plan_title(state),
             # No one to ask (or would rather not): show where to find more help, not an empty table.
             "services_only": state.services_only(),
             "help_lines": [{"name": l["name"], "how_to_reach": l["how_to_reach"]}
@@ -535,6 +547,37 @@ class Session:
             self.agent = JustInCaseAgent(approver=self.approver, trace=self.on_trace,
                                          on_tool=self.on_tool, out_dir=self.out_dir)
         await self.agent.__aenter__()
+
+    async def switch_plan(self, saved) -> None:
+        """Another plan tab: hand the page this plan to keep (in the browser), then open the other one,
+        or a fresh one. Each plan runs through the same checks as a saved plan. Not in Ruth's example."""
+        if self.mode == "example" or self.lock.locked():
+            self.emit({"type": "table_error", "text": "Please wait for the current answer, then switch plans."})
+            return
+        async with self.lock:
+            self.emit({"type": "plan_left", "state": self.agent.box.export()})
+            for fut in self.pending.values():
+                if not fut.done():
+                    fut.set_result(False)
+            try:
+                await self.agent.__aexit__(None, None, None)
+            except Exception:
+                pass
+            if self.share_id:   # the shared list stays, with its own plan; the page keeps its private link
+                SHARE_OWNERS.pop(self.share_id, None)
+            self.share_id = self.owner_token = self.share_expires = None
+            self.recapped, self.returning, self.ready_said, self.summary_ok, self.declined = (), False, False, False, []
+            shutil.rmtree(self.out_dir, ignore_errors=True)
+            await self.start()
+            skipped = []
+            if isinstance(saved, dict):
+                skipped = self.agent.box.restore(saved)
+                if hasattr(self.agent, "turn") and self.agent.state.items:
+                    self.agent.turn = 3
+                self.returning = True
+                self.maybe_recap()
+            self.emit({"type": "plan_opened", "fresh": not isinstance(saved, dict), "skipped": skipped})
+            self.emit({"type": "plan", "plan": self.plan()})
 
     async def stop(self):
         for fut in self.pending.values():
@@ -1050,6 +1093,10 @@ async def ws_endpoint(ws: WebSocket):
                 s.next_step_edit(str(msg.get("need", ""))[:60], str(msg.get("action", "")))
             elif msg.get("type") == "item":
                 s.answer_item(str(msg.get("need", "")), msg.get("ok") is True)
+            elif msg.get("type") == "switch_plan":
+                t = asyncio.create_task(s.switch_plan(msg.get("state")))
+                tasks.add(t)
+                t.add_done_callback(tasks.discard)
             elif msg.get("type") == "restore":
                 s.restore(msg.get("state"))
     except WebSocketDisconnect:

@@ -532,7 +532,7 @@
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg> Only if you choose</h2>
         <p>"Save my progress" keeps your plan on this device. "Share with family" saves your helper list on our server.</p>
-        <details class="more"><summary>Show details</summary><p>Saved progress holds your plan, helper table, card details, review dates, the day you started, and your last 100 chat messages. It stays in this browser. If you answer "Was this helpful?", we save only that answer and your comment: no name, no plan, and no date. Helpers' phone numbers or emails you type stay in this browser too: they are never sent to our server or shown on a shared list. My people works the same way. The names, phone numbers or emails, and invites you add there are saved only in this browser, so you can use them next time. They are never sent to our server. A shared list holds each task, date, time, and name, plus the first name you chose to show. When a helper signs up, it also holds the days and times that work for them, and their note if they add one. Your own phone number, if you add it to the link, is never saved there.</p><p>A readiness summary is made only when you ask and say yes. It is not saved, it shows helpers by first name only, and Just in Case never sends it. You choose who sees it.</p></details>
+        <details class="more"><summary>Show details</summary><p>Saved progress holds each of your plans (one for each tab), with its helper table, card details, review dates, the day you started, and your last 100 chat messages. It stays in this browser. If you answer "Was this helpful?", we save only that answer and your comment: no name, no plan, and no date. Helpers' phone numbers or emails you type stay in this browser too: they are never sent to our server or shown on a shared list. My people works the same way. The names, phone numbers or emails, and invites you add there are saved only in this browser, so you can use them next time. They are never sent to our server. A shared list holds each task, date, time, and name, plus the first name you chose to show. When a helper signs up, it also holds the days and times that work for them, and their note if they add one. Your own phone number, if you add it to the link, is never saved there.</p><p>A readiness summary is made only when you ask and say yes. It is not saved, it shows helpers by first name only, and Just in Case never sends it. You choose who sees it.</p></details>
       </div>
       <div class="about-box">
         <h2><svg class="icon" aria-hidden="true"><use href="#i-person"/></svg> Who can see it</h2>
@@ -624,6 +624,11 @@
         <a id="story-again" class="btn btn-quiet" href="/?example=1#plan"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Watch again</a>
       </div>
     </section>
+    <nav id="plan-tabs" class="plan-tabs" aria-label="Your plans" hidden>
+      <div id="plan-tab-list" class="plan-tab-list"></div>
+      <button type="button" id="plan-new" class="plan-tab plan-new"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> New plan</button>
+      <p id="plan-tab-status" class="helper-small plan-tab-status" role="status"></p>
+    </nav>
     <p class="promise" role="note">
       <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
       <span>Just in Case never sends, shares, or books anything without your OK.</span>

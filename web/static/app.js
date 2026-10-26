@@ -178,7 +178,11 @@
     try {
       // Helpers' phone numbers and emails stay on this device: they ride along in this saved copy only.
       const contactsSaved = (state.tasks || []).map((t) => contacts.get(t.id) || "");
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ at, state, history: chatHistory.slice(-100), contacts: contactsSaved }));
+      // Every plan tab is kept: this one fresh from the server, the others as they were left.
+      const all = plans.map((p, i) => (i === planAt ? { ...p, state, history: chatHistory.slice(-100), contacts: contactsSaved,
+                                                          share: shareRef(shareState) || p.share } : p));
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ at, state, history: chatHistory.slice(-100), contacts: contactsSaved,
+                                                      plans: all, planAt }));
       $("save-status").textContent = "Saved on this device, " + timeText(at) + ".";
     } catch (_) {
       $("save-status").textContent = "This browser would not save. Your plan is still here while this page is open.";
@@ -207,6 +211,10 @@
       for (const m of saved.history || []) addMessage(m.who, m.text, m.cls || undefined);
       $("starters").hidden = true; $("example-open").hidden = true;
       restoringContacts = { tasks: saved.state.tasks || [], contacts: saved.contacts || [] };
+      if (Array.isArray(saved.plans) && saved.plans.length) {   // every plan tab comes back
+        plans.splice(0, plans.length, ...saved.plans.slice(0, 12).map((p) => ({ ...blankPlan(), ...p })));
+        planAt = Math.min(Math.max(0, saved.planAt | 0), plans.length - 1);
+      }
       ws.send(JSON.stringify({ type: "restore", state: saved.state }));
       setSaving(true);
     };
@@ -783,6 +791,7 @@
 
     renderTasks(plan);
     renderShare(plan);
+    renderPlanTabs(plan);
     renderInvitePeople(); inviteWhenShared(plan);
     renderServicesOnly(plan);
     renderTimeline(plan.timeline);
@@ -1148,7 +1157,8 @@
             $("demo-icon").setAttribute("href", "#i-info");
           }
           $("table-download").href = `/table/${sessionId}.csv`;
-          setPeopleTemplate(m.people_template);   // blank wording; names are filled in here, on this device
+          setPeopleTemplate(m.people_template);
+          greetingText = m.greeting;   // blank wording; names are filled in here, on this device
           setBusy(false);
           if (!messages.children.length) addMessage("agent", m.greeting);
           if (!feed.children.length) feed.appendChild(el("li", "feed-empty", `Each step shows up here while ${AGENT} works.`));
@@ -1160,7 +1170,7 @@
         case "restored": {
           addMessage("agent", "Welcome back. Here's where we left off. What would you like to do next?");
           // Look at the shared list again for new sign-ups, with the private link this browser kept.
-          const mine = readShares(); const last = mine[mine.length - 1];
+          const mine = readShares(); const last = plans[planAt].share || (plans.length === 1 ? mine[mine.length - 1] : null);
           if (last) ws.send(JSON.stringify({ type: "share_reconnect", id: last.id, owner: last.owner }));
           if (m.skipped.length) addMessage("agent", "A few parts could not be reopened, so they were left out: " + m.skipped.join(", ") + ". We can add them again.");
           break;
@@ -1177,6 +1187,8 @@
         case "suggest": addSuggestion(m); break;
         case "timeline_error": $("timeline-error").textContent = m.text; break;
         case "plans_changed": showPlanUpdates(m); break;
+        case "plan_left": planLeft(m.state); break;
+        case "plan_opened": planOpened(m); break;
         case "thank_you": showThankYous(m); break;
         case "mode":   // today's AI limit was reached: the guided planner took over, with no outside service
           document.documentElement.dataset.ai = m.mode === "live" ? "on" : "off";
@@ -1865,6 +1877,67 @@
   $("share-stop").addEventListener("click", () => {
     if (confirm("Stop sharing? Your list will be deleted and the link will stop working.")) ws.send(JSON.stringify({ type: "share_delete" }));
   });
+
+  // ---- More than one plan: a tab for each, and "New plan" ----------------------------
+  // Each plan is kept in this page (and on this device when saving is on). Switching hands the server
+  // the other plan, which runs it through the same checks as a saved plan. Not in Ruth's example.
+  const blankPlan = () => ({ title: "", state: null, history: [], contacts: [], share: null });
+  const plans = [blankPlan()];
+  let planAt = 0, switchingTo = null, greetingText = "";
+  function shareRef(share) {
+    if (!share) return null;
+    const owner = new URLSearchParams(share.owner_url.split("?")[1] || "").get("owner");
+    return owner ? { id: share.url.split("/").pop(), owner } : null;
+  }
+  function renderPlanTabs(plan) {
+    if (plan) plans[planAt].title = plan.title || plans[planAt].title;
+    const show = !EXAMPLE && (plans.length > 1 || !!(plan && (plan.title || plan.items.length)));   // once a plan is under way
+    $("plan-tabs").hidden = !show;
+    if (!show) return;
+    $("plan-tab-list").replaceChildren(...plans.map((p, i) => {
+      const b = el("button", "plan-tab", p.title || `Plan ${i + 1}`); b.type = "button";
+      if (i === planAt) b.setAttribute("aria-current", "true");
+      b.setAttribute("aria-label", `${p.title || "Plan " + (i + 1)}${i === planAt ? ", open now" : ""}`);
+      b.onclick = () => switchPlan(i);
+      return b;
+    }));
+  }
+  function switchPlan(i) {
+    $("plan-tab-status").textContent = "";
+    if (i === planAt || switchingTo !== null || !ws || ws.readyState !== 1) return;
+    if (busy) { $("plan-tab-status").textContent = "Please wait for the current answer, then switch plans."; return; }
+    switchingTo = i;
+    ws.send(JSON.stringify({ type: "switch_plan", state: plans[i].state }));
+  }
+  $("plan-new").addEventListener("click", () => {
+    if (busy || switchingTo !== null) { $("plan-tab-status").textContent = "Please wait for the current answer, then start a new plan."; return; }
+    plans.push(blankPlan());
+    switchPlan(plans.length - 1);
+  });
+  function planLeft(state) {   // keep the plan we are leaving, then clear the screen for the next one
+    const cur = plans[planAt];
+    cur.state = state; cur.history = chatHistory.slice(-100);
+    cur.contacts = (state.tasks || []).map((t) => contacts.get(t.id) || "");
+    cur.share = shareRef(shareState) || cur.share;
+    messages.replaceChildren(); pages = []; view = 0; chatHistory.length = 0;
+    contacts.clear(); seenItems.clear(); openItems.clear(); seenTasks.clear();
+    openInvite = null; wizard = null; showTableAnyway = false; foldItems = 0; lastAgent = "";
+    for (const id of ["pc-drafts", "thanks-drafts"]) { $(id).hidden = true; $(id).replaceChildren(); }
+    feed.replaceChildren(el("li", "feed-empty", `Each step shows up here while ${AGENT} works.`));
+    planAt = switchingTo; switchingTo = null;
+    const next = plans[planAt];
+    restoringContacts = next.state ? { tasks: next.state.tasks || [], contacts: next.contacts || [] } : null;
+    for (const m of next.history || []) addMessage(m.who, m.text, m.cls || undefined);
+  }
+  function planOpened(m) {
+    const next = plans[planAt];
+    if (m.fresh) { addMessage("agent", greetingText); $("starters").hidden = false; }
+    else if (!(next.history || []).length) addMessage("agent", "Here's this plan again. What would you like to do next?");
+    if (m.skipped && m.skipped.length) addMessage("agent", "A few parts could not be reopened, so they were left out: " + m.skipped.join(", ") + ".");
+    if (next.share) ws.send(JSON.stringify({ type: "share_reconnect", id: next.share.id, owner: next.share.owner }));
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    requestSave();
+  }
 
   // ---- fridge card viewer ------------------------------------------------
   const dialog = $("card-dialog"), frame = $("card-frame");

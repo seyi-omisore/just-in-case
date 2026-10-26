@@ -2251,3 +2251,40 @@ def test_a_yes_confirms_and_a_no_says_thats_okay():
         assert news[-1]["kind"] == "declined" and news[-1]["text"].startswith("David can't help with: water the plants. That's okay.")
         ws.send_json({"type": "table", "action": "declined_ok", "row": {"id": ids[1]}})
         assert until(ws, "plan")["plan"]["whats_new"] == []
+
+
+# ---- More than one plan: tabs ----------------------------------------------------------
+
+def test_a_new_plan_tab_keeps_the_first_plan_and_switching_back_restores_it():
+    with client.websocket_connect("/ws") as ws:
+        *_, first = ruth_flow(ws)
+        assert first["title"] == "Procedure" and first["items"]
+        ws.send_json({"type": "switch_plan", "state": None})               # + New plan
+        kept = until(ws, "plan_left")["state"]
+        assert until(ws, "plan_opened")["fresh"] is True
+        fresh = until(ws, "plan")["plan"]
+        assert fresh["items"] == [] and fresh["tasks"] == [] and fresh["title"] == ""
+        ws.send_json({"type": "say", "text": "I'm going away for two weeks."})
+        approve(ws)
+        second = until(ws, "plan")["plan"]
+        assert second["title"] == "Going away"
+        ws.send_json({"type": "switch_plan", "state": kept})               # back to the first tab
+        until(ws, "plan_left")
+        assert until(ws, "plan_opened")["fresh"] is False
+        back = until(ws, "plan")["plan"]
+        assert {i["need"] for i in back["items"]} == {i["need"] for i in first["items"]}
+        assert [t["task"] for t in back["tasks"]] == [t["task"] for t in first["tasks"]]
+    js = client.get("/static/app.js").text
+    assert 'ws.send(JSON.stringify({ type: "switch_plan", state: plans[i].state }));' in js
+    assert "plans: all, planAt" in js                                       # every tab is saved, when saving is on
+    page = client.get("/").text
+    assert 'id="plan-tabs"' in page and "New plan</button>" in page
+
+
+def test_ruths_example_has_no_plan_tabs():
+    with client.websocket_connect("/ws?example=1") as ws:
+        until(ws, "hello")
+        ws.send_json({"type": "switch_plan", "state": None})
+        assert "switch plans" in until(ws, "table_error")["text"]
+    js = client.get("/static/app.js").text
+    assert "const show = !EXAMPLE &&" in js
