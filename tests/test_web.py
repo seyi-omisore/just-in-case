@@ -1163,17 +1163,17 @@ def test_the_911_and_988_bar_stays_in_sight_while_scrolling():
 
 # ---- Round 7, part 5: the tour video ---------------------------------------------------
 
-def test_about_has_a_one_minute_tour_with_captions_on_and_no_autoplay():
+def test_about_has_ruths_story_video_with_captions_on_and_no_autoplay():
     import re, pathlib
     page = client.get("/").text
     about = page[page.index('id="panel-about"'):page.index('id="panel-features"')]
     tour = about[about.index('id="tour-video"'):about.index("</section>", about.index('id="tour-video"'))]
-    assert "Watch a 1-minute tour" in tour
+    assert "Watch Ruth's story" in tour
     video = re.search(r"<video[^>]*>", tour).group(0)
     assert "controls" in video and "autoplay" not in video and 'poster="/static/img/tour-poster.jpg"' in video
     assert '<source src="/static/img/tour.mp4" type="video/mp4">' in tour
     assert '<track kind="captions" src="/static/img/tour.vtt" srclang="en" label="English" default>' in tour
-    assert 'id="tour-play"' in tour and 'id="tour-fallback"' in tour and tour.count("<li>") >= 6   # steps if the video is missing
+    assert 'id="tour-play"' in tour and 'id="tour-fallback"' in tour and tour.count("<li>") == 5   # her five moments if the video is missing
     js = client.get("/static/app.js").text
     assert 'tr.mode = "showing"' in js and "tourMissing" in js and '"Pause"' in js and ".play()" in js
     img = pathlib.Path(__file__).resolve().parent.parent / "web" / "static" / "img"
@@ -1181,7 +1181,7 @@ def test_about_has_a_one_minute_tour_with_captions_on_and_no_autoplay():
         assert (img / name).exists(), name
     assert (img / "tour.mp4").stat().st_size < 10 * 1024 * 1024
     vtt = (img / "tour.vtt").read_text()
-    assert vtt.startswith("WEBVTT") and "Tell Haven what's coming up." in vtt and "Print your fridge card." in vtt
+    assert vtt.startswith("WEBVTT") and "I live alone. Who do I ask?" in vtt and "Home safe." in vtt
     assert client.get("/static/img/tour.vtt").headers["content-type"].startswith("text/vtt")
 
 def test_the_tour_script_records_ruths_example_at_phone_size_in_light():
@@ -1222,7 +1222,7 @@ def test_the_tour_narration_uses_a_calm_premium_voice_and_a_captioned_copy_exist
     for effect in ("atempo", "asetrate", "rubberband", "loudnorm"):
         assert effect not in src, effect                                         # nothing stretches or rides the sound
     assert "Two narration lines overlap" in src and 'info.count("Audio:") == (1 if wav else 0)' in src
-    assert (root / "web" / "static" / "img" / "tour-narration.wav").exists()
+    assert 'wav = OUT / "tour-narration.wav" if clips else None' in src             # saved whenever there is narration
     assert (root / "web" / "static" / "img" / "tour-captioned.mp4").stat().st_size < 10 * 1024 * 1024
 
 
@@ -1601,15 +1601,16 @@ def test_live_agent_prepares_the_message_and_the_page_opens_send_buttons():
         assert until(ws, "activity")["text"] == "You sent a note from your own phone or email"
 
 
-def test_ruths_example_and_the_tour_video_include_the_invite_step():
+def test_the_story_video_follows_ruths_five_moments_in_her_own_words():
     import pathlib
-    js = client.get("/static/app.js").text
     script = (pathlib.Path(__file__).resolve().parent.parent / "scripts" / "make_tour_video.py").read_text()
-    assert '"Haven writes the invite. You send it."' in script
-    assert 'tour.tap("#helper-rows .invite-btn")' in script and "captions[8]" in script
-
-
-# ---- Round 11: less work after the plan --------------------------------------
+    assert 'MOMENTS = ("The call", "Telling Haven", "Haven finds help", "Friends reply", "The night before")' in script
+    for words in ("I live alone. Who do I ask?", "I didn't have to ask anyone for a big favor.",
+                  "Doris signed up for mornings", "Home safe.", "That's Ruth's story. Now make your own plan."):
+        assert words in script
+    assert "MIN_S, MAX_S = 60, 90" in script and "PART = 6.0" in script            # about 15 seconds a moment
+    assert "Cut or shorten a moment. Not saved." in script and "atempo" not in script   # never sped up
+    assert "def align(video: Path, segments, ffmpeg: str):" in script               # the edit follows the markers
 
 def test_plan_checkins_are_one_optional_repeating_calendar_event():
     page = client.get("/").text

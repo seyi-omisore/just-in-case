@@ -1953,7 +1953,7 @@
   player.querySelector("source").addEventListener("error", tourMissing);
   fetch("/static/img/tour.mp4", { method: "HEAD" }).then((r) => { if (!r.ok) tourMissing(); }).catch(() => {});
   const tourLabel = () => playBtn.replaceChildren(icon(player.paused ? "play" : "pause"), document.createTextNode(" "),
-                                                 el("span", null, player.paused ? "Play tour" : "Pause"));
+                                                 el("span", null, player.paused ? "Play Ruth's story" : "Pause"));
   playBtn.addEventListener("click", () => (player.paused ? player.play() : player.pause()));
   for (const ev of ["play", "pause", "ended"]) player.addEventListener(ev, tourLabel);
   for (const tr of player.textTracks) tr.mode = "showing";      // captions on, from the start

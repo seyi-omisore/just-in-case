@@ -86,7 +86,8 @@ Cards are saved in `output/` as printable HTML.
 
 ## Remake the tour video
 
-The About tab shows a 1-minute tour of Ruth's made-up example. After the app changes, remake it:
+The About tab shows Ruth's story: her made-up example in five moments (the call, telling Haven, Haven finds help,
+friends reply, the night before), 60 to 90 seconds, narrated in her own words. After the app changes, remake it:
 
 ```bash
 pip install -r requirements-video.txt    # once: Playwright and an ffmpeg program, inside .venv
@@ -94,10 +95,11 @@ python -m playwright install ffmpeg      # once: the small helper Playwright rec
 python scripts/make_tour_video.py        # a few minutes; add --no-voice to leave out narration
 ```
 
-It starts the app in demo mode (Light theme, phone size), plays Ruth's guided story, keeps the main
-moments, and saves `tour.mp4`, `tour.vtt` (captions), and `tour-poster.jpg` in `web/static/img/`.
+It starts the app in demo mode (Light theme, phone size), plays Ruth's story, keeps her five moments,
+and saves `tour.mp4`, `tour-captioned.mp4`, `tour.vtt` (captions), and `tour-poster.jpg` in `web/static/img/`.
+If the story would run under 60 or over 90 seconds, it stops without saving: cut a moment, never speed up the voice.
 It records with your Google Chrome, or Playwright's Chromium if Chrome is missing. On a Mac, the
-built-in voice reads each caption quietly. Only Ruth's made-up details appear in the video.
+built-in voice (Ava, Premium, when installed) reads each caption calmly. Only Ruth's made-up details appear in the video.
 
 ## Built with
 

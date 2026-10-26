@@ -1,4 +1,4 @@
-"""Make the 1-minute tour video of Ruth's example. Ruth is made up: no real people appear.
+"""Make the story video of Ruth's example, in her five moments. Ruth is made up: no real people appear.
 
 Run, after the app changes:   python scripts/make_tour_video.py
 Needs (once):                 pip install -r requirements-video.txt
@@ -6,8 +6,8 @@ Records with Google Chrome if you have it, or Playwright's Chromium.
 Narration uses the Mac's built-in voices (say): Ava (Premium) if it is installed, then Zoe (Premium),
 then the best other English voice. Add --no-voice to leave it out.
 
-It starts the app in demo mode, plays Ruth's guided story at phone size inside a
-phone frame, keeps only the main moments, and writes into web/static/img/:
+It starts the app in demo mode, plays Ruth's story at phone size inside a phone frame,
+keeps only her five moments (60 to 90 seconds, about 15 each), and writes into web/static/img/:
     tour.mp4          the video, under 10 MB
     tour.vtt          the captions, with their timings
     tour-poster.jpg   the opening screen, shown before the video plays
@@ -32,18 +32,29 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "web" / "static" / "img"
 W, H = 480, 1040            # the recording page: the phone, with a caption area underneath
 PHONE_W, PHONE_H = 390, 844
-HOLD = 2.6                  # seconds on each main moment
+HOLD = 2.6                  # seconds for a short look
 MAX_MB = 10
-BRIDGE = 1.3                # seconds on each step between the main moments, so no step is skipped
+PART = 6.0                  # each caption stays on screen at least this long (two captions make a moment, about 15 seconds)
+LAST = 4.0                  # the closing line
+MIN_S, MAX_S = 60, 90       # the story video's length. If it runs long, cut a moment: never speed up the voice.
 # Calm and warm, like the app's Read aloud: the most natural voice first.
 VOICES = ("Ava (Premium)", "Zoe (Premium)", "(Premium)", "(Enhanced)", "Moira", "Tessa", "Samantha", "Daniel")
 SPEED = 0.9                 # about 90% of the voice's usual pace, set with the voice's own rate (never stretched after)
 PAUSE = 0.4                 # seconds of quiet between sentences
 AUDIO_RATE = 48000          # Hz, for the narration file and the video
-CAPTIONS = ["Meet Haven, your planning helper.", "Tell Haven what's coming up.", "Answer one question at a time.",
-            "Your plan builds as you go.", "Haven writes the invite. You send it.",
-            "Friends pick what fits. Haven tells you.", "Do one next step at a time.", "Print your fridge card.",
-            "Share a summary, if you choose.", "Plan today. Rest easier tomorrow."]
+# Ruth's five moments, in her own words: these are both the narration and the captions.
+MOMENTS = ("The call", "Telling Haven", "Haven finds help", "Friends reply", "The night before")
+CAPTIONS = ["My doctor says I need a procedure next month, and someone has to drive me home.",       # 1 The call
+            "I live alone. Who do I ask?",
+            "So I told Haven what was coming up.",                                                   # 2 Telling Haven
+            "It asked me one thing at a time. I just answered.",
+            "It found a free escort service, a key lockbox, and my neighbor Doris for Fifi.",        # 3 Haven finds help
+            "I didn't have to ask anyone for a big favor.",
+            "Doris signed up for mornings, and Haven told me in What's new.",                        # 4 Friends reply
+            "Then I printed my fridge card.",
+            "The night before, Haven showed me who is doing what.",                                  # 5 The night before
+            "Home safe. Haven wrote a thank-you note to Doris.",
+            "That's Ruth's story. Now make your own plan."]
 # Burned-in captions for tour-captioned.mp4: dark bold words in the caption area under the phone.
 # ffmpeg sizes captions on a 288-pixel-tall canvas, so pixel sizes are scaled to it.
 _PX = 288 / H
@@ -51,7 +62,7 @@ CAPTION_STYLE = (f"FontName=Verdana,FontSize={22 * _PX:.1f},Bold=1,PrimaryColour
                  f"Shadow=0,Alignment=2,MarginV={round(44 * _PX)}")
 
 FRAME = """<!doctype html><html><head><meta charset="utf-8"><style>
-  html, body { margin: 0; height: 100%; background: #EDE8E1; font-family: "Atkinson Hyperlegible", Verdana, sans-serif; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #EDE8E1; font-family: "Atkinson Hyperlegible", Verdana, sans-serif; }
   .stage { position: relative; width: __W__px; height: __H__px; }
   .phone { position: absolute; left: 33px; top: 22px; width: __PW__px; height: __PH__px; border: 12px solid #1F2933;
            border-radius: 46px; overflow: hidden; background: #F7F5F2; box-shadow: 0 18px 40px rgba(31, 41, 51, .18); }
@@ -67,9 +78,14 @@ FRAME = """<!doctype html><html><head><meta charset="utf-8"><style>
   .tap.show { opacity: 1; transform: scale(1); }
 </style></head><body><div class="stage">
   <div class="phone"><iframe id="app" src="__APP__" title="Just in Case, Ruth's example"></iframe></div>
-  <div class="caption-area"><div class="dots" id="dots"></div><div>Ruth's example. A made-up story.</div></div>
+  <div class="caption-area"><div class="dots" id="dots"></div><div>Ruth is an example. A made-up story.</div></div>
   <div class="tap" id="tap"></div>
+  <div id="mark" style="position:fixed; right:0; bottom:0; width:12px; height:12px; background:#EDE8E1"></div>
 </div><script>
+  // The app's own scrolling can move this outer page too (scrollIntoView reaches every frame). Keep it still.
+  addEventListener("scroll", () => { if (scrollX || scrollY) scrollTo(0, 0); });
+  // A small colored square marks each caption's start in the recording, so the edit lines up with what was on screen.
+  function mark(i) { document.getElementById("mark").style.background = i < 0 ? "#EDE8E1" : (i % 2 ? "#0000FF" : "#FF0000"); }
   function showTap(x, y) { const t = document.getElementById("tap"); t.style.left = x + "px"; t.style.top = y + "px";
     t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 900); }
   function dots(n, on) { document.getElementById("dots").innerHTML = Array.from({ length: n }, (_, i) => `<i class="${i === on ? "on" : ""}"></i>`).join(""); }
@@ -122,20 +138,24 @@ class Tour:
     def now(self) -> float:
         return time.monotonic() - self.t0
 
-    def moment(self, caption: str):
+    def moment(self, caption: str, dot: int):
+        """One caption on camera. It stays until its narration ends, and at least PART seconds (LAST for the end)."""
         tour = self
 
         class Moment:
             def __enter__(self):
-                tour.page.evaluate("([n, on]) => dots(n, on)", [tour.steps, sum(1 for s in tour.segments if s[2])])
+                tour.page.evaluate("([n, on]) => dots(n, on)", [tour.steps, dot])
+                tour.page.evaluate("i => mark(i)", len(tour.segments))
                 self.start = tour.now()
                 tour.mark_seen()
 
             def __exit__(self, *exc):
-                left = tour.speech.get(caption, 0) + 0.9 - (tour.now() - self.start)
+                least = LAST if caption == CAPTIONS[-1] else PART
+                left = max(tour.speech.get(caption, 0) + 0.9, least) - (tour.now() - self.start)
                 if left > 0:
                     tour.hold(left)
                 tour.segments.append((self.start, tour.now(), caption))
+                tour.page.evaluate("mark(-1)")
                 tour.mark_seen()
         return Moment()
 
@@ -145,23 +165,10 @@ class Tour:
             label = self.story_step()
         except Exception:
             return None
-        if "step" not in label or label in self.seen:
+        if " of " not in label or label in self.seen:
             return None
         self.seen.append(label)
         return label
-
-    def snap(self, seconds: float = BRIDGE, wait: float = 0):
-        """If the story moved to a step the video has not shown yet, keep it on screen for a moment (no narration).
-        `wait`: how long to give the story to move on first (after a dialog closes, it takes a moment)."""
-        end = time.monotonic() + wait
-        new = self.mark_seen()
-        while not new and time.monotonic() < end:
-            self.page.wait_for_timeout(150)
-            new = self.mark_seen()
-        if new:
-            start = self.now()
-            self.hold(seconds)
-            self.segments.append((start, self.now(), ""))
 
     def hold(self, seconds: float = HOLD):
         self.page.wait_for_timeout(int(seconds * 1000))
@@ -197,34 +204,17 @@ class Tour:
         if target.is_visible():      # Ruth's example may have tapped her first sentence by itself already
             target.click()
 
-    def yes_until(self, done: str, timeout: float = 60):
-        """Tap the ringed Yes on each checkpoint until `done` (a selector) shows. Not part of the video."""
-        end = time.monotonic() + timeout
-        while time.monotonic() < end:
-            shown = self.app.locator(done).first
-            if shown.count() and shown.evaluate("e => !e.hidden"):   # it may sit in a closed drop-down section
-                return
-            ring = self.app.locator(".slip-actions .btn-primary.story-next")
-            if ring.count() and ring.first.is_visible():
-                ring.first.click()
-                self.page.wait_for_timeout(500)
-                self.snap()
-            self.page.wait_for_timeout(300)
-        raise TimeoutError(f"the story never showed {done}")
-
-    def story_next(self):
-        self.app.locator("#story-next").wait_for(state="visible", timeout=30000)
-        self.app.locator("#story-next").click()
-        self.page.wait_for_timeout(300)
-        self.snap()
-
     def story_step(self) -> str:
         return self.app.locator("#story-count").inner_text().lower()
 
     def close_tags(self):
         """Fold the plan items back up, so their details (and service numbers) stay off screen."""
-        for head in self.app.locator('.tag-head[aria-expanded="true"]').all():
-            head.click()
+        for _ in range(12):   # the plan redraws after each tap, so look again each time
+            open_heads = self.app.locator('.tag-head[aria-expanded="true"]')
+            if not open_heads.count():
+                break
+            open_heads.first.click()
+            self.page.wait_for_timeout(150)
 
 
 def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[tuple[float, float, str]]]:
@@ -244,100 +234,110 @@ def record(base: str, work: Path, speech: dict[str, float]) -> tuple[Path, list[
         context.add_init_script(f"""if (location.origin === {json.dumps(base)}) {{
             localStorage.setItem("jic-theme-v2", "light"); localStorage.setItem("jic-tour-done", "1"); }}""")
         page = context.new_page()
-        tour = Tour(page, len(captions), speech)
+        tour = Tour(page, len(MOMENTS), speech)
         page.goto(frame.as_uri())
-        tour.wait(".starter")
+        tour.wait("#story-guide")
+        app = tour.app
 
-        with tour.moment(captions[0]):            # Haven's greeting
-            tour.hold(2.4)
-        with tour.moment(captions[1]):            # choosing the ride-home situation
-            tour.tap(".starter")
-            tour.wait(".slip-actions .btn-primary")
-            tour.hold(1.6)
-        with tour.moment(captions[2]):            # one question
-            tour.tap(".slip-actions .btn-primary")
-            tour.app.get_by_text("comfortable asking").first.wait_for(timeout=20000)
-            tour.hold()
-        tour.yes_until("#card-link")              # Ruth's answers and the other checkpoints, off camera
-        while "step 4 of" not in tour.story_step():
-            tour.story_next()
-        tour.app.locator(".story-next").first.click()   # her yes to the ride home
-        tour.page.wait_for_timeout(400)
-        tour.snap()
-        tour.wait("#ride-scene")
-        tour.close_tags()
-        with tour.moment(captions[3]):            # the plan and its timeline: the car drives to the house
-            tour.calm_scroll("#ride-scene")
-            tour.hold(3.2)
-        tour.story_next(); tour.story_next()       # past the timeline and helper steps
-        tour.calm_scroll("#helper-rows .invite-btn")
-        tour.tap("#helper-rows .invite-btn")          # Ruth taps Invite (the soft circle shows the tap)
-        tour.wait("#helper-rows .invite-panel")
-        with tour.moment(captions[4]):            # Invite: Haven drafts it, Ruth sends it from her own phone
-            tour.app.locator("#helper-rows .invite-panel textarea").first.evaluate(
-                "e => { e.scrollIntoView({ block: 'start' }); window.scrollBy({ top: -150, behavior: 'smooth' }); }")
-            tour.hold(3.4)
-        tour.app.locator("#helper-rows .invite-panel .btn-quiet.btn-small").click()   # close it, off camera
-        tour.story_next()                          # My people: Doris and Leo, each with a saved invite
-        tour.story_next()                          # two tasks her people could help with
-        tour.story_next()                          # Invite my people, one person at a time
-        while "invite my people" in tour.app.locator("#story-text").inner_text().lower():
-            tour.app.locator(".story-next").first.click()   # each tap, off camera: share, send, "Yes, I sent it", next
-            page.wait_for_timeout(700)
-        tour.snap(wait=1.5)                        # Leo and Doris answer on her shared list
-        tour.story_next()
-        with tour.moment(captions[5]):            # What's new: who can help, and a time that doesn't fit
-            tour.calm_scroll("#whats-new")
+        def story_next():
+            """The story's own Next, off camera between captions."""
+            app.locator("#story-next").wait_for(state="visible", timeout=30000)
+            end = time.monotonic() + 60
+            while not app.locator("#story-next").is_enabled():
+                if time.monotonic() > end:
+                    raise TimeoutError("the story's Next never opened at: " + app.locator("#story-count").inner_text()
+                                       + " / " + app.locator("#story-text").inner_text())
+                page.wait_for_timeout(200)
+            app.locator("#story-next").click()
+            page.wait_for_timeout(500)
+
+        def tap_ring(wait: float = 20):
+            """Tap the button the story rings (the soft circle shows the tap)."""
+            app.locator(".story-next").first.wait_for(state="visible", timeout=wait * 1000)
+            tour.tap(".story-next")
+            page.wait_for_timeout(500)
+
+        def taps_until_next(timeout: float = 90):
+            """Off camera: tap each ringed button until the story's Next opens. Closes the card if it opens."""
+            end = time.monotonic() + timeout
+            page.wait_for_timeout(700)                   # let the story catch up first
+            while time.monotonic() < end:
+                if app.locator("#card-dialog[open]").count():
+                    app.locator("#card-close").click()
+                if app.locator("#story-next").is_enabled():
+                    return
+                ring = app.locator(".story-next")
+                if ring.count() and ring.first.is_visible():
+                    ring.first.click()
+                    page.wait_for_timeout(600)
+                page.wait_for_timeout(250)
+            raise TimeoutError("the story never moved on")
+
+        # 1 The call: her doctor's words, over the hello screen.
+        with tour.moment(captions[0], 0):
+            tour.hold(1.5)
+        with tour.moment(captions[1], 0):
+            tour.hold(1.0)
+        story_next()
+        # 2 Telling Haven: she sends her first words and answers one question.
+        with tour.moment(captions[2], 1):
             tour.hold(3.0)
-        tour.story_next()                          # Leo's time fits
-        tour.tap("#whats-new .news-helping .btn-primary")   # she marks his ride as confirmed
-        page.wait_for_timeout(700)
-        tour.snap(wait=1.5)
-        with tour.moment(captions[6]):            # the Next step card
-            tour.calm_scroll("#next-step")
-            tour.hold(1.4)
-            tour.tap("#next-done")
-            tour.hold(1.4)
-        while tour.app.locator(".tag-answer .btn-primary").count():   # yes to the rest, off camera
-            tour.app.locator(".story-next").first.click()
-            page.wait_for_timeout(600)
-            tour.snap()
+            tap_ring()                                   # Send: "I have a procedure coming up..."
+            app.locator(".slip-actions .btn-primary").first.wait_for(timeout=20000)
+        with tour.moment(captions[3], 1):
+            tap_ring()                                   # yes to the list
+            app.get_by_text("comfortable asking").first.wait_for(timeout=20000)
+            page.wait_for_timeout(1200)
+            tap_ring()                                   # her answer: "Yes, I could ask Doris, my neighbor."
+        taps_until_next()                                # the rest of her answers, off camera
+        story_next()
+        # 3 Haven finds help: she says yes to each part.
+        with tour.moment(captions[4], 2):
+            tour.hold(0.8)
+            tap_ring()
+        with tour.moment(captions[5], 2):
+            while app.locator(".tag-answer").count():
+                tap_ring()
         tour.close_tags()
-        tour.story_next(); tour.story_next(); tour.story_next()   # "Why this?", "What needs attention", then the fridge card step
-        with tour.moment(captions[7]):            # the fridge card
-            tour.tap("#card-link")
+        story_next()
+        page.wait_for_timeout(600)
+        tap_ring()                                       # off camera: Share with family...
+        app.locator("#consent-dialog[open]").wait_for(timeout=20000)
+        app.locator("#consent-yes").click()              # ...and her yes in the consent box
+        app.locator("#whats-new .news-helping").first.wait_for(timeout=30000)   # then Doris answers on the shared list
+        page.wait_for_timeout(800)
+        # 4 Friends reply: What's new, then her fridge card.
+        with tour.moment(captions[6], 3):
+            tour.hold(1.0)
+        story_next()
+        with tour.moment(captions[7], 3):
+            tap_ring()                                   # See your fridge card
             tour.wait("#card-dialog[open]")
-            tour.hold(1.4)
+            tour.hold(1.6)
             card = next(f for f in page.frames if "/card/" in f.url)
             card.wait_for_load_state()
-            card.evaluate("window.scrollTo({ top: 380, behavior: 'smooth' })")   # down to her allergies and papers
-            tour.hold(1.8)
-        tour.app.locator("#card-close").click()
-        tour.snap(wait=2)                          # the wallet card step
-        tour.story_next(); tour.story_next()       # the night-before preview, then the readiness summary step
-        with tour.moment(captions[8]):            # the readiness summary
-            tour.tap("#summary-print")
-            tour.wait("#summary-dialog[open]")
-            tour.hold(1.2)
-            tour.tap("#summary-yes")
-            tour.wait("#card-dialog[open]")
-            tour.hold(2.2)
-        tour.app.locator("#card-close").click()
-        tour.snap(wait=2)                          # "My plans changed"
-        tour.story_next()                          # her last step: marking the plan reviewed
-        tour.reveal("#review-mark")
-        tour.app.locator("#review-mark").click()
+            card.evaluate("window.scrollTo({ top: 380, behavior: 'smooth' })")
+        app.locator("#card-close").click()
+        page.wait_for_timeout(400)
+        story_next()
+        # 5 The night before: the calm summary, then home safe and a thank-you note.
+        with tour.moment(captions[8], 4):
+            tour.hold(1.0)
+        story_next()
+        with tour.moment(captions[9], 4):
+            tour.hold(1.0)
+        story_next()
         tour.wait("#story-own")
-        with tour.moment(captions[9]):            # the end of Ruth's story
-            tour.wait("#ready-ill")
-            tour.calm_scroll("#ready-ill")
-            tour.hold(2.4)
-        shown = [int(re.search(r"step (\d+) of", label).group(1)) for label in tour.seen]
-        total = int(re.search(r"of (\d+)", tour.seen[0]).group(1))
-        if shown != list(range(1, total + 1)):
-            missing = sorted(set(range(1, total + 1)) - set(shown))
-            sys.exit(f"The video would skip Ruth's example steps {missing} (it shows {shown}). Not saved.")
-        print(f"Every step of Ruth's example is shown, in order: 1 to {total}.")
+        with tour.moment(captions[10], 4):               # "That's Ruth's story. Now make your own plan."
+            tour.hold(1.0)
+        moments = sorted({int(re.match(r"(\d+) of", label).group(1)) for label in tour.seen if re.match(r"\d+ of", label)})
+        if moments != list(range(1, len(MOMENTS) + 1)):
+            sys.exit(f"The video would skip Ruth's moments {sorted(set(range(1, 6)) - set(moments))}. Not saved.")
+        total = sum(b - a for a, b, _ in tour.segments)
+        if not MIN_S <= total <= MAX_S:
+            sys.exit(f"The story would run {total:.0f} seconds (it should be {MIN_S} to {MAX_S}). Cut or shorten a moment. Not saved.")
+        print(f"All five of Ruth's moments are shown, in order, in {total:.0f} seconds.")
+        tour.hold(6)   # the browser's recording can run behind: give it time to catch up before it closes
         video = Path(page.video.path())
         context.close()
         browser.close()
@@ -401,6 +401,25 @@ def narrate(clips, total: float, ffmpeg: str, out: Path) -> None:
     raw.unlink()
 
 
+MARK = 12   # pixels: the marker square in the bottom-right corner of the recording
+
+
+def align(video: Path, segments, ffmpeg: str):
+    """Find where each caption really starts in the recording, from its marker square. The browser's recording can
+    run a few seconds behind the script's clock, so times from the clock alone could show the wrong screen."""
+    fps = 50
+    raw = subprocess.run([ffmpeg, "-loglevel", "error", "-i", str(video), "-vf",
+                          f"fps={fps},crop=6:6:iw-9:ih-9,scale=1:1:flags=area", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                         capture_output=True, check=True).stdout
+    pixels = [tuple(raw[k:k + 3]) for k in range(0, len(raw) - 2, 3)]
+    # Each caption turns the square red or blue (taking turns), and it goes back to the page color in between.
+    kind = ["red" if r > g + 80 and r > bl + 80 else "blue" if bl > r + 80 and bl > g + 80 else "off" for r, g, bl in pixels]
+    starts = [k for k in range(1, len(kind)) if kind[k] != "off" and kind[k] != kind[k - 1]]
+    if len(starts) < len(segments):
+        sys.exit(f"Found {len(starts)} of {len(segments)} caption starts in the recording. Not saved.")
+    return [(starts[i] / fps, starts[i] / fps + (b - a), text) for i, (a, b, text) in enumerate(segments)]
+
+
 def make(segments, video: Path, narration: Path | None, ffmpeg: str, crf: int, out: Path) -> None:
     """Keep only the main moments, with a quick cross-dissolve between them (no blank flash), and add the narration track as it is."""
     parts, inputs = [], ["-i", str(video)]
@@ -409,7 +428,8 @@ def make(segments, video: Path, narration: Path | None, ffmpeg: str, crf: int, o
     for i, (a, b, _) in enumerate(segments):
         lead_i = 0.0 if i == 0 else min(lead, a)
         leads.append(lead_i)
-        parts.append(f"[0:v]trim=start={a - lead_i:.3f}:end={b:.3f},setpts=PTS-STARTPTS,fps=30,format=yuv420p[c{i}]")
+        parts.append(f"[0:v]trim=start={a - lead_i:.3f}:end={b:.3f},setpts=PTS-STARTPTS,fps=30,"
+                     f"drawbox=x=iw-{MARK}:y=ih-{MARK}:w={MARK}:h={MARK}:color=0xEDE8E1@1:t=fill,format=yuv420p[c{i}]")
     shown, last = 0.0, "c0"
     for i in range(1, len(segments)):
         shown += segments[i - 1][1] - segments[i - 1][0]
@@ -464,6 +484,7 @@ def main() -> None:
             speech = {text: (c[-1][1] + c[-1][2]) for text, c in spoken.items()}
             print(f"Recording Ruth's example (narration: {voice or 'none'})...")
             video, segments = record(base, work, speech)
+            segments = align(video, segments, ffmpeg)
             starts, t = [], 0.0
             for a, b, _ in segments:
                 starts.append(t)
