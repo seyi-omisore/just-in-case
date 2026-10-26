@@ -459,8 +459,10 @@ def make(segments, video: Path, narration: Path | None, ffmpeg: str, crf: int, o
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--voice", help='narrator, for example --voice "Shelley (English (US))" (see: say -v ?)')
+    ap.add_argument("--speed", type=float, default=SPEED, help="narration pace as a share of the voice's usual speed (default %(default)s; 1.0 is lively)")
     ap.add_argument("--no-voice", action="store_true", help="leave out the spoken narration")
     args = ap.parse_args()
+    globals()["SPEED"] = args.speed
     ffmpeg = ffmpeg_exe()
     voice = None if args.no_voice else pick_voice(args.voice)
     if args.voice and not args.no_voice and not voice:
